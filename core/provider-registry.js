@@ -263,8 +263,10 @@ import { xaiPlugin } from "../lib/providers/xai.js";
 import { dashscopeCodingPlugin } from "../lib/providers/dashscope-coding.js";
 import { kimiCodingPlugin } from "../lib/providers/kimi-coding.js";
 import { volcegineCodingPlugin } from "../lib/providers/volcengine-coding.js";
+import { agentryBridgePlugin } from "../lib/providers/agentry-bridge.js";
 
 const BUILTIN_PLUGINS = [
+  agentryBridgePlugin,
   dashscopePlugin,
   openaiPlugin,
   anthropicPlugin,
