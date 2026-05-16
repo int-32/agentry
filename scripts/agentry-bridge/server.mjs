@@ -54,6 +54,49 @@ function writeDelta(res, id, model, content) {
   res.write(`data: ${JSON.stringify(chunk)}\n\n`);
 }
 
+// reasoning_content 增量 — Pi SDK / openai-completions 解析为 thinking 块
+function writeReasoning(res, id, model, reasoning) {
+  const chunk = {
+    id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model,
+    choices: [{ index: 0, delta: { reasoning_content: reasoning }, finish_reason: null }],
+  };
+  res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+}
+
+// 一次性发送一条完整的 tool_call（id/name/arguments 同包）
+// idx 为 OpenAI tool_calls 数组下标，需在同一 turn 内单调递增
+function writeToolCall(res, id, model, idx, callId, name, argsObj) {
+  const chunk = {
+    id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model,
+    choices: [{
+      index: 0,
+      delta: {
+        tool_calls: [{
+          index: idx,
+          id: callId,
+          type: "function",
+          function: { name, arguments: JSON.stringify(argsObj ?? {}) },
+        }],
+      },
+      finish_reason: null,
+    }],
+  };
+  res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+}
+
+// 工具结果 — OpenAI 流协议无原生承载，妥协方案：以可折叠之 markdown 块作 text delta 透出
+// 后续如 Hanako 支持自定义协议扩展可改为 structural delta
+function writeToolResultBlock(res, id, model, toolName, callId, payload) {
+  const text = typeof payload === "string" ? payload : safeStringify(payload);
+  const preview = text.length > 4000 ? text.slice(0, 4000) + "\n…（截断）" : text;
+  const header = `\n\n<details><summary>tool_result · ${toolName}${callId ? ` (${callId.slice(0, 8)})` : ""}</summary>\n\n\`\`\`\n${preview}\n\`\`\`\n\n</details>\n`;
+  writeDelta(res, id, model, header);
+}
+
+function safeStringify(v) {
+  try { return JSON.stringify(v, null, 2); } catch { return String(v); }
+}
+
 function writeDone(res, id, model, finishReason = "stop", usage = null) {
   const chunk = {
     id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model,
@@ -66,16 +109,42 @@ function writeDone(res, id, model, finishReason = "stop", usage = null) {
 }
 
 // ── Claude SDK ──
+// 透传：
+//   assistant.text       → delta.content
+//   assistant.thinking   → delta.reasoning_content
+//   assistant.tool_use   → delta.tool_calls[{ id, type:"function", function:{name, arguments} }]
+//   user.tool_result     → 以 <details> 块作 text 透出（OpenAI 流协议无原生承载）
 async function streamClaude({ res, id, model, prompt }) {
   const stream = claudeQuery({ prompt, options: {} });
   let usage = null;
+  let toolCallIdx = 0;
+  const toolNameById = new Map(); // id → name，用于 tool_result 时回查
   for await (const msg of stream) {
     if (msg.type === "assistant" && msg.message?.content) {
       for (const block of msg.message.content) {
         if (block.type === "text" && block.text) {
           writeDelta(res, id, model, block.text);
+        } else if (block.type === "thinking" && block.thinking) {
+          writeReasoning(res, id, model, block.thinking);
+        } else if (block.type === "tool_use") {
+          toolNameById.set(block.id, block.name);
+          writeToolCall(res, id, model, toolCallIdx++, block.id, block.name, block.input ?? {});
         }
-        // tool_use / thinking 暂忽略（后续可改为 OpenAI tool_calls 字段透传）
+      }
+    } else if (msg.type === "user" && msg.message?.content) {
+      const content = Array.isArray(msg.message.content) ? msg.message.content : [];
+      for (const block of content) {
+        if (block.type === "tool_result") {
+          const name = toolNameById.get(block.tool_use_id) || "tool";
+          // tool_result.content 可能是 string 或 content blocks 数组
+          let payload = block.content;
+          if (Array.isArray(payload)) {
+            payload = payload
+              .map(b => b.type === "text" ? b.text : safeStringify(b))
+              .join("\n");
+          }
+          writeToolResultBlock(res, id, model, name, block.tool_use_id, payload);
+        }
       }
     } else if (msg.type === "result") {
       usage = msg.usage || null;
@@ -89,6 +158,14 @@ async function streamClaude({ res, id, model, prompt }) {
 }
 
 // ── Codex SDK ──
+// 透传：
+//   item.updated/agent_message  → delta.content（增量切片）
+//   item.completed/reasoning    → delta.reasoning_content
+//   item.completed/command_execution → tool_call name="bash" args={ command, exit_code, output? }
+//   item.completed/file_change       → tool_call name="edit" args={ changes }
+//   item.completed/mcp_tool_call     → tool_call name="<server>/<tool>" args=arguments
+//                                       + tool_result block
+//   item.completed/web_search        → tool_call name="web_search" args={ query }
 async function streamCodex({ res, id, model, prompt }) {
   const codex = new Codex();
   const thread = codex.startThread({ sandboxMode: "read-only", skipGitRepoCheck: true, approvalPolicy: "never" });
@@ -96,17 +173,47 @@ async function streamCodex({ res, id, model, prompt }) {
 
   let lastText = "";
   let usage = null;
+  let toolCallIdx = 0;
   for await (const evt of streamed.events) {
     if (evt.type === "item.updated" && evt.item.type === "agent_message") {
       const cur = evt.item.text || "";
       const delta = cur.slice(lastText.length);
       if (delta) writeDelta(res, id, model, delta);
       lastText = cur;
-    } else if (evt.type === "item.completed" && evt.item.type === "agent_message") {
-      const cur = evt.item.text || "";
-      const delta = cur.slice(lastText.length);
-      if (delta) writeDelta(res, id, model, delta);
-      lastText = cur;
+    } else if (evt.type === "item.completed") {
+      const item = evt.item;
+      if (item.type === "agent_message") {
+        const cur = item.text || "";
+        const delta = cur.slice(lastText.length);
+        if (delta) writeDelta(res, id, model, delta);
+        lastText = cur;
+      } else if (item.type === "reasoning") {
+        if (item.text) writeReasoning(res, id, model, item.text);
+      } else if (item.type === "command_execution") {
+        writeToolCall(res, id, model, toolCallIdx++, item.id, "bash", {
+          command: item.command,
+          exit_code: item.exit_code,
+          status: item.status,
+        });
+        if (item.aggregated_output) {
+          writeToolResultBlock(res, id, model, "bash", item.id, item.aggregated_output);
+        }
+      } else if (item.type === "file_change") {
+        writeToolCall(res, id, model, toolCallIdx++, item.id, "edit", {
+          changes: item.changes,
+          status: item.status,
+        });
+      } else if (item.type === "mcp_tool_call") {
+        const callName = `${item.server}/${item.tool}`;
+        writeToolCall(res, id, model, toolCallIdx++, item.id, callName, item.arguments ?? {});
+        if (item.result) {
+          writeToolResultBlock(res, id, model, callName, item.id, item.result);
+        } else if (item.error) {
+          writeToolResultBlock(res, id, model, callName, item.id, `error: ${item.error.message}`);
+        }
+      } else if (item.type === "web_search") {
+        writeToolCall(res, id, model, toolCallIdx++, item.id, "web_search", { query: item.query });
+      }
     } else if (evt.type === "turn.completed") {
       usage = evt.usage;
     }
@@ -119,6 +226,11 @@ async function streamCodex({ res, id, model, prompt }) {
 }
 
 // ── Gemini CLI spawn ──
+// 透传：
+//   { type:"message", role:"assistant", content, delta:true }   → delta.content
+//   { type:"tool_use", tool_name, tool_id, parameters }         → tool_call
+//   { type:"tool_result", tool_id, status, output, error }      → tool_result block
+//   { type:"result", stats }                                    → usage
 async function streamGemini({ res, id, model, prompt }) {
   return new Promise((resolve) => {
     const child = spawn(
@@ -128,14 +240,23 @@ async function streamGemini({ res, id, model, prompt }) {
     );
     const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
     let usage = null;
+    let toolCallIdx = 0;
+    const toolNameById = new Map();
     rl.on("line", (line) => {
       if (!line.trim()) return;
       let evt;
       try { evt = JSON.parse(line); } catch { return; }
-      // Gemini stream-json: { type: "message", role: "assistant"|"user", content: "...", delta: true }
       if (evt.type === "message" && evt.role === "assistant" && typeof evt.content === "string") {
-        // delta:true 表示增量，直接累加
         if (evt.content) writeDelta(res, id, model, evt.content);
+      } else if (evt.type === "tool_use" && evt.tool_id) {
+        toolNameById.set(evt.tool_id, evt.tool_name);
+        writeToolCall(res, id, model, toolCallIdx++, evt.tool_id, evt.tool_name || "tool", evt.parameters ?? {});
+      } else if (evt.type === "tool_result" && evt.tool_id) {
+        const name = toolNameById.get(evt.tool_id) || "tool";
+        const payload = evt.status === "error"
+          ? `[error] ${evt.error?.message || evt.output || ""}`
+          : (evt.output ?? "");
+        writeToolResultBlock(res, id, model, name, evt.tool_id, payload);
       } else if (evt.type === "result" && evt.stats) {
         usage = evt.stats;
       }
