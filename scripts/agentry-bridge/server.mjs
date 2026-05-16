@@ -137,8 +137,19 @@ function writeDone(res, id, model, finishReason = "stop", usage = null) {
 //   assistant.tool_use   → markdown 头 "▸ <name>(args)"（不发 delta.tool_calls，避免 Hanako 重执行死循环）
 //   user.tool_result     → markdown fenced code block
 async function streamClaude({ res, id, model, prompt, systemPrompt }) {
-  // Claude SDK Options.systemPrompt 接受 string；非空时覆盖 claude_code preset
-  const options = systemPrompt ? { systemPrompt } : {};
+  // Claude SDK 隔离配置：
+  //   - settingSources: [] —— 禁加载 ~/.claude/settings.json + project/.claude/settings.json
+  //     避免本机 CC session 之 SessionStart hook（persona-inject 等）污染 bridge 子进程之 persona
+  //   - systemPrompt 接受 string；非空时覆盖 claude_code preset，纯由 Hanako 注入之 persona 定调
+  //   - disallowedTools 屏蔽交互式 UI 工具（AskUserQuestion / ExitPlanMode）。bridge 之 ④ 仅作
+  //     markdown 文本透传，无 GUI prompt 通道；若 agent 调 AskUserQuestion，raw call 会作 markdown
+  //     落 Hanako 对话页，陛下无法用 GUI 答 — UX 错位。屏蔽后 agent 改在 text 内列选项让陛下下条
+  //     message 答（兼容 GUI 单文本输入框）
+  const options = {
+    settingSources: [],
+    disallowedTools: ["AskUserQuestion", "ExitPlanMode"],
+  };
+  if (systemPrompt) options.systemPrompt = systemPrompt;
   const stream = claudeQuery({ prompt, options });
   let usage = null;
   const toolNameById = new Map();
@@ -244,12 +255,13 @@ async function streamCodex({ res, id, model, prompt, systemPrompt }) {
 //   { type:"tool_result", tool_id, status, output, error }      → tool_result block
 //   { type:"result", stats }                                    → usage
 async function streamGemini({ res, id, model, prompt, systemPrompt }) {
-  // gemini CLI 无 --system flag，把 systemPrompt prepend 到 -p prompt
+  // gemini CLI 无 --system flag，把 systemPrompt prepend 到 -p prompt。
+  // --approval-mode yolo：bridge 无 GUI 接通道，缺省 default 模式会等用户确认致流挂死
   const finalPrompt = composeForNoSystemBackend(systemPrompt, prompt);
   return new Promise((resolve) => {
     const child = spawn(
       "gemini",
-      ["-p", finalPrompt, "-o", "stream-json"],
+      ["-p", finalPrompt, "-o", "stream-json", "--approval-mode", "yolo"],
       { stdio: ["ignore", "pipe", "pipe"], env: process.env }
     );
     const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
