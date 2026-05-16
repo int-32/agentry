@@ -33,16 +33,40 @@ function routeBackend(model) {
   return "claude";
 }
 
-// ── 提取最后一条 user message 作 prompt（最简语义；后续可改成完整 messages 透传）──
-function extractPrompt(messages) {
-  if (!Array.isArray(messages)) return "";
-  const lastUser = [...messages].reverse().find(m => m.role === "user");
-  if (!lastUser) return "";
-  if (typeof lastUser.content === "string") return lastUser.content;
-  if (Array.isArray(lastUser.content)) {
-    return lastUser.content.filter(c => c.type === "text").map(c => c.text).join("\n");
+// ── 把 OpenAI 消息 content（string / 多模 array）拼成纯文本 ──
+function flattenContent(content) {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter(c => c && c.type === "text" && typeof c.text === "string")
+      .map(c => c.text)
+      .join("\n");
   }
   return "";
+}
+
+// ── 抽 system prompt：合并所有 role==='system' 消息（OpenAI 协议允许多条 system）──
+function extractSystemPrompt(messages) {
+  if (!Array.isArray(messages)) return "";
+  return messages
+    .filter(m => m && m.role === "system")
+    .map(m => flattenContent(m.content))
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+// ── 抽 user prompt：最后一条 user（简化：暂不透传历史；agentry chat 历史由 Hanako 自管）──
+function extractPrompt(messages) {
+  if (!Array.isArray(messages)) return "";
+  const lastUser = [...messages].reverse().find(m => m && m.role === "user");
+  if (!lastUser) return "";
+  return flattenContent(lastUser.content);
+}
+
+// ── system + user 组装供 Codex / Gemini 等无 system 槽位之 backend 用 ──
+function composeForNoSystemBackend(systemPrompt, userPrompt) {
+  if (!systemPrompt) return userPrompt;
+  return `=== SYSTEM ===\n${systemPrompt}\n\n=== USER ===\n${userPrompt}`;
 }
 
 // ── 写 SSE delta chunk ──
@@ -112,8 +136,10 @@ function writeDone(res, id, model, finishReason = "stop", usage = null) {
 //   assistant.thinking   → delta.reasoning_content（pi-ai → thinking 块 / ThinkingBlock）
 //   assistant.tool_use   → markdown 头 "▸ <name>(args)"（不发 delta.tool_calls，避免 Hanako 重执行死循环）
 //   user.tool_result     → markdown fenced code block
-async function streamClaude({ res, id, model, prompt }) {
-  const stream = claudeQuery({ prompt, options: {} });
+async function streamClaude({ res, id, model, prompt, systemPrompt }) {
+  // Claude SDK Options.systemPrompt 接受 string；非空时覆盖 claude_code preset
+  const options = systemPrompt ? { systemPrompt } : {};
+  const stream = claudeQuery({ prompt, options });
   let usage = null;
   const toolNameById = new Map();
   for await (const msg of stream) {
@@ -161,10 +187,12 @@ async function streamClaude({ res, id, model, prompt }) {
 //   item.completed/file_change       → markdown edit 行
 //   item.completed/mcp_tool_call     → markdown 行 + 结果块
 //   item.completed/web_search        → markdown web_search 行
-async function streamCodex({ res, id, model, prompt }) {
+async function streamCodex({ res, id, model, prompt, systemPrompt }) {
+  // Codex SDK ThreadOptions 无 system/instructions 槽，把 systemPrompt prepend 到 prompt
   const codex = new Codex();
   const thread = codex.startThread({ sandboxMode: "read-only", skipGitRepoCheck: true, approvalPolicy: "never" });
-  const streamed = await thread.runStreamed(prompt);
+  const finalPrompt = composeForNoSystemBackend(systemPrompt, prompt);
+  const streamed = await thread.runStreamed(finalPrompt);
 
   let lastText = "";
   let usage = null;
@@ -215,11 +243,13 @@ async function streamCodex({ res, id, model, prompt }) {
 //   { type:"tool_use", tool_name, tool_id, parameters }         → tool_call
 //   { type:"tool_result", tool_id, status, output, error }      → tool_result block
 //   { type:"result", stats }                                    → usage
-async function streamGemini({ res, id, model, prompt }) {
+async function streamGemini({ res, id, model, prompt, systemPrompt }) {
+  // gemini CLI 无 --system flag，把 systemPrompt prepend 到 -p prompt
+  const finalPrompt = composeForNoSystemBackend(systemPrompt, prompt);
   return new Promise((resolve) => {
     const child = spawn(
       "gemini",
-      ["-p", prompt, "-o", "stream-json"],
+      ["-p", finalPrompt, "-o", "stream-json"],
       { stdio: ["ignore", "pipe", "pipe"], env: process.env }
     );
     const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
@@ -291,6 +321,7 @@ const server = createServer(async (req, res) => {
 
       const model = payload.model || "claude-opus-4-1";
       const prompt = extractPrompt(payload.messages);
+      const systemPrompt = extractSystemPrompt(payload.messages);
       const id = `chatcmpl-${randomUUID()}`;
       const backend = routeBackend(model);
       const wantStream = payload.stream === true;
@@ -314,11 +345,11 @@ const server = createServer(async (req, res) => {
           },
           end: () => {},
         };
-        console.error(`[bridge] ${new Date().toISOString()} ${backend} ${model} (non-stream) prompt=${prompt.slice(0, 60).replace(/\n/g, "↵")}`);
+        console.error(`[bridge] ${new Date().toISOString()} ${backend} ${model} (non-stream) sys=${systemPrompt.length}B prompt=${prompt.slice(0, 60).replace(/\n/g, "↵")}`);
         try {
-          if (backend === "claude") await streamClaude({ res: fakeRes, id, model, prompt });
-          else if (backend === "codex") await streamCodex({ res: fakeRes, id, model, prompt });
-          else if (backend === "gemini") await streamGemini({ res: fakeRes, id, model, prompt });
+          if (backend === "claude") await streamClaude({ res: fakeRes, id, model, prompt, systemPrompt });
+          else if (backend === "codex") await streamCodex({ res: fakeRes, id, model, prompt, systemPrompt });
+          else if (backend === "gemini") await streamGemini({ res: fakeRes, id, model, prompt, systemPrompt });
         } catch (err) {
           console.error(`[bridge][ERROR non-stream] ${err.message}`);
           textBuf += `\n[bridge:error] ${err.message}`;
@@ -344,12 +375,12 @@ const server = createServer(async (req, res) => {
         "Connection": "keep-alive",
       });
 
-      console.error(`[bridge] ${new Date().toISOString()} ${backend} ${model} (stream) prompt=${prompt.slice(0, 60).replace(/\n/g, "↵")}`);
+      console.error(`[bridge] ${new Date().toISOString()} ${backend} ${model} (stream) sys=${systemPrompt.length}B prompt=${prompt.slice(0, 60).replace(/\n/g, "↵")}`);
 
       try {
-        if (backend === "claude") await streamClaude({ res, id, model, prompt });
-        else if (backend === "codex") await streamCodex({ res, id, model, prompt });
-        else if (backend === "gemini") await streamGemini({ res, id, model, prompt });
+        if (backend === "claude") await streamClaude({ res, id, model, prompt, systemPrompt });
+        else if (backend === "codex") await streamCodex({ res, id, model, prompt, systemPrompt });
+        else if (backend === "gemini") await streamGemini({ res, id, model, prompt, systemPrompt });
         else {
           writeDelta(res, id, model, `[bridge] unknown backend for model ${model}`);
           writeDone(res, id, model);
