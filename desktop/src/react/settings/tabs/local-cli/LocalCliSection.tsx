@@ -6,8 +6,15 @@
  */
 
 import React, { useCallback, useEffect, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { hanaFetch } from "../../api";
+import { useSettingsStore } from "../../store";
+import { loadSettingsConfig } from "../../actions";
 import { SettingsSection } from "../../components/SettingsSection";
+
+const BRIDGE_BASE_URL = "http://127.0.0.1:51720/v1";
+const BRIDGE_API_KEY = "dummy";
+const BRIDGE_PROTOCOL = "openai-completions";
 
 interface CliInfo {
   id: string;
@@ -29,10 +36,68 @@ interface ModelInfo {
 }
 
 export function LocalCliSection() {
+  const { currentAgentId, settingsConfig, showToast } = useSettingsStore(
+    useShallow(s => ({
+      currentAgentId: s.currentAgentId,
+      settingsConfig: s.settingsConfig,
+      showToast: s.showToast,
+    }))
+  );
   const [cliS, setCliS] = useState<CliInfo[] | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [models, setModels] = useState<Record<string, ModelInfo[]>>({});
   const [scanning, setScanning] = useState(false);
+  const [pending, setPending] = useState<string | null>(null);
+
+  // 已启用之模型清单：从 settingsConfig.providers[cli-<id>].models 派生
+  const enabledByCli = React.useMemo(() => {
+    const out: Record<string, Set<string>> = {};
+    const ps = (settingsConfig as any)?.providers || {};
+    for (const cli of (cliS || [])) {
+      const pid = `cli-${cli.id}`;
+      const cfg = ps[pid];
+      const ids: string[] = Array.isArray(cfg?.models)
+        ? cfg.models.map((m: any) => typeof m === "string" ? m : (m?.id || ""))
+        : [];
+      out[cli.id] = new Set(ids.filter(Boolean));
+    }
+    return out;
+  }, [settingsConfig, cliS]);
+
+  const toggleModel = useCallback(async (cliId: string, modelId: string) => {
+    if (!currentAgentId) return;
+    const pid = `cli-${cliId}`;
+    const current = enabledByCli[cliId] || new Set();
+    const next = new Set(current);
+    if (next.has(modelId)) next.delete(modelId);
+    else next.add(modelId);
+
+    const key = `${cliId}::${modelId}`;
+    setPending(key);
+    try {
+      await hanaFetch(`/api/agents/${currentAgentId}/config`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providers: {
+            [pid]: {
+              base_url: BRIDGE_BASE_URL,
+              api_key: BRIDGE_API_KEY,
+              api: BRIDGE_PROTOCOL,
+              models: Array.from(next),
+            },
+          },
+        }),
+      });
+      await loadSettingsConfig();
+      showToast?.(next.has(modelId) ? `已加入 ${modelId}` : `已移除 ${modelId}`, "success");
+    } catch (err: any) {
+      console.warn("[local-cli] toggle model failed:", err);
+      showToast?.(`操作失败: ${err?.message || err}`, "error");
+    } finally {
+      setPending(null);
+    }
+  }, [currentAgentId, enabledByCli, showToast]);
 
   const scan = useCallback(async () => {
     setScanning(true);
@@ -142,15 +207,37 @@ export function LocalCliSection() {
                   )}
                   {modelList && modelList.length > 0 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "var(--space-xs) 0 var(--space-sm)" }}>
-                      {modelList.slice(0, 30).map(m => (
-                        <div key={m.id} style={{ fontSize: "0.78rem", display: "flex", gap: "var(--space-sm)", alignItems: "baseline" }}>
-                          <code style={{ color: "var(--text)" }}>{m.id}</code>
-                          <span style={{ color: "var(--text-muted)", fontSize: "0.7rem" }}>{m.name}</span>
-                          {m.context && <span style={{ color: "var(--text-muted)", fontSize: "0.7rem" }}>{Math.round(m.context / 1000)}K</span>}
-                          {m.reasoning && <span style={{ color: "var(--accent)", fontSize: "0.7rem" }}>R</span>}
-                          {m.image && <span style={{ color: "var(--accent)", fontSize: "0.7rem" }}>V</span>}
-                        </div>
-                      ))}
+                      {modelList.slice(0, 30).map(m => {
+                        const enabled = enabledByCli[cli.id]?.has(m.id) || false;
+                        const isPending = pending === `${cli.id}::${m.id}`;
+                        return (
+                          <div key={m.id} style={{ fontSize: "0.78rem", display: "flex", gap: "var(--space-sm)", alignItems: "center", padding: "2px 0" }}>
+                            <button
+                              onClick={() => toggleModel(cli.id, m.id)}
+                              disabled={isPending}
+                              title={enabled ? "点击移除" : "加入 agent 模型候选"}
+                              style={{
+                                width: 22, height: 22, borderRadius: 4,
+                                border: enabled ? "1px solid var(--accent)" : "1px solid var(--border)",
+                                background: enabled ? "var(--accent)" : "var(--bg-card)",
+                                color: enabled ? "white" : "var(--text-muted)",
+                                cursor: isPending ? "default" : "pointer",
+                                opacity: isPending ? 0.5 : 1,
+                                fontSize: "0.75rem",
+                                flex: "0 0 22px",
+                                lineHeight: 1,
+                              }}
+                            >
+                              {enabled ? "✓" : "+"}
+                            </button>
+                            <code style={{ color: "var(--text)" }}>{m.id}</code>
+                            <span style={{ color: "var(--text-muted)", fontSize: "0.7rem" }}>{m.name}</span>
+                            {m.context && <span style={{ color: "var(--text-muted)", fontSize: "0.7rem" }}>{Math.round(m.context / 1000)}K</span>}
+                            {m.reasoning && <span style={{ color: "var(--accent)", fontSize: "0.7rem" }}>R</span>}
+                            {m.image && <span style={{ color: "var(--accent)", fontSize: "0.7rem" }}>V</span>}
+                          </div>
+                        );
+                      })}
                       {modelList.length > 30 && (
                         <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>… 还有 {modelList.length - 30} 个</div>
                       )}

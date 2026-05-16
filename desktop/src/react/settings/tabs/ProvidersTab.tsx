@@ -28,7 +28,10 @@ export function ProvidersTab() {
 
   useEffect(() => { loadSummary(); }, [loadSummary]);
 
-  const providerIds = Object.keys(providersSummary);
+  // 过滤掉 agentry 内部之本机 CLI provider（id 以 "cli-" 开头或 agentry-bridge）。
+  // 这些走「本机 Agent CLI」独立 section（参 LocalCliSection），不在云端供应商列表显示。
+  const isLocalCliProvider = (id: string) => id === "agentry-bridge" || id.startsWith("cli-");
+  const providerIds = Object.keys(providersSummary).filter(id => !isLocalCliProvider(id));
   const selected = selectedProviderId;
 
   // 分组：OAuth / Coding Plan / API Key
