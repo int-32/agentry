@@ -75,6 +75,12 @@
       "backgroundColor": "#26343D",
       "i18nName": "settings.appearance.midnightContrast",
       "i18nMode": "settings.appearance.midnightContrastMode"
+    },
+    "tang-paper": {
+      "cssPath": "themes/tang-paper.css",
+      "backgroundColor": "#F5EFE0",
+      "i18nName": "settings.appearance.tangPaper",
+      "i18nMode": "settings.appearance.tangPaperMode"
     }
   }
 }

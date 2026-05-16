@@ -670,7 +670,9 @@
       "paperTextureHint": "背景に和紙のテクスチャを追加する",
       "paperTextureDarkDisabledHint": "夜間テーマでは和紙の質感は使えません。明るいテーマに戻すと保存済みの設定で復帰します",
       "leavesOverlay": "晴れモード",
-      "leavesOverlayHint": "たまには日向ぼっこしよう"
+      "leavesOverlayHint": "たまには日向ぼっこしよう",
+      "tangPaper": "唐紙",
+      "tangPaperMode": "朝廷"
     },
     "editor": {
       "title": "エディター",
@@ -745,12 +747,30 @@
         "title": "ツール",
         "description": "ツールの切り替えは、会話を再開するか新しく始めた後に反映されます。進行中の会話は開始時のツールセットを使い続けます。",
         "items": {
-          "browser": { "label": "ブラウザ", "summary": "ヘッドレスブラウザを操作してウェブを閲覧" },
-          "computer": { "label": "Computer Use", "summary": "承認済みのデスクトップアプリを操作し、動作カーソルを表示します" },
-          "cron": { "label": "定期実行", "summary": "指定した時刻にタスクを自動実行" },
-          "dm": { "label": "ダイレクトメッセージ", "summary": "別のエージェントに 1 対 1 のメッセージを送信" },
-          "install_skill": { "label": "スキルをインストール", "summary": "GitHub またはスキルライブラリから新しいスキルをインストール" },
-          "update_settings": { "label": "設定を変更", "summary": "Agent にアプリ設定の変更を許可" }
+          "browser": {
+            "label": "ブラウザ",
+            "summary": "ヘッドレスブラウザを操作してウェブを閲覧"
+          },
+          "computer": {
+            "label": "Computer Use",
+            "summary": "承認済みのデスクトップアプリを操作し、動作カーソルを表示します"
+          },
+          "cron": {
+            "label": "定期実行",
+            "summary": "指定した時刻にタスクを自動実行"
+          },
+          "dm": {
+            "label": "ダイレクトメッセージ",
+            "summary": "別のエージェントに 1 対 1 のメッセージを送信"
+          },
+          "install_skill": {
+            "label": "スキルをインストール",
+            "summary": "GitHub またはスキルライブラリから新しいスキルをインストール"
+          },
+          "update_settings": {
+            "label": "設定を変更",
+            "summary": "Agent にアプリ設定の変更を許可"
+          }
         }
       },
       "computerUse": {

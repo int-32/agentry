@@ -655,7 +655,9 @@
       "paperTextureHint": "为背景添加宣纸质感",
       "paperTextureDarkDisabledHint": "黑夜模式不支持纸质纹理，切回浅色主题后会按原设置恢复",
       "leavesOverlay": "晴天模式",
-      "leavesOverlayHint": "没事儿晒晒太阳"
+      "leavesOverlayHint": "没事儿晒晒太阳",
+      "tangPaper": "唐纸",
+      "tangPaperMode": "朝廷"
     },
     "editor": {
       "title": "编辑器",
@@ -755,12 +757,30 @@
         "title": "工具",
         "description": "这些工具开关会在重启对话或新建对话后生效。当前进行中的会话继续使用创建时的工具集。",
         "items": {
-          "browser": { "label": "浏览器", "summary": "控制无头浏览器浏览网页" },
-          "computer": { "label": "电脑控制", "summary": "控制已批准的桌面应用，并显示实时动作光标" },
-          "cron": { "label": "定时任务", "summary": "在指定时间自动执行任务" },
-          "dm": { "label": "私信", "summary": "向其他 Agent 发送一对一消息" },
-          "install_skill": { "label": "安装技能", "summary": "从 GitHub 或技能库安装新技能" },
-          "update_settings": { "label": "修改设置", "summary": "让 Agent 修改应用配置项" }
+          "browser": {
+            "label": "浏览器",
+            "summary": "控制无头浏览器浏览网页"
+          },
+          "computer": {
+            "label": "电脑控制",
+            "summary": "控制已批准的桌面应用，并显示实时动作光标"
+          },
+          "cron": {
+            "label": "定时任务",
+            "summary": "在指定时间自动执行任务"
+          },
+          "dm": {
+            "label": "私信",
+            "summary": "向其他 Agent 发送一对一消息"
+          },
+          "install_skill": {
+            "label": "安装技能",
+            "summary": "从 GitHub 或技能库安装新技能"
+          },
+          "update_settings": {
+            "label": "修改设置",
+            "summary": "让 Agent 修改应用配置项"
+          }
         }
       },
       "computerUse": {
