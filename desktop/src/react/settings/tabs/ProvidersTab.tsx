@@ -8,6 +8,7 @@ import { ProviderDetail } from './providers/ProviderDetail';
 import { AddCustomButton, AddProviderOverlay } from './providers/ProviderList';
 import { OtherModelsSection } from './providers/OtherModelsSection';
 import { SettingsSection } from '../components/SettingsSection';
+import { LocalCliSection } from './local-cli/LocalCliSection';
 import styles from '../Settings.module.css';
 
 export function ProvidersTab() {
@@ -77,6 +78,9 @@ export function ProvidersTab() {
 
   return (
     <div className={`${styles['settings-tab-content']} ${styles['active']}`} data-tab="providers">
+      {/* agentry 独家：本机 Agent CLI（与云端供应商概念分层） */}
+      <LocalCliSection />
+
       {/* pv-layout：double-column 外壳（sectionBody 透明，pv-layout 保留原视觉） */}
       <SettingsSection variant="double-column">
         <div className={styles['pv-layout']}>
