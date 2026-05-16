@@ -1564,6 +1564,7 @@
         "preview": "预览",
         "open": "打开",
         "reveal": "定位",
+        "downloadToDevice": "下载到本机",
         "copyPath": "复制路径",
         "copySelectedPaths": "复制 {n} 个路径",
         "sendToBridge": "发送到...",

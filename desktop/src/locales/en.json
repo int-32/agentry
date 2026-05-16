@@ -1559,6 +1559,7 @@
         "preview": "Preview",
         "open": "Open",
         "reveal": "Reveal",
+        "downloadToDevice": "Download to this device",
         "copyPath": "Copy path",
         "copySelectedPaths": "Copy {n} paths",
         "sendToBridge": "Send to...",

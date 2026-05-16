@@ -1519,6 +1519,7 @@
         "preview": "預覽",
         "open": "打開",
         "reveal": "定位",
+        "downloadToDevice": "下載到本機",
         "copyPath": "複製路徑",
         "copySelectedPaths": "複製 {n} 個路徑",
         "sendToBridge": "傳送到...",

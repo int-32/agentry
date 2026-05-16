@@ -1519,6 +1519,7 @@
         "preview": "미리보기",
         "open": "열기",
         "reveal": "위치 보기",
+        "downloadToDevice": "이 기기에 다운로드",
         "copyPath": "경로 복사",
         "copySelectedPaths": "경로 {n}개 복사",
         "sendToBridge": "보내기...",

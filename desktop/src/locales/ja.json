@@ -1519,6 +1519,7 @@
         "preview": "プレビュー",
         "open": "開く",
         "reveal": "場所を表示",
+        "downloadToDevice": "この端末にダウンロード",
         "copyPath": "パスをコピー",
         "copySelectedPaths": "{n} 件のパスをコピー",
         "sendToBridge": "送信先...",

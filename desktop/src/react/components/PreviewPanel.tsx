@@ -75,11 +75,15 @@ export function PreviewPanel() {
   }, [activeTabId]);
 
   return (
-    <div className={`${previewStyles.previewPanel}${previewOpen ? '' : ` ${previewStyles.previewPanelCollapsed}`}`} id="previewPanel">
+    <div
+      className={`${previewStyles.previewPanel}${previewOpen ? '' : ` ${previewStyles.previewPanelCollapsed}`}`}
+      id="previewPanel"
+      data-preview-open={previewOpen ? 'true' : 'false'}
+    >
       <div className="resize-handle resize-handle-left" id="previewResizeHandle"></div>
-      <div className={previewStyles.previewPanelInner}>
+      <div className={previewStyles.previewPanelInner} data-preview-panel-inner="">
         <TabBar />
-        <div className={previewStyles.previewBodyShell}>
+        <div className={previewStyles.previewBodyShell} data-preview-body-shell="">
           {previewOpen && previewItem && (
             <FloatingActions
               content={previewItem.content}
@@ -88,7 +92,7 @@ export function PreviewPanel() {
               onToggleMarkdownPreview={handleToggleMarkdownPreview}
             />
           )}
-          <div className={previewStyles.previewPanelBody} id="previewBody" onMouseUp={handleMouseUp}>
+          <div className={previewStyles.previewPanelBody} id="previewBody" data-preview-panel-body="" onMouseUp={handleMouseUp}>
             {previewOpen && previewItem && !editable && (
               <PreviewRenderer previewItem={previewItem} />
             )}

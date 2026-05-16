@@ -64,6 +64,7 @@ describe('MobileApp', () => {
       dispatchEvent: vi.fn(),
     })));
     MockWebSocket.instances = [];
+    document.documentElement.removeAttribute('data-platform');
     resetStoreForMobileTest();
     window.t = ((key: string) => key) as typeof window.t;
     window.i18n = {
@@ -193,6 +194,34 @@ describe('MobileApp', () => {
     });
     fireEvent.click(screen.getByTitle('sidebar.jian'));
     expect(await screen.findByText('note.md')).toBeInTheDocument();
+  });
+
+  it('opens workbench files through the mobile content route using the desktop preview panel', async () => {
+    document.documentElement.setAttribute('data-platform', 'web');
+    fetchMock.mockImplementation((input: RequestInfo | URL, options?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/web-auth/session')) {
+        return Promise.resolve(jsonResponse({ authenticated: true, principal: principal(['chat', 'resources.read', 'files.read', 'files.write']) }));
+      }
+      return Promise.resolve(jsonResponse(jsonResponseForMobile(url, options)));
+    });
+
+    render(<MobileApp />);
+
+    await screen.findByText('日常记录');
+    fireEvent.click(screen.getByTitle('sidebar.jian'));
+    fireEvent.click(await screen.findByRole('treeitem', { name: /note\.md/ }));
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([input]) => {
+        const url = String(input);
+        return url.includes('/api/mobile/workbench/content')
+          && url.includes('name=note.md')
+          && url.includes('rootId=default');
+      })).toBe(true);
+      expect(useStore.getState().previewOpen).toBe(true);
+    });
+    expect(await screen.findByText('来自手机工作台预览')).toBeInTheDocument();
   });
 
   it('uses the desktop new-session draft flow on mobile instead of creating an empty session immediately', async () => {
@@ -335,6 +364,9 @@ function jsonResponseForMobile(url: string, _options?: RequestInit): unknown {
       subdir: '',
       files: [{ name: 'note.md', isDir: false, size: 12, mtime: '2026-05-16T00:00:00.000Z' }],
     };
+  }
+  if (url.includes('/api/mobile/workbench/content')) {
+    return '# Mobile Note\n\n来自手机工作台预览';
   }
   if (url.includes('/api/desk/jian')) {
     return { content: null };

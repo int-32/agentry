@@ -5,6 +5,7 @@ import { ChatPage, WorkspaceCompanionRail } from '../components/app/AppPages';
 import { ChatSidebar } from '../components/app/ChatSidebar';
 import { MainContent } from '../MainContent';
 import { MediaViewer } from '../components/shared/MediaViewer/MediaViewer';
+import { PreviewPanel } from '../components/PreviewPanel';
 import { StatusBar } from '../components/StatusBar';
 import { ToastContainer } from '../components/ToastContainer';
 import { toggleSidebar } from '../components/SidebarLayout';
@@ -155,6 +156,7 @@ function MobileDesktopShell({
         <MainContent>
           <ChatPage inputSurface="mobile" regionPrefix="mobile-" />
         </MainContent>
+        <PreviewPanel />
         <WorkspaceCompanionRail />
       </div>
       {showDrawerScrim && <button className="mobile-drawer-scrim" type="button" aria-label="关闭侧边栏" onClick={closeMobileDrawers} />}
