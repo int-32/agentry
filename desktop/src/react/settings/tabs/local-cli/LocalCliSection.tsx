@@ -64,6 +64,54 @@ export function LocalCliSection() {
     return out;
   }, [settingsConfig, cliS]);
 
+  const writeCliModels = useCallback(async (cliId: string, modelIds: string[]) => {
+    if (!currentAgentId) return;
+    const pid = `cli-${cliId}`;
+    await hanaFetch(`/api/agents/${currentAgentId}/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        providers: {
+          [pid]: {
+            base_url: BRIDGE_BASE_URL,
+            api_key: BRIDGE_API_KEY,
+            api: BRIDGE_PROTOCOL,
+            models: modelIds,
+          },
+        },
+      }),
+    });
+    await loadSettingsConfig();
+  }, [currentAgentId]);
+
+  const enableAllForCli = useCallback(async (cliId: string) => {
+    const list = models[cliId] || [];
+    if (list.length === 0) return;
+    const key = `${cliId}::__all_enable`;
+    setPending(key);
+    try {
+      await writeCliModels(cliId, list.map(m => m.id));
+      showToast?.(`已启用 ${list.length} 个模型`, "success");
+    } catch (err: any) {
+      showToast?.(`启用失败: ${err?.message || err}`, "error");
+    } finally {
+      setPending(null);
+    }
+  }, [models, writeCliModels, showToast]);
+
+  const disableAllForCli = useCallback(async (cliId: string) => {
+    const key = `${cliId}::__all_disable`;
+    setPending(key);
+    try {
+      await writeCliModels(cliId, []);
+      showToast?.("已停用全部", "success");
+    } catch (err: any) {
+      showToast?.(`停用失败: ${err?.message || err}`, "error");
+    } finally {
+      setPending(null);
+    }
+  }, [writeCliModels, showToast]);
+
   const toggleModel = useCallback(async (cliId: string, modelId: string) => {
     if (!currentAgentId) return;
     const pid = `cli-${cliId}`;
@@ -104,7 +152,19 @@ export function LocalCliSection() {
     try {
       const res = await hanaFetch("/api/local-cli/scan");
       const data = await res.json();
-      setCliS(data.clis || []);
+      const list: CliInfo[] = data.clis || [];
+      setCliS(list);
+      // 同步预载所有已装 CLI 之模型清单 —— 一键启用 / 已启用计数无需展开
+      const installed = list.filter(c => c.installed);
+      const preloaded: Record<string, ModelInfo[]> = {};
+      await Promise.all(installed.map(async c => {
+        try {
+          const r = await hanaFetch(`/api/local-cli/${c.id}/models`);
+          const j = await r.json();
+          preloaded[c.id] = j.models || [];
+        } catch { /* swallow */ }
+      }));
+      setModels(prev => ({ ...prev, ...preloaded }));
     } catch (err) {
       console.warn("[local-cli] scan failed:", err);
     } finally {
@@ -154,43 +214,70 @@ export function LocalCliSection() {
                 opacity: cli.installed ? 1 : 0.55,
               }}
             >
-              <button
-                onClick={() => cli.installed && toggleExpand(cli.id)}
-                disabled={!cli.installed}
-                style={{
-                  width: "100%",
-                  padding: "var(--space-sm) var(--space-md)",
-                  background: "transparent",
-                  border: "none",
-                  textAlign: "left",
-                  cursor: cli.installed ? "pointer" : "default",
-                  color: "var(--text)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "var(--space-sm)",
-                  fontSize: "0.9rem",
-                }}
-              >
-                <span
-                  style={{
-                    width: 8, height: 8, borderRadius: "50%",
-                    background: cli.installed ? "var(--green, #6A8C5A)" : "var(--text-muted)",
-                    flex: "0 0 8px",
-                  }}
-                />
-                <span style={{ fontWeight: 500 }}>{cli.displayName}</span>
-                {cli.version && <span style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>v{cli.version}</span>}
-                {cli.installed && (
-                  <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginLeft: "auto" }}>
-                    {cli.modelsCount} 模型 {isExpanded ? "▴" : "▾"}
-                  </span>
-                )}
-                {!cli.installed && (
-                  <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginLeft: "auto" }}>
-                    未装
-                  </span>
-                )}
-              </button>
+              {(() => {
+                const enabledCount = enabledByCli[cli.id]?.size || 0;
+                const allEnabled = cli.installed && enabledCount === cli.modelsCount && cli.modelsCount > 0;
+                const enableBusy = pending === `${cli.id}::__all_enable`;
+                const disableBusy = pending === `${cli.id}::__all_disable`;
+                return (
+                  <div
+                    onClick={() => cli.installed && toggleExpand(cli.id)}
+                    style={{
+                      padding: "var(--space-sm) var(--space-md)",
+                      cursor: cli.installed ? "pointer" : "default",
+                      color: "var(--text)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "var(--space-sm)",
+                      fontSize: "0.9rem",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 8, height: 8, borderRadius: "50%",
+                        background: cli.installed ? "var(--green, #6A8C5A)" : "var(--text-muted)",
+                        flex: "0 0 8px",
+                      }}
+                    />
+                    <span style={{ fontWeight: 500 }}>{cli.displayName}</span>
+                    {cli.version && <span style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>v{cli.version}</span>}
+                    {cli.installed && enabledCount > 0 && (
+                      <span style={{ color: "var(--accent)", fontSize: "0.72rem", padding: "1px 6px", borderRadius: 4, background: "var(--accent-light)" }}>
+                        {enabledCount}/{cli.modelsCount} 已启用
+                      </span>
+                    )}
+                    <span style={{ marginLeft: "auto", display: "flex", gap: "var(--space-xs)", alignItems: "center" }}>
+                      {cli.installed && (
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); allEnabled ? disableAllForCli(cli.id) : enableAllForCli(cli.id); }}
+                            disabled={enableBusy || disableBusy}
+                            title={allEnabled ? "一键停用此 CLI 之全部模型" : "一键启用此 CLI 之全部模型"}
+                            style={{
+                              padding: "2px 10px",
+                              borderRadius: 4,
+                              border: "1px solid var(--border)",
+                              background: allEnabled ? "var(--accent)" : "var(--bg-card)",
+                              color: allEnabled ? "white" : "var(--text)",
+                              fontSize: "0.72rem",
+                              cursor: enableBusy || disableBusy ? "default" : "pointer",
+                              opacity: enableBusy || disableBusy ? 0.5 : 1,
+                            }}
+                          >
+                            {enableBusy ? "…" : disableBusy ? "…" : allEnabled ? "全部停用" : "全部启用"}
+                          </button>
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>
+                            {cli.modelsCount} 模型 {isExpanded ? "▴" : "▾"}
+                          </span>
+                        </>
+                      )}
+                      {!cli.installed && (
+                        <span style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>未装</span>
+                      )}
+                    </span>
+                  </div>
+                );
+              })()}
 
               {isExpanded && (
                 <div style={{ padding: "0 var(--space-md) var(--space-sm)", borderTop: "1px solid var(--border)" }}>

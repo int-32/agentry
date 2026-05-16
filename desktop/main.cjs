@@ -242,6 +242,8 @@ const TITLEBAR_HEIGHT = 44;        // 浏览器窗口标题栏高度（px）
 let serverProcess = null;
 let serverPort = null;
 let serverToken = null;
+let bridgeProcess = null;        // agentry-bridge 子进程（本机 CLI HTTP 桥）
+const BRIDGE_PORT = process.env.AGENTRY_BRIDGE_PORT || "51720";
 let isQuitting = false;  // 区分关窗口（hide）和真正退出（quit）
 let tray = null;
 let reusedServerPid = null; // 复用已有 server 时记录其 PID，退出时发 SIGTERM
@@ -3229,6 +3231,9 @@ app.whenReady().then(async () => {
     monitorServer();
     setupBrowserCommands();
     createTray();
+
+    // 2.5 后台启动 agentry-bridge（本机 CLI HTTP 桥）
+    startAgentryBridge();
     if (_startHiddenAtLogin && process.platform === "darwin") {
       app.dock.hide();
     }
@@ -3301,9 +3306,55 @@ app.on("activate", () => {
   }
 });
 
+// ── agentry-bridge 子进程管理 ──
+function startAgentryBridge() {
+  if (bridgeProcess && !bridgeProcess.killed) {
+    console.log("[agentry-bridge] 已运行，跳过启动");
+    return;
+  }
+  const bridgePath = path.join(__dirname, "..", "scripts", "agentry-bridge", "server.mjs");
+  try {
+    const fs = require("fs");
+    if (!fs.existsSync(bridgePath)) {
+      console.warn("[agentry-bridge] 脚本不存在，跳过:", bridgePath);
+      return;
+    }
+  } catch { /* fall through */ }
+  console.log(`[agentry-bridge] 启动: node ${bridgePath} (port ${BRIDGE_PORT})`);
+  try {
+    bridgeProcess = spawn(process.execPath, [bridgePath], {
+      cwd: path.join(__dirname, ".."),
+      env: { ...process.env, AGENTRY_BRIDGE_PORT: BRIDGE_PORT, ELECTRON_RUN_AS_NODE: "1" },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    bridgeProcess.stdout?.on("data", (chunk) => process.stdout.write(`[bridge] ${chunk}`));
+    bridgeProcess.stderr?.on("data", (chunk) => process.stderr.write(`[bridge] ${chunk}`));
+    bridgeProcess.on("exit", (code, signal) => {
+      console.log(`[agentry-bridge] 子进程退出 code=${code} signal=${signal}`);
+      bridgeProcess = null;
+    });
+    bridgeProcess.on("error", (err) => {
+      console.warn("[agentry-bridge] spawn error:", err.message);
+      bridgeProcess = null;
+    });
+    bridgeProcess.unref?.();
+  } catch (err) {
+    console.warn("[agentry-bridge] 启动失败:", err.message);
+    bridgeProcess = null;
+  }
+}
+
+function stopAgentryBridge() {
+  if (!bridgeProcess || bridgeProcess.killed) return;
+  console.log("[agentry-bridge] 正在停止…");
+  try { bridgeProcess.kill("SIGTERM"); } catch { /* ignore */ }
+  bridgeProcess = null;
+}
+
 // ── 优雅关闭 ──
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
+  stopAgentryBridge();
   // 销毁托盘图标
   if (tray && !tray.isDestroyed()) {
     tray.destroy();
