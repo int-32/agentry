@@ -189,14 +189,58 @@ const server = createServer(async (req, res) => {
       const prompt = extractPrompt(payload.messages);
       const id = `chatcmpl-${randomUUID()}`;
       const backend = routeBackend(model);
+      const wantStream = payload.stream === true;
 
+      // ── 非流式 (stream: false) —— 累计后一次返完整 ChatCompletion JSON ──
+      if (!wantStream) {
+        let textBuf = "";
+        let usageBuf = null;
+        const fakeRes = {
+          write: (line) => {
+            // line: "data: <json>\n\n"
+            const m = /^data:\s*(.+?)\n\n$/s.exec(line);
+            if (!m) return;
+            if (m[1] === "[DONE]") return;
+            try {
+              const chunk = JSON.parse(m[1]);
+              const delta = chunk.choices?.[0]?.delta?.content;
+              if (delta) textBuf += delta;
+              if (chunk.usage) usageBuf = chunk.usage;
+            } catch {}
+          },
+          end: () => {},
+        };
+        console.error(`[bridge] ${new Date().toISOString()} ${backend} ${model} (non-stream) prompt=${prompt.slice(0, 60).replace(/\n/g, "↵")}`);
+        try {
+          if (backend === "claude") await streamClaude({ res: fakeRes, id, model, prompt });
+          else if (backend === "codex") await streamCodex({ res: fakeRes, id, model, prompt });
+          else if (backend === "gemini") await streamGemini({ res: fakeRes, id, model, prompt });
+        } catch (err) {
+          console.error(`[bridge][ERROR non-stream] ${err.message}`);
+          textBuf += `\n[bridge:error] ${err.message}`;
+        }
+        const completion = {
+          id, object: "chat.completion", created: Math.floor(Date.now() / 1000), model,
+          choices: [{
+            index: 0,
+            message: { role: "assistant", content: textBuf },
+            finish_reason: "stop",
+          }],
+          usage: usageBuf || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+        };
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(completion));
+        return;
+      }
+
+      // ── 流式 SSE ──
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
       });
 
-      console.error(`[bridge] ${new Date().toISOString()} ${backend} ${model} prompt=${prompt.slice(0, 60).replace(/\n/g, "↵")}`);
+      console.error(`[bridge] ${new Date().toISOString()} ${backend} ${model} (stream) prompt=${prompt.slice(0, 60).replace(/\n/g, "↵")}`);
 
       try {
         if (backend === "claude") await streamClaude({ res, id, model, prompt });
