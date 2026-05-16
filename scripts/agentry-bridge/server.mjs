@@ -63,27 +63,32 @@ function writeReasoning(res, id, model, reasoning) {
   res.write(`data: ${JSON.stringify(chunk)}\n\n`);
 }
 
-// OpenAI tool_calls delta — pi-ai 之 openai-completions 解析为 toolCall content block，
-// 触发 chat 路由之 toolcall_end → Hanako 端合成 tool_start/tool_end →
-// UI 显 tool_group 块（与 Hanako 原生工具同框，可折叠）。
-// idx 为本次 response 内之 tool_calls 数组下标，需单调递增；调用方维护计数。
-function writeToolCallDelta(res, id, model, idx, callId, name, argsObj) {
-  const chunk = {
-    id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model,
-    choices: [{
-      index: 0,
-      delta: {
-        tool_calls: [{
-          index: idx,
-          id: callId,
-          type: "function",
-          function: { name, arguments: JSON.stringify(argsObj ?? {}) },
-        }],
-      },
-      finish_reason: null,
-    }],
-  };
-  res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+// 工具调用 — 不发 delta.tool_calls（否则 Hanako agent loop 见 toolCall 块要本地执行，
+// 找不到 Claude SDK 内部之 Read/Bash 等工具 → 报错重发 LLM → 死循环）。
+// 改作 markdown 文本透出，UI 走 MarkdownContent 显条理。
+function writeToolCallText(res, id, model, name, argsObj) {
+  const argsStr = formatArgsInline(argsObj);
+  const head = `\n\n**▸ ${name}**${argsStr ? `(${argsStr})` : "()"}\n`;
+  writeDelta(res, id, model, head);
+}
+
+function writeToolResultText(res, id, model, name, payload) {
+  const text = typeof payload === "string" ? payload : safeStringify(payload);
+  const trimmed = text.length > 4000 ? text.slice(0, 4000) + "\n…（截断）" : text;
+  writeDelta(res, id, model, `\n\`\`\`text\n${trimmed}\n\`\`\`\n`);
+}
+
+function formatArgsInline(argsObj) {
+  if (!argsObj || typeof argsObj !== "object") return "";
+  const entries = Object.entries(argsObj);
+  if (entries.length === 0) return "";
+  return entries
+    .map(([k, v]) => {
+      const s = typeof v === "string" ? v : safeStringify(v);
+      const short = s.length > 120 ? s.slice(0, 120) + "…" : s;
+      return `${k}=${short}`;
+    })
+    .join(", ");
 }
 
 function safeStringify(v) {
@@ -104,13 +109,13 @@ function writeDone(res, id, model, finishReason = "stop", usage = null) {
 // ── Claude SDK ──
 // 透传：
 //   assistant.text       → delta.content
-//   assistant.thinking   → delta.reasoning_content（pi-ai → thinking 块）
-//   assistant.tool_use   → delta.tool_calls（pi-ai → toolCall 块 → Hanako 合成 tool_group）
-//   user.tool_result     → bridge 内 SDK 已执行，结果不再单独发；保留 tool_group 显示工具名+参数即可
+//   assistant.thinking   → delta.reasoning_content（pi-ai → thinking 块 / ThinkingBlock）
+//   assistant.tool_use   → markdown 头 "▸ <name>(args)"（不发 delta.tool_calls，避免 Hanako 重执行死循环）
+//   user.tool_result     → markdown fenced code block
 async function streamClaude({ res, id, model, prompt }) {
   const stream = claudeQuery({ prompt, options: {} });
   let usage = null;
-  let toolIdx = 0;
+  const toolNameById = new Map();
   for await (const msg of stream) {
     if (msg.type === "assistant" && msg.message?.content) {
       for (const block of msg.message.content) {
@@ -119,7 +124,22 @@ async function streamClaude({ res, id, model, prompt }) {
         } else if (block.type === "thinking" && block.thinking) {
           writeReasoning(res, id, model, block.thinking);
         } else if (block.type === "tool_use") {
-          writeToolCallDelta(res, id, model, toolIdx++, block.id, block.name, block.input ?? {});
+          toolNameById.set(block.id, block.name);
+          writeToolCallText(res, id, model, block.name, block.input ?? {});
+        }
+      }
+    } else if (msg.type === "user" && msg.message?.content) {
+      const content = Array.isArray(msg.message.content) ? msg.message.content : [];
+      for (const block of content) {
+        if (block.type === "tool_result") {
+          const name = toolNameById.get(block.tool_use_id) || "tool";
+          let payload = block.content;
+          if (Array.isArray(payload)) {
+            payload = payload
+              .map(b => b.type === "text" ? b.text : safeStringify(b))
+              .join("\n");
+          }
+          writeToolResultText(res, id, model, name, payload);
         }
       }
     } else if (msg.type === "result") {
@@ -134,13 +154,13 @@ async function streamClaude({ res, id, model, prompt }) {
 }
 
 // ── Codex SDK ──
-// 透传（详见 streamClaude 注释）：
+// 透传（同 streamClaude 之 markdown 文本策略，避免 delta.tool_calls 引 Hanako 死循环）：
 //   item.updated/agent_message      → delta.content
 //   item.completed/reasoning        → delta.reasoning_content
-//   item.completed/command_execution → delta.tool_calls name="bash"
-//   item.completed/file_change       → delta.tool_calls name="edit"
-//   item.completed/mcp_tool_call     → delta.tool_calls name="<server>/<tool>"
-//   item.completed/web_search        → delta.tool_calls name="web_search"
+//   item.completed/command_execution → markdown bash 行 + 输出块
+//   item.completed/file_change       → markdown edit 行
+//   item.completed/mcp_tool_call     → markdown 行 + 结果块
+//   item.completed/web_search        → markdown web_search 行
 async function streamCodex({ res, id, model, prompt }) {
   const codex = new Codex();
   const thread = codex.startThread({ sandboxMode: "read-only", skipGitRepoCheck: true, approvalPolicy: "never" });
@@ -148,7 +168,6 @@ async function streamCodex({ res, id, model, prompt }) {
 
   let lastText = "";
   let usage = null;
-  let toolIdx = 0;
   for await (const evt of streamed.events) {
     if (evt.type === "item.updated" && evt.item.type === "agent_message") {
       const cur = evt.item.text || "";
@@ -165,14 +184,19 @@ async function streamCodex({ res, id, model, prompt }) {
       } else if (item.type === "reasoning") {
         if (item.text) writeReasoning(res, id, model, item.text);
       } else if (item.type === "command_execution") {
-        writeToolCallDelta(res, id, model, toolIdx++, item.id, "bash", { command: item.command });
+        writeToolCallText(res, id, model, "bash", { command: item.command });
+        if (item.aggregated_output) {
+          writeToolResultText(res, id, model, "bash", item.aggregated_output);
+        }
       } else if (item.type === "file_change") {
-        writeToolCallDelta(res, id, model, toolIdx++, item.id, "edit", { changes: item.changes });
+        writeToolCallText(res, id, model, "edit", { changes: item.changes });
       } else if (item.type === "mcp_tool_call") {
         const callName = `${item.server}/${item.tool}`;
-        writeToolCallDelta(res, id, model, toolIdx++, item.id, callName, item.arguments ?? {});
+        writeToolCallText(res, id, model, callName, item.arguments ?? {});
+        if (item.result) writeToolResultText(res, id, model, callName, item.result);
+        else if (item.error) writeToolResultText(res, id, model, callName, `error: ${item.error.message}`);
       } else if (item.type === "web_search") {
-        writeToolCallDelta(res, id, model, toolIdx++, item.id, "web_search", { query: item.query });
+        writeToolCallText(res, id, model, "web_search", { query: item.query });
       }
     } else if (evt.type === "turn.completed") {
       usage = evt.usage;
@@ -200,7 +224,7 @@ async function streamGemini({ res, id, model, prompt }) {
     );
     const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
     let usage = null;
-    let toolIdx = 0;
+    const toolNameById = new Map();
     rl.on("line", (line) => {
       if (!line.trim()) return;
       let evt;
@@ -208,11 +232,17 @@ async function streamGemini({ res, id, model, prompt }) {
       if (evt.type === "message" && evt.role === "assistant" && typeof evt.content === "string") {
         if (evt.content) writeDelta(res, id, model, evt.content);
       } else if (evt.type === "tool_use" && evt.tool_id) {
-        writeToolCallDelta(res, id, model, toolIdx++, evt.tool_id, evt.tool_name || "tool", evt.parameters ?? {});
+        toolNameById.set(evt.tool_id, evt.tool_name);
+        writeToolCallText(res, id, model, evt.tool_name || "tool", evt.parameters ?? {});
+      } else if (evt.type === "tool_result" && evt.tool_id) {
+        const name = toolNameById.get(evt.tool_id) || "tool";
+        const payload = evt.status === "error"
+          ? `[error] ${evt.error?.message || evt.output || ""}`
+          : (evt.output ?? "");
+        writeToolResultText(res, id, model, name, payload);
       } else if (evt.type === "result" && evt.stats) {
         usage = evt.stats;
       }
-      // tool_result 不发：SDK 已执行，Hanako 端合成 tool_group 块仅显工具名+参数
     });
     child.on("close", () => {
       writeDone(res, id, model, "stop", usage && {

@@ -148,10 +148,6 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
         isAborted: false,
         titleRequested: false,
         titlePreview: "",
-        // CLI-bridge passthrough：LLM 自报 tool_calls 但本端不执行（Claude/Codex/Gemini SDK 内部已跑）。
-        // 收 toolcall_end 入队，tool_execution_start 配对消费；turn_end 时未消费者合成 tool_start/tool_end，
-        // 让 UI 走与 Hanako 原生工具同样的 tool_group 块（可折叠）。
-        pendingToolCallEnds: [],
         lastAccessed: Date.now(),
         ...createSessionStreamState(),
       });
@@ -348,14 +344,6 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
         });
       } else if (sub === "toolcall_start") {
         // 不在这里关闭 thinking 状态
-      } else if (sub === "toolcall_end") {
-        // pi-ai 已解析完整 toolCall { id, name, arguments }。
-        // 入队等 tool_execution_start 配对；CLI bridge 之 SDK 内执行场景无配对，
-        // turn_end 时合成 tool_start/tool_end 让 UI 显 tool_group 块。
-        const tc = event.assistantMessageEvent?.toolCall;
-        if (tc?.name) {
-          ss.pendingToolCallEnds.push({ name: tc.name, args: tc.arguments || {} });
-        }
       } else if (sub === "error") {
         ss.hasError = true;
         broadcast({ type: "error", message: event.assistantMessageEvent.error || "Unknown error", sessionPath });
@@ -367,9 +355,6 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
         ss.isThinking = false;
         emitStreamEvent(sessionPath, ss, { type: "thinking_end" });
       }
-      // 配对消费 LLM 自报之 toolcall_end（Hanako 真正执行此工具，故 turn_end 不再合成）
-      const pIdx = ss.pendingToolCallEnds.findIndex(p => p.name === event.toolName);
-      if (pIdx >= 0) ss.pendingToolCallEnds.splice(pIdx, 1);
       // 只保留前端 extractToolDetail 需要的字段，避免广播完整文件内容
       const args = summarizeToolStartArgs(event.toolName || "", event.args);
       emitStreamEvent(sessionPath, ss, { type: "tool_start", name: event.toolName || "", args });
@@ -495,7 +480,6 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
           ss.hasThinking = false;
           ss.hasError = false;
           ss.isAborted = false;
-          ss.pendingToolCallEnds = [];
           ss.titleRequested = false;
           ss.titlePreview = "";
           beginSessionStream(ss);
@@ -591,20 +575,6 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
         }
       });
 
-      // ── CLI bridge passthrough：合成未被 Hanako 执行之 tool_calls 为 UI tool_group 块 ──
-      // pendingToolCallEnds 是 LLM 自报但 Hanako 未配对执行之 toolcall_end 队列。
-      // 通常源自 agentry-bridge：Claude/Codex/Gemini SDK 内部已执行工具，bridge 只透传 tool_calls；
-      // Hanako 不识此工具名故 tool_execution_start 不触发，需此处合成 tool_start/tool_end
-      // 让 UI 显与 Hanako 原生工具同样之 tool_group 块（可折叠）。
-      if (ss.pendingToolCallEnds.length > 0) {
-        ss.hasToolCall = true;
-        for (const tc of ss.pendingToolCallEnds) {
-          const args = summarizeToolStartArgs(tc.name, tc.args);
-          emitStreamEvent(sessionPath, ss, { type: "tool_start", name: tc.name, args });
-          emitStreamEvent(sessionPath, ss, { type: "tool_end", name: tc.name, success: true });
-        }
-        ss.pendingToolCallEnds = [];
-      }
 
 
       // 空回复检测：本轮没有文本输出也没有工具调用，提示用户检查配置
@@ -645,7 +615,6 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
       ss.hasThinking = false;
       ss.hasError = false;
       ss.isAborted = false;
-      ss.pendingToolCallEnds = [];
       ss.thinkTagParser.reset();
       ss.moodParser.reset();
       ss.cardParser.reset();
