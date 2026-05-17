@@ -74,7 +74,8 @@ export function getReasoningProfile(model) {
 
 function stripEmptyTools(payload) {
   if (Array.isArray(payload.tools) && payload.tools.length === 0) {
-    const { tools, ...rest } = payload;
+    const rest = { ...payload };
+    delete rest.tools;
     return rest;
   }
   return payload;
@@ -88,7 +89,8 @@ function stripIncompatibleThinking(payload, model) {
   if (!model) return payload;
   const thinkingFormat = getThinkingFormat(model);
   if (thinkingFormat === "anthropic" || thinkingFormat === "deepseek") return payload;
-  const { thinking, ...rest } = payload;
+  const rest = { ...payload };
+  delete rest.thinking;
   return rest;
 }
 

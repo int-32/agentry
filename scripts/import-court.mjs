@@ -117,7 +117,7 @@ function buildPublic(identityMd, description) {
 }
 
 // ── 构造 agent config.yaml（schema 参考既有 hanako/config.yaml）──
-function buildAgentConfig({ key, name, title }) {
+function buildAgentConfig({ key: _key, name, title }) {
   // yuan 保持 hanako：agentry buildSystemPrompt 读 lib/yuan/<yuan>.md，
   // master/yanliben 在 productDir 内无对应 yuan 模板，用 hanako 兜底，persona 在 identity.md / ishiki.md 表达
   const config = {

@@ -35,13 +35,12 @@ export function BridgeStatusText({ status, error }: { status?: string; error?: s
 // ── OwnerSelect ──
 
 interface OwnerSelectProps {
-  platform: string;
   users: KnownUser[];
   currentOwner?: string;
   onChange: (userId: string) => void;
 }
 
-export function OwnerSelect({ platform, users, currentOwner, onChange }: OwnerSelectProps) {
+export function OwnerSelect({ users, currentOwner, onChange }: OwnerSelectProps) {
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
 
   const handleChange = (value: string) => {

@@ -188,15 +188,13 @@ function sessionFileFields(file) {
 function extractPluginCard(details) {
   if (!details?.card?.pluginId) return null;
   const c = details.card;
-  const {
-    // COMPAT(v0.127, remove no earlier than v0.133):
-    // 文件归属必须走 SessionFile / details.media，card 只保留展示参数。
-    file: _file,
-    files: _files,
-    sessionFile: _sessionFile,
-    sourceFile: _sourceFile,
-    ...safeCard
-  } = c;
+  const safeCard = { ...c };
+  // COMPAT(v0.127, remove no earlier than v0.133):
+  // 文件归属必须走 SessionFile / details.media，card 只保留展示参数。
+  delete safeCard.file;
+  delete safeCard.files;
+  delete safeCard.sessionFile;
+  delete safeCard.sourceFile;
   return { type: "plugin_card", card: { ...safeCard, type: safeCard.type || "iframe" } };
 }
 

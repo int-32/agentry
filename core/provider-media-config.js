@@ -21,7 +21,8 @@ function normalizeMediaModelEntry(model) {
   if (!isPlainObject(model)) return null;
   const id = typeof model.id === "string" ? model.id.trim() : "";
   if (!id) return null;
-  const { type: _type, display_name: displayName, ...rest } = model;
+  const { display_name: displayName, ...rest } = model;
+  delete rest.type;
   const next = { ...rest, id };
   if (displayName !== undefined && next.displayName === undefined && next.name === undefined) {
     next.name = displayName;

@@ -8,10 +8,9 @@ import { KeyInput } from '../../widgets/KeyInput';
 import { getApiKeySavePlan } from './api-key-save-plan';
 import styles from '../../Settings.module.css';
 
-export function ApiKeyCredentials({ providerId, summary, providerConfig, isPresetSetup, presetInfo, onRefresh }: {
+export function ApiKeyCredentials({ providerId, summary, isPresetSetup, presetInfo, onRefresh }: {
   providerId: string;
   summary: ProviderSummary;
-  providerConfig?: Record<string, unknown>;
   isPresetSetup?: boolean;
   presetInfo?: { label: string; value: string; url?: string; api?: string; local?: boolean };
   onRefresh: () => Promise<void>;

@@ -14,7 +14,7 @@ export function WechatQrcodeOverlay() {
   const [qrcodeId, setQrcodeId] = useState('');
   const [status, setStatus] = useState<QrStatus>('loading');
   const [error, setError] = useState('');
-  const [refreshCount, setRefreshCount] = useState(0);
+  const refreshCountRef = useRef(0);
   const agentIdRef = useRef<string | null>(null);
   const stoppedRef = useRef(true);
 
@@ -27,7 +27,7 @@ export function WechatQrcodeOverlay() {
     setQrcodeId('');
     setStatus('loading');
     setError('');
-    setRefreshCount(0);
+    refreshCountRef.current = 0;
     agentIdRef.current = null;
   }, [stopPolling]);
 
@@ -98,16 +98,13 @@ export function WechatQrcodeOverlay() {
             return;
           } else if (data.status === 'expired') {
             stoppedRef.current = true;
-            setRefreshCount((prev) => {
-              const next = prev + 1;
-              if (next >= MAX_REFRESH) {
-                setStatus('error');
-                setError(t('settings.bridge.wechatExpired'));
-              } else {
-                fetchQrcode();
-              }
-              return next;
-            });
+            refreshCountRef.current += 1;
+            if (refreshCountRef.current >= MAX_REFRESH) {
+              setStatus('error');
+              setError(t('settings.bridge.wechatExpired'));
+            } else {
+              fetchQrcode();
+            }
             return;
           }
         } catch { /* 网络错误静默重试 */ }
@@ -126,7 +123,7 @@ export function WechatQrcodeOverlay() {
       const detail = (e as CustomEvent<{ agentId?: string | null }>).detail;
       agentIdRef.current = detail?.agentId ?? null;
       setVisible(true);
-      setRefreshCount(0);
+      refreshCountRef.current = 0;
       fetchQrcode();
     };
     window.addEventListener('hana-show-wechat-qrcode', show);

@@ -87,7 +87,6 @@ export function OtherModelsSection({ providers }: { providers: Record<string, { 
 
   const searchProvider = globalModelsConfig?.search?.provider || '';
   const searchIsBrowserProvider = BROWSER_SEARCH_PROVIDERS.has(searchProvider);
-  const searchNeedsApiKey = searchProviderNeedsApiKey(searchProvider);
 
   useEffect(() => {
     if (searchIsBrowserProvider) {

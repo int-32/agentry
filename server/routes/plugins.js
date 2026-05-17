@@ -431,13 +431,12 @@ function pluginDevErrorResponse(c, err) {
 }
 
 function sanitizeMarketplacePluginForClient(plugin) {
-  const {
-    readme: _readme,
-    readmePath: _readmePath,
-    distribution,
-    versions,
-    ...rest
-  } = plugin;
+  const rest = { ...plugin };
+  const { distribution, versions } = rest;
+  delete rest.readme;
+  delete rest.readmePath;
+  delete rest.distribution;
+  delete rest.versions;
   return {
     ...rest,
     distribution: distribution
@@ -804,7 +803,8 @@ export function createPluginsRoute(engine) {
         agentId,
         sessionPath,
       });
-      const { rawValues: _rawValues, ...safeConfig } = config;
+      const safeConfig = { ...config };
+      delete safeConfig.rawValues;
       return c.json(safeConfig);
     } catch (err) {
       if (err?.code === "PLUGIN_CONFIG_INVALID") {

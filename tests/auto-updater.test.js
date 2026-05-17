@@ -15,7 +15,7 @@ const mockAutoUpdater = {
 };
 
 const mockWindows = [];
-let mockExePath = "/Applications/Hanako.app/Contents/MacOS/Hanako";
+let mockExePath = "/Applications/Agentry.app/Contents/MacOS/Agentry";
 
 vi.mock("electron", () => ({
   ipcMain: { handle: vi.fn() },
@@ -55,7 +55,7 @@ describe("auto-updater", () => {
     mockAutoUpdater.autoInstallOnAppQuit = true;
     mockAutoUpdater.allowPrerelease = false;
     mockAutoUpdater.installDirectory = undefined;
-    mockExePath = "/Applications/Hanako.app/Contents/MacOS/Hanako";
+    mockExePath = "/Applications/Agentry.app/Contents/MacOS/Agentry";
 
     ({ ipcMain } = await import("electron"));
     ipcMain.handle.mockImplementation((name, handler) => {

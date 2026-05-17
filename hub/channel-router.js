@@ -444,7 +444,6 @@ export class ChannelRouter {
     mentionedAgents = [],
     mentionTargeted = false,
   } = {}) {
-    const engine = this._engine;
     const msgText = formatMessagesForLLM(newMessages);
     const isZh = getLocale().startsWith("zh");
     const lastNewMessage = newMessages[newMessages.length - 1] || null;

@@ -11,7 +11,6 @@
  * - 无 sessionPath：{hanakoHome}/uploads/，按 24 小时清理旧临时文件
  * - 有 sessionPath：{hanakoHome}/session-files/<session-hash>/，跟随 session 冷却清理
  */
-import fsSync from "fs";
 import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";

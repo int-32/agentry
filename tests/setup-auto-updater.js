@@ -43,7 +43,7 @@ const electronStub = {
     isPackaged: true,
     getVersion: () => "1.0.0",
     getPath: (name) => {
-      if (name === "exe") return "/Applications/Hanako.app/Contents/MacOS/Hanako";
+      if (name === "exe") return "/Applications/Agentry.app/Contents/MacOS/Agentry";
       if (name === "userData") return "/tmp/test-userdata";
       return "/tmp";
     },

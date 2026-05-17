@@ -259,7 +259,7 @@ function parseFmDescription(fm: string): string {
   if (idx === -1) return '';
   const fromDesc = fm.slice(idx);
   const lines = fromDesc.split('\n');
-  let value = lines[0].replace(/^description:\s*/, '');
+  const value = lines[0].replace(/^description:\s*/, '');
 
   const q = value[0];
   if (q === '"' || q === "'") {
@@ -284,8 +284,4 @@ function parseFmDescription(fm: string): string {
   }
 
   return value.trim();
-}
-
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

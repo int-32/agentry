@@ -250,7 +250,14 @@ export function LocalCliSection() {
                       {cli.installed && (
                         <>
                           <button
-                            onClick={(e) => { e.stopPropagation(); allEnabled ? disableAllForCli(cli.id) : enableAllForCli(cli.id); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (allEnabled) {
+                                disableAllForCli(cli.id);
+                              } else {
+                                enableAllForCli(cli.id);
+                              }
+                            }}
                             disabled={enableBusy || disableBusy}
                             title={allEnabled ? "一键停用此 CLI 之全部模型" : "一键启用此 CLI 之全部模型"}
                             style={{

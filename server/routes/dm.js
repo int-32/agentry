@@ -87,7 +87,7 @@ export function createDmRoute(engine) {
       }
 
       // 安全校验
-      if (/[\/\\]|\.\./.test(peerId)) {
+      if (/[/\\]|\.\./.test(peerId)) {
         return c.json({ error: "Invalid peerId" }, 400);
       }
 
@@ -97,7 +97,7 @@ export function createDmRoute(engine) {
       }
 
       const content = fs.readFileSync(dmFile, "utf-8");
-      const { meta, messages } = parseChannel(content);
+      const { messages } = parseChannel(content);
 
       const peerAgent = engine.getAgent(peerId);
       const peerName = peerAgent?.agentName || peerId;

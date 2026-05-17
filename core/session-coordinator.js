@@ -2566,7 +2566,7 @@ export class SessionCoordinator {
   }
 
   /** 创建 session 专用 settings（控制 compaction + max_completion_tokens） */
-  _createSettings(model) {
+  _createSettings(_model) {
     return createDefaultSettings();
   }
 }

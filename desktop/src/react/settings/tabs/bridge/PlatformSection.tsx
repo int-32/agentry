@@ -23,7 +23,6 @@ export interface CredentialField {
 }
 
 interface PlatformSectionProps {
-  platform: string;
   title: string;
   status?: { status?: string; error?: string; enabled?: boolean };
   credentialFields: CredentialField[];
@@ -50,7 +49,6 @@ export function PlatformSection({
   currentOwner,
   onOwnerChange,
   onCredentialBlur,
-  platform,
   children,
 }: PlatformSectionProps) {
   const lastFieldIndex = credentialFields.length - 1;
@@ -127,7 +125,6 @@ export function PlatformSection({
           borderTop: '1px solid var(--border)',
         }}>
           <OwnerSelect
-            platform={platform}
             users={ownerUsers}
             currentOwner={currentOwner}
             onChange={onOwnerChange}

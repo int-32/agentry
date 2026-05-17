@@ -46,7 +46,7 @@ export function matches(model) {
 }
 
 export function apply(payload, model, options = {}) {
-  let result = normalizeDashScopeVideoPayload(payload, model);
+  const result = normalizeDashScopeVideoPayload(payload, model);
   // chat 路径让 Pi SDK 自己处理（compat.thinkingFormat="qwen" 路径），不动 payload
   // utility 路径强制关思考（短输出不需要思考链 + 省 token）
   if (options?.mode === "utility") {

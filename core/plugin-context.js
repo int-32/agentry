@@ -70,7 +70,9 @@ export function createPluginContext({ pluginId, pluginDir, dataDir, bus, accessL
   }
 
   function stageFile(entry = {}) {
-    const { origin: _origin, storageKind: _storageKind, ...safeEntry } = entry;
+    const safeEntry = { ...entry };
+    delete safeEntry.origin;
+    delete safeEntry.storageKind;
     const file = registerSessionFile({ ...safeEntry, origin: "plugin_output" });
     return { file, mediaItem: toMediaItem(file) };
   }

@@ -8,7 +8,7 @@
 
 import fs from "fs";
 import path from "path";
-import { execSync, execFileSync } from "child_process";
+import { execFileSync } from "child_process";
 import { Hono } from "hono";
 import { safeJson } from "../hono-helpers.js";
 import { extractZip } from "../../lib/extract-zip.js";

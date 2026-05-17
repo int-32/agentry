@@ -36,7 +36,7 @@ rl.on("line", (line) => {
   let evt;
   try {
     evt = JSON.parse(line);
-  } catch (err) {
+  } catch {
     console.error(`\n[poc][bad-json] ${line.slice(0, 120)}`);
     return;
   }

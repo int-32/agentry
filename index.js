@@ -132,7 +132,7 @@ engine.subscribe((event) => {
 });
 
 // ── 启动 session ──
-let { session } = await engine.createSession();
+await engine.createSession();
 console.log("✿ 记忆系统已激活\n");
 
 // ── CLI 交互 ──
@@ -242,7 +242,7 @@ const ask = () => {
           const picked = display[idx];
           console.log(`\n✿ 正在加载 session...`);
           moodParser.reset();
-          session = await engine.switchSession(picked.path);
+          await engine.switchSession(picked.path);
           const msgCount = engine.messages?.length ?? 0;
           console.log(`✿ 已切换到历史 session（${msgCount} 条消息）`);
         } else {
@@ -258,7 +258,7 @@ const ask = () => {
     if (trimmed === "/new") {
       console.log("\n✿ 开始新的对话...");
       moodParser.reset();
-      ({ session } = await engine.createSession());
+      await engine.createSession();
       console.log("✿ 新 session 已创建");
       ask();
       return;

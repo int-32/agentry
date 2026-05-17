@@ -24,11 +24,8 @@ import {
 import { AppError } from "../../shared/errors.js";
 import { errorBus } from "../../shared/error-bus.js";
 import { waitTimingDetails } from "../../lib/tools/wait-contract.js";
-import { MAX_CHAT_IMAGE_BASE64_CHARS, isAllowedChatImageMime, isChatImageBase64WithinLimit } from "../../shared/image-mime.js";
+import { isAllowedChatImageMime, isChatImageBase64WithinLimit } from "../../shared/image-mime.js";
 import { isAllowedChatVideoMime, isChatVideoBase64WithinLimit } from "../../shared/video-mime.js";
-import fs from "fs";
-import path from "path";
-import crypto from "crypto";
 
 /** tool_start 事件只广播这些 arg 字段，避免传输完整文件内容（同步维护：chat-render-shim.ts extractToolDetail） */
 const TOOL_ARG_SUMMARY_KEYS = ["file_path", "path", "command", "pattern", "url", "query", "key", "value", "action", "type", "schedule", "prompt", "label"];
@@ -606,7 +603,7 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
             }, sessionPath);
           }
         }
-      } catch (_) { /* 统计失败不阻塞主流程 */ }
+      } catch { /* 统计失败不阻塞主流程 */ }
 
       emitStreamEvent(sessionPath, ss, { type: "turn_end" });
       finishSessionStream(ss);
@@ -651,7 +648,7 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
   // ── WebSocket 路由（挂载在 wsRoute，由 index.js 挂到根路径） ──
 
   wsRoute.get("/ws",
-    upgradeWebSocket((c) => {
+    upgradeWebSocket((_c) => {
       let closed = false;
 
       return {
@@ -891,7 +888,7 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
           });
         },
 
-        onError(event, ws) {
+        onError(event) {
           const err = event.error || event;
           console.error("[ws] error:", err.message || err);
           debugLog()?.error("ws", err.message || String(err));

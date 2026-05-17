@@ -102,7 +102,7 @@ img.clickable:hover{opacity:0.85}
                '<div class="play-btn">▶</div></div>';
       }
       var imgOpenUrl = mediaBase + '/media/open/' + encoded + (tokenParam ? tokenParam + '&' : '?') + 'token=' + token;
-      return '<img src="' + mediaBase + '/media/' + encoded + tokenParam + '" class="clickable" onclick="fetch(\'' + imgOpenUrl + '\',{method:\'POST\'})">';
+      return `<img src="${mediaBase}/media/${encoded}${tokenParam}" class="clickable" onclick="fetch('${imgOpenUrl}',{method:'POST'})">`;
     }
     if (t.status === 'failed') {
       return '<div class="failed">' + escHtml(t.failReason || '生成失败') + '</div>';

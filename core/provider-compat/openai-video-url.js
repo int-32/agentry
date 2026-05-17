@@ -33,13 +33,17 @@ export function normalizeOpenAIVideoUrlPayload(payload) {
       const url = getDataVideoUrl(part);
       if (!url) return part;
 
-      const { image_url, imageUrl, video_url, ...rest } = part;
+      const previousVideoUrl = part.video_url;
+      const rest = { ...part };
+      delete rest.image_url;
+      delete rest.imageUrl;
+      delete rest.video_url;
       contentChanged = true;
       return {
         ...rest,
         type: "video_url",
         video_url: {
-          ...(video_url && typeof video_url === "object" && !Array.isArray(video_url) ? video_url : {}),
+          ...(previousVideoUrl && typeof previousVideoUrl === "object" && !Array.isArray(previousVideoUrl) ? previousVideoUrl : {}),
           url,
         },
       };

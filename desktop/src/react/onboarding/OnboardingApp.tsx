@@ -22,7 +22,6 @@ export function OnboardingApp({ preview, skipToTutorial }: OnboardingAppProps) {
   const [serverConnection, setServerConnection] = useState<ServerConnection | null>(null);
   const [step, setStep] = useState(skipToTutorial ? 6 : 0);
   const [stepKey, setStepKey] = useState(0);
-  const [agentName, setAgentName] = useState('Hanako');
   const [avatarSrc, setAvatarSrc] = useState('assets/Hanako.png');
   const [locale, setLocale] = useState('zh-CN');
   const [i18nReady, setI18nReady] = useState(false);
@@ -90,7 +89,6 @@ export function OnboardingApp({ preview, skipToTutorial }: OnboardingAppProps) {
         const loc = splashInfo?.locale || 'zh-CN';
         const name = splashInfo?.agentName || 'Hanako';
         setLocale(loc);
-        setAgentName(name);
         await i18n.load(loc);
         i18n.defaultName = name;
         setI18nReady(true);
@@ -114,7 +112,7 @@ export function OnboardingApp({ preview, skipToTutorial }: OnboardingAppProps) {
         ))}
       </div>
 
-      {step === 0 && <LocaleStep key={`step-0-${stepKey}`} preview={preview} hanaFetch={hanaFetch} avatarSrc={avatarSrc} initialLocale={locale} goToStep={goToStep} showError={showError} onLocaleChange={onLocaleChange} />}
+      {step === 0 && <LocaleStep key={`step-0-${stepKey}`} preview={preview} hanaFetch={hanaFetch} avatarSrc={avatarSrc} initialLocale={locale} goToStep={goToStep} onLocaleChange={onLocaleChange} />}
       {step === 1 && <NameStep key={`step-1-${stepKey}`} preview={preview} hanaFetch={hanaFetch} goToStep={goToStep} showError={showError} />}
       {step === 2 && <ProviderStep key={`step-2-${stepKey}`} preview={preview} hanaFetch={hanaFetch} goToStep={goToStep} showError={showError} onProviderReady={onProviderReady} />}
       {step === 3 && <ModelStep key={`step-3-${stepKey}`} preview={preview} hanaFetch={hanaFetch} providerName={providerName} providerUrl={providerUrl} providerApi={providerApi} apiKey={apiKey} goToStep={goToStep} showError={showError} />}

@@ -29,7 +29,7 @@ export function migrateConfigScope({ agentsDir, prefs, primaryAgentId, log = () 
   log("[migrate] config scope 迁移开始...");
 
   // 收集所有 agent 的 config.yaml
-  let agentConfigs = [];
+  const agentConfigs = [];
   try {
     const entries = fs.readdirSync(agentsDir, { withFileTypes: true });
     for (const entry of entries) {
@@ -83,7 +83,6 @@ export function migrateConfigScope({ agentsDir, prefs, primaryAgentId, log = () 
   };
 
   // Phase 1: migrate up — 将 agent config 中的全局值提升到 preferences
-  let prefsChanged = false;
   for (const [schemaPath, def] of Object.entries(CONFIG_SCHEMA)) {
     if (def.scope !== 'global') continue;
 
@@ -102,7 +101,6 @@ export function migrateConfigScope({ agentsDir, prefs, primaryAgentId, log = () 
 
       if (agentValue !== undefined && agentValue !== defaultVal) {
         writePath(preferences, prefsParts, agentValue);
-        prefsChanged = true;
         log(`[migrate] ${schemaPath}: "${JSON.stringify(agentValue)}" migrated from agent "${ac.id}" to preferences`);
         break;
       }

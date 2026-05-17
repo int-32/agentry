@@ -49,7 +49,8 @@ export const createComputerOverlaySlice = (
   })),
 
   clearComputerOverlayForSession: (sessionPath) => set((state) => {
-    const { [sessionPath]: _removed, ...rest } = state.computerOverlayBySession;
+    const rest = { ...state.computerOverlayBySession };
+    delete rest[sessionPath];
     return { computerOverlayBySession: rest };
   }),
 });

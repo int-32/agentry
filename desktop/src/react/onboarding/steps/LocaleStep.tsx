@@ -14,13 +14,12 @@ interface LocaleStepProps {
   avatarSrc: string;
   initialLocale: string;
   goToStep: (index: number) => void;
-  showError: (msg: string) => void;
   onLocaleChange: (locale: string) => Promise<void>;
 }
 
 export function LocaleStep({
   preview, hanaFetch, avatarSrc, initialLocale,
-  goToStep, showError, onLocaleChange,
+  goToStep, onLocaleChange,
 }: LocaleStepProps) {
   const [locale, setLocale] = useState(initialLocale);
 

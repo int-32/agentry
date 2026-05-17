@@ -6,7 +6,6 @@
  */
 
 import { memo, useState, useEffect, useRef, useCallback } from 'react';
-import { subscribeStreamKey } from '../../services/stream-key-dispatcher';
 import { hanaUrl } from '../../hooks/use-hana-fetch';
 import { useStore } from '../../stores';
 import { AgentAvatar, resolveAgentDisplayInfo } from '../../utils/agent-display';
@@ -35,13 +34,6 @@ interface SubagentCardProps {
 
 export const SubagentCard = memo(function SubagentCard({ block }: SubagentCardProps) {
   const [status, setStatus] = useState(block.streamStatus);
-  const [display, setDisplay] = useState<string>(() => {
-    if (block.streamStatus === 'done') return block.summary || '已完成';
-    if (block.streamStatus === 'failed') return block.summary || '失败';
-    if (block.streamStatus === 'aborted') return block.summary || '已终止';
-    return '准备中...';
-  });
-  const textRef = useRef('');
 
   // 头像：优先用 agent 头像 API，fallback 到 yuan 剪影头像
   const currentAgentId = useStore(s => s.currentAgentId);
@@ -64,10 +56,7 @@ export const SubagentCard = memo(function SubagentCard({ block }: SubagentCardPr
   // Sync block prop changes (from block_update patch)
   useEffect(() => {
     setStatus(block.streamStatus);
-    if (block.streamStatus === 'done') setDisplay(block.summary || '已完成');
-    if (block.streamStatus === 'failed') setDisplay(block.summary || '失败');
-    if (block.streamStatus === 'aborted') setDisplay(block.summary || '已终止');
-  }, [block.streamStatus, block.summary]);
+  }, [block.streamStatus]);
 
   useEffect(() => {
     useStore.getState().setSubagentPreviewSessionPath(block.taskId, block.streamKey || null);
@@ -90,30 +79,6 @@ export const SubagentCard = memo(function SubagentCard({ block }: SubagentCardPr
     return () => window.clearTimeout(timer);
   }, [isOpen, shouldRenderPreview]);
 
-  // Subscribe to live events
-  useEffect(() => {
-    if (status !== 'running' || !block.streamKey) return;
-
-    const unsub = subscribeStreamKey(block.streamKey, (event: any) => {
-      if (event.type === 'text_delta') {
-        textRef.current += event.delta || '';
-        if (textRef.current.length > 100) textRef.current = textRef.current.slice(-100);
-        setDisplay(textRef.current);
-      } else if (event.type === 'thinking_start') {
-        setDisplay('正在思考...');
-      } else if (event.type === 'thinking_end') {
-        if (textRef.current) setDisplay(textRef.current);
-      } else if (event.type === 'tool_start') {
-        setDisplay(`正在调用 ${event.name}...`);
-      } else if (event.type === 'tool_end') {
-        if (textRef.current) setDisplay(textRef.current);
-        else setDisplay('执行中...');
-      }
-    });
-
-    return unsub;
-  }, [block.streamKey, status]);
-
   // "已中断" 仅在历史加载时判断：组件首次 mount 时如果 streamKey 为空且 status=running，
   // 等待一小段时间让 block_update 到达。如果一直没到才标记中断。
   const [waitedForKey, setWaitedForKey] = useState(false);
@@ -130,7 +95,6 @@ export const SubagentCard = memo(function SubagentCard({ block }: SubagentCardPr
       const res = await fetch(hanaUrl(`/api/task/${block.taskId}/abort`), { method: 'POST' });
       if (res.ok) {
         setStatus('aborted');
-        setDisplay(window.t?.('subagentAborted') || '已终止');
       }
     } catch { /* user-initiated abort; silent on network failure */ }
   }, [block.taskId]);

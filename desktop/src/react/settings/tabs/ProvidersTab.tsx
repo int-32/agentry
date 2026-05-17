@@ -134,7 +134,6 @@ export function ProvidersTab() {
                   key={selected}
                   providerId={selected}
                   summary={summary}
-                  providerConfig={providers[selected]}
                   isPresetSetup={!existing && !!preset}
                   presetInfo={preset}
                   onRefresh={async () => { await loadSettingsConfig(); await loadSummary(); }}

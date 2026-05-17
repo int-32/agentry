@@ -285,7 +285,7 @@ export class AgentManager {
     if (!name?.trim()) throw new Error(t("error.agentNameEmpty"));
 
     const agentId = id?.trim() || await this._generateAgentId(name);
-    if (/[\/\\]|\.\./.test(agentId)) throw new Error(t("error.agentIdInvalid"));
+    if (/[/\\]|\.\./.test(agentId)) throw new Error(t("error.agentIdInvalid"));
     const agentDir = path.join(this._d.agentsDir, agentId);
 
     if (fs.existsSync(agentDir)) {

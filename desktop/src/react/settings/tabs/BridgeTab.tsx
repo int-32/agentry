@@ -83,7 +83,6 @@ export function BridgeTab() {
 
       {/* Telegram */}
       <PlatformSection
-        platform="telegram"
         title={t('settings.bridge.telegram')}
         status={tgInfo}
         credentialFields={[
@@ -109,7 +108,6 @@ export function BridgeTab() {
 
       {/* 飞书 */}
       <PlatformSection
-        platform="feishu"
         title={t('settings.bridge.feishu')}
         status={fsInfo}
         credentialFields={[
@@ -137,7 +135,6 @@ export function BridgeTab() {
 
       {/* QQ */}
       <PlatformSection
-        platform="qq"
         title="QQ"
         status={qqInfo}
         credentialFields={[

@@ -51,7 +51,12 @@ const {
   withForcedLocalProxyBypass,
 } = require("../shared/network-proxy.cjs");
 
-const APP_USER_MODEL_ID = "com.hanako.app"; // Keep in sync with package.json build.appId.
+const APP_NAME = "Agentry";
+const APP_USER_MODEL_ID = "com.agentry.app"; // Keep in sync with package.json build.appId.
+const APP_ICON_PNG = path.join(__dirname, "src", "icon.png");
+const APP_ICON_ICO = path.join(__dirname, "src", "icon.ico");
+
+app.setName(APP_NAME);
 
 // preload 缺失时 Electron 会静默忽略，renderer 拿不到 window.hana →
 // onboarding/主窗口白屏且无前端报错。此处硬崩，拒绝以不可用状态启动。
@@ -325,12 +330,28 @@ function killPid(pid, force = false) {
 /** 跨平台标题栏选项：macOS hiddenInset + 红绿灯，Windows/Linux 无框 */
 function windowIconOpts() {
   if (process.platform === "win32") {
-    return { icon: path.join(__dirname, "src", "icon.ico") };
+    return { icon: APP_ICON_ICO };
   }
   if (process.platform === "linux") {
-    return { icon: path.join(__dirname, "src", "icon.png") };
+    return { icon: APP_ICON_PNG };
   }
   return {};
+}
+
+function applyAppBranding() {
+  app.setName(APP_NAME);
+  app.setAboutPanelOptions({
+    applicationName: APP_NAME,
+    applicationVersion: app.getVersion(),
+    iconPath: APP_ICON_PNG,
+  });
+
+  if (process.platform === "darwin") {
+    const dockIcon = nativeImage.createFromPath(APP_ICON_PNG);
+    if (!dockIcon.isEmpty()) {
+      app.dock.setIcon(dockIcon);
+    }
+  }
 }
 
 function framelessWindowOpts() {
@@ -901,10 +922,10 @@ function createTray() {
     if (process.platform === "darwin") icon.setTemplateImage(true);
   }
   tray = new Tray(icon);
-  tray.setToolTip(isDev ? "Hanako (dev)" : "Hanako");
+  tray.setToolTip(isDev ? `${APP_NAME} (dev)` : APP_NAME);
 
   const buildMenu = () => Menu.buildFromTemplate([
-    { label: mt("tray.show", null, "Show Hanako"), click: () => showPrimaryWindow() },
+    { label: mt("tray.show", null, `Show ${APP_NAME}`), click: () => showPrimaryWindow() },
     { label: mt("tray.settings", null, "Settings"), click: () => createSettingsWindow() },
     { type: "separator" },
     { label: mt("tray.quit", null, "Quit"), click: () => { isExitingServer = true; isQuitting = true; app.quit(); } },
@@ -1007,7 +1028,7 @@ function createSplashWindow() {
     height: 280,
     resizable: false,
     frame: false,
-    title: "Hanako",
+    title: APP_NAME,
     ...titleBarOpts({ x: 12, y: 12 }),
     transparent: true,
     show: false,
@@ -1069,7 +1090,7 @@ function createMainWindow() {
     height: saved?.height || 820,
     minWidth: 420,
     minHeight: 500,
-    title: "Hanako",
+    title: APP_NAME,
     ...titleBarOpts({ x: 16, y: 16 }),
     backgroundColor: getThemeBackgroundColor(initialTheme),
     show: false,
@@ -2198,7 +2219,7 @@ function createOnboardingWindow(query = {}) {
     height: 780,
     resizable: false,
     frame: false,
-    title: "Hanako",
+    title: APP_NAME,
     ...titleBarOpts({ x: 16, y: 16 }),
     backgroundColor: getThemeBackgroundColor(initialTheme),
     show: false,
@@ -2649,7 +2670,7 @@ wrapIpcOn("settings-changed", (_event, type, data) => {
     // 重建托盘菜单，使标签跟随新 locale
     if (tray && !tray.isDestroyed()) {
       const buildMenu = () => Menu.buildFromTemplate([
-        { label: mt("tray.show", null, "Show Hanako"), click: () => showPrimaryWindow() },
+        { label: mt("tray.show", null, `Show ${APP_NAME}`), click: () => showPrimaryWindow() },
         { label: mt("tray.settings", null, "Settings"), click: () => createSettingsWindow() },
         { type: "separator" },
         { label: mt("tray.quit", null, "Quit"), click: () => { isExitingServer = true; isQuitting = true; app.quit(); } },
@@ -3222,6 +3243,7 @@ wrapIpcBestEffortHandler("app-ready", () => {
 // ── App 生命周期 ──
 app.whenReady().then(async () => {
   try {
+    applyAppBranding();
     migrateSetupComplete();
     _startHiddenAtLogin = getAutoLaunchStatus({ app }).openedAtLogin === true && isSetupComplete();
 

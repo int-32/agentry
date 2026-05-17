@@ -8,10 +8,9 @@ import { ApiKeyCredentials } from './ApiKeyCredentials';
 import { ProviderModelList } from './ProviderModelList';
 import styles from '../../Settings.module.css';
 
-export function ProviderDetail({ providerId, summary, providerConfig, isPresetSetup, presetInfo, onRefresh }: {
+export function ProviderDetail({ providerId, summary, isPresetSetup, presetInfo, onRefresh }: {
   providerId: string;
   summary: ProviderSummary;
-  providerConfig?: Record<string, unknown>;
   isPresetSetup?: boolean;
   presetInfo?: { label: string; value: string; url?: string; api?: string; local?: boolean };
   onRefresh: () => Promise<void>;
@@ -40,7 +39,6 @@ export function ProviderDetail({ providerId, summary, providerConfig, isPresetSe
         <ApiKeyCredentials
           providerId={providerId}
           summary={summary}
-          providerConfig={providerConfig}
           isPresetSetup={isPresetSetup}
           presetInfo={presetInfo}
           onRefresh={onRefresh}

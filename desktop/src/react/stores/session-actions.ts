@@ -75,15 +75,24 @@ async function resetDeskForSessionCwd(cwd?: string | null): Promise<void> {
 function clearSessionRuntimeCaches(path: string): void {
   useStore.getState().clearSession?.(path);
   useStore.setState((s: Record<string, any>) => {
-    const { [path]: _attached, ...attachedFilesBySession } = s.attachedFilesBySession || {};
-    const { [path]: _registryFiles, ...sessionRegistryFilesByPath } = s.sessionRegistryFilesByPath || {};
-    const { [path]: _draft, ...drafts } = s.drafts || {};
-    const { [path]: _streamMeta, ...sessionStreams } = s.sessionStreams || {};
-    const { [path]: _browser, ...browserBySession } = s.browserBySession || {};
-    const { [path]: _computerOverlay, ...computerOverlayBySession } = s.computerOverlayBySession || {};
-    const { [path]: _scroll, ...scrollPositions } = s.scrollPositions || {};
-    const { [path]: _todos, ...todosBySession } = s.todosBySession || {};
-    const { [path]: _todosLive, ...todosLiveVersionBySession } = s.todosLiveVersionBySession || {};
+    const attachedFilesBySession = { ...(s.attachedFilesBySession || {}) };
+    const sessionRegistryFilesByPath = { ...(s.sessionRegistryFilesByPath || {}) };
+    const drafts = { ...(s.drafts || {}) };
+    const sessionStreams = { ...(s.sessionStreams || {}) };
+    const browserBySession = { ...(s.browserBySession || {}) };
+    const computerOverlayBySession = { ...(s.computerOverlayBySession || {}) };
+    const scrollPositions = { ...(s.scrollPositions || {}) };
+    const todosBySession = { ...(s.todosBySession || {}) };
+    const todosLiveVersionBySession = { ...(s.todosLiveVersionBySession || {}) };
+    delete attachedFilesBySession[path];
+    delete sessionRegistryFilesByPath[path];
+    delete drafts[path];
+    delete sessionStreams[path];
+    delete browserBySession[path];
+    delete computerOverlayBySession[path];
+    delete scrollPositions[path];
+    delete todosBySession[path];
+    delete todosLiveVersionBySession[path];
     return {
       attachedFilesBySession,
       sessionRegistryFilesByPath,
