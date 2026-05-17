@@ -19,7 +19,7 @@ interface SessionConfirmationPromptProps {
 function displayTitle(block: SessionConfirmationBlock) {
   if (block.kind === 'computer_app_approval') {
     const appName = block.subject?.label || '这个应用';
-    return `是否允许 Hana 控制 ${appName}`;
+    return `是否允许 Agentry 控制 ${appName}`;
   }
   return block.title;
 }

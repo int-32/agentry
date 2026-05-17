@@ -8,7 +8,7 @@ import {
   loadDefaultWorkspace,
   saveWorkspace,
 } from '../onboarding-actions';
-import type { HanaFetch } from '../onboarding-actions';
+import type { AgentryFetch } from '../onboarding-actions';
 import { StepContainer, Multiline } from '../onboarding-ui';
 
 const WorkspaceIcon = () => (
@@ -21,7 +21,7 @@ const WorkspaceIcon = () => (
 
 interface WorkspaceStepProps {
   preview: boolean;
-  hanaFetch: HanaFetch;
+  hanaFetch: AgentryFetch;
   goToStep: (index: number) => void;
   showError: (msg: string) => void;
 }

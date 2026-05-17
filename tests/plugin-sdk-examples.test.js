@@ -11,10 +11,10 @@ describe("plugin SDK examples and docs", () => {
   it("documents the SDK package map in a top-level guide", () => {
     const guide = fs.readFileSync(path.join(root, "PLUGIN_SDK.md"), "utf-8");
 
-    expect(guide).toContain("@hana/plugin-protocol");
-    expect(guide).toContain("@hana/plugin-sdk");
-    expect(guide).toContain("@hana/plugin-runtime");
-    expect(guide).toContain("@hana/plugin-components");
+    expect(guide).toContain("@agentry/plugin-protocol");
+    expect(guide).toContain("@agentry/plugin-sdk");
+    expect(guide).toContain("@agentry/plugin-runtime");
+    expect(guide).toContain("@agentry/plugin-components");
     expect(guide).toContain("npm run build:packages");
   });
 
@@ -46,9 +46,9 @@ describe("plugin SDK examples and docs", () => {
     expect(index).toContain("HANA_BUS_SKIP");
     expect(tool).toContain("defineTool");
     expect(tool).toContain("createMediaDetails");
-    expect(panel).toContain("@hana/plugin-sdk");
-    expect(panel).toContain("@hana/plugin-components");
-    expect(panel).toContain("HanaThemeProvider");
+    expect(panel).toContain("@agentry/plugin-sdk");
+    expect(panel).toContain("@agentry/plugin-components");
+    expect(panel).toContain("AgentryThemeProvider");
     expect(readme).toContain("bundle the UI");
   });
 

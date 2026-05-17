@@ -712,7 +712,7 @@ export class SessionCoordinator {
     //   C. restore=false                       → fresh compute from agent config
     //
     // allToolNames must cover the COMPLETE active set: Pi SDK built-ins
-    // (read/bash/edit/write/grep/find/ls) from sessionTools + OpenHanako
+    // (read/bash/edit/write/grep/find/ls) from sessionTools + Agentry
     // customs + plugin tools from sessionCustomTools. Using only agent.tools
     // would silently drop SDK built-ins and plugin tools when
     // setActiveToolsByName is applied.
@@ -1518,7 +1518,7 @@ export class SessionCoordinator {
    * 强制释放一个卡在 streaming 状态的 session。
    *
    * 停止按钮属于控制平面，不能等待 provider stream 自己收尾。这里先把
-   * Hanako 侧的 sessionPath 控制权释放出来，再把 SDK abort 和资源清理
+   * Agentry 侧的 sessionPath 控制权释放出来，再把 SDK abort 和资源清理
    * 丢到后台继续做。旧 session 的事件订阅和 SDK agent 连接会先断开，
    * 避免它之后恢复时把过期 delta 写回同一个前端会话或历史文件。
    *
@@ -1585,7 +1585,7 @@ export class SessionCoordinator {
    *
    * 三步契约:
    *   1. emit session_shutdown — 让 SDK 扩展清理 setInterval / store 订阅
-   *   2. unsub — 取消 Hanako 层的 session 事件转发
+   *   2. unsub — 取消 Agentry 层的 session 事件转发
    *   3. session.dispose — 让 SDK 释放 agent 订阅和 event listeners
    *
    * 任何一步失败都 log.warn 并继续下一步, 保证下游资源一定被释放。
@@ -1796,7 +1796,7 @@ export class SessionCoordinator {
    * 当前 model 对象。
    *
    * 必要性：Pi SDK 把 baseUrl 烤在 model 对象字段里，session 持的是创建时
-   * 的对象引用。Hanako 这边 ModelRegistry.refresh() 之后会重建模型对象，
+   * 的对象引用。Agentry 这边 ModelRegistry.refresh() 之后会重建模型对象，
    * 但 session 还指向旧对象——下一个 turn 仍用旧 baseUrl 发请求。
    * 本方法由 engine.onProviderChanged() 触发。
    */

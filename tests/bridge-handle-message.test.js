@@ -56,7 +56,7 @@ function createMocks() {
       writeIndex: () => {},
     },
     agentName: "TestAgent",
-    hanakoHome: os.tmpdir(),
+    agentryHome: os.tmpdir(),
     currentAgentId: "hana",
   };
 

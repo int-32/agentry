@@ -605,9 +605,9 @@ export class AgentManager {
 
     await fsp.rm(agentDir, { recursive: true, force: true });
 
-    if (this._d.hanakoHome) {
+    if (this._d.agentryHome) {
       try {
-        detachAgentFromBundles({ hanakoHome: this._d.hanakoHome }, agentId);
+        detachAgentFromBundles({ agentryHome: this._d.agentryHome }, agentId);
       } catch (err) {
         log.error(`Skill Bundle 解耦失败 (${agentId}): ${err.message}`);
       }

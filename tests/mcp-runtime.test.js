@@ -90,7 +90,7 @@ describe("MCP runtime policy", () => {
     expect(config.servers).toEqual(config.connectors);
   });
 
-  it("normalizes Cherry-style MCP server fields into Hana connectors", () => {
+  it("normalizes Cherry-style MCP server fields into Agentry connectors", () => {
     const config = normalizeMcpConfig({
       enabled: true,
       connectors: [

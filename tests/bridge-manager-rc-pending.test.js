@@ -34,7 +34,7 @@ function createMocks() {
     steerBridgeSession: vi.fn(() => false),
     bridgeSessionManager: { injectMessage: vi.fn(() => true), readIndex: () => ({}), writeIndex: () => {} },
     agentName: "T",
-    hanakoHome: os.tmpdir(),
+    agentryHome: os.tmpdir(),
     currentAgentId: "hana",
     listSessions: vi.fn(async () => []),
   };

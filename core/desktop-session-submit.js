@@ -61,7 +61,7 @@ export async function submitDesktopSessionMessage(engine, opts = {}) {
 
   if (displayAttachments?.length) {
     const registeredDisplay = registerDisplayAttachments({
-      hanakoHome: engine.hanakoHome,
+      agentryHome: engine.agentryHome,
       sessionPath,
       attachments: displayAttachments,
       registerSessionFile: engine.registerSessionFile?.bind(engine),
@@ -79,7 +79,7 @@ export async function submitDesktopSessionMessage(engine, opts = {}) {
 
   if (inboundFiles?.length) {
     const materialized = await materializeBridgeInboundFiles({
-      hanakoHome: engine.hanakoHome,
+      agentryHome: engine.agentryHome,
       sessionPath,
       files: inboundFiles,
       registerSessionFile: engine.registerSessionFile?.bind(engine),
@@ -153,7 +153,7 @@ export async function submitDesktopSessionMessage(engine, opts = {}) {
   };
 }
 
-function registerDisplayAttachments({ hanakoHome, sessionPath, attachments, registerSessionFile }) {
+function registerDisplayAttachments({ agentryHome, sessionPath, attachments, registerSessionFile }) {
   const nextAttachments = [];
   const imageAttachmentPaths = [];
   const videoAttachmentPaths = [];
@@ -168,7 +168,7 @@ function registerDisplayAttachments({ hanakoHome, sessionPath, attachments, regi
         filePath: next.path,
         label: next.name || path.basename(next.path),
         origin: "user_attachment",
-        storageKind: displayAttachmentStorageKind(hanakoHome, next.path),
+        storageKind: displayAttachmentStorageKind(agentryHome, next.path),
       }));
       if (sessionFile) {
         next = {
@@ -208,9 +208,9 @@ function registerDisplayAttachments({ hanakoHome, sessionPath, attachments, regi
   };
 }
 
-function displayAttachmentStorageKind(hanakoHome, filePath) {
-  if (!hanakoHome) return "external";
-  const root = path.resolve(hanakoHome, "session-files");
+function displayAttachmentStorageKind(agentryHome, filePath) {
+  if (!agentryHome) return "external";
+  const root = path.resolve(agentryHome, "session-files");
   const target = path.resolve(filePath);
   const rel = path.relative(root, target);
   if (rel === "" || (rel && !rel.startsWith("..") && !path.isAbsolute(rel))) {

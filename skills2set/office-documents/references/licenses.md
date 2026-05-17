@@ -1,6 +1,6 @@
 # Licensing Notes
 
-This skill must stay safe to bundle with Hana. Do not copy text, scripts, templates, or examples from Anthropic's document skills.
+This skill must stay safe to bundle with Agentry. Do not copy text, scripts, templates, or examples from Anthropic's document skills.
 
 ## Approved Sources
 
@@ -19,7 +19,7 @@ OfficeCLI is Apache-2.0, but this skill intentionally does not require or invoke
 
 ## Blocked Source
 
-Anthropic's `skills/docx`, `skills/xlsx`, `skills/pptx`, and `skills/pdf` are source-available, not open source. Their license restricts extracting, copying, creating derivatives from, distributing, sublicensing, or transferring the materials. Do not vendor or paraphrase those skill files into Hana.
+Anthropic's `skills/docx`, `skills/xlsx`, `skills/pptx`, and `skills/pdf` are source-available, not open source. Their license restricts extracting, copying, creating derivatives from, distributing, sublicensing, or transferring the materials. Do not vendor or paraphrase those skill files into Agentry.
 
 Reference link: https://github.com/anthropics/skills
 

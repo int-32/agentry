@@ -4,12 +4,12 @@ export type JsonSchema = Record<string, unknown>;
 
 export const HANA_BUS_SKIP = Symbol.for('hana.event-bus.skip');
 
-export interface HanaToolResult {
+export interface AgentryToolResult {
   content?: Array<Record<string, unknown>>;
   details?: Record<string, unknown>;
 }
 
-export interface HanaSessionFile {
+export interface AgentrySessionFile {
   id?: string | null;
   fileId?: string | null;
   sessionPath?: string | null;
@@ -32,7 +32,7 @@ export interface HanaSessionFile {
   [key: string]: unknown;
 }
 
-export interface HanaSessionFileMediaItem {
+export interface AgentrySessionFileMediaItem {
   type: 'session_file';
   fileId: string;
   sessionPath?: string | null;
@@ -44,96 +44,96 @@ export interface HanaSessionFileMediaItem {
   [key: string]: unknown;
 }
 
-export interface HanaStagedSessionFile {
-  file?: HanaSessionFile | null;
-  sessionFile?: HanaSessionFile | null;
-  mediaItem: HanaSessionFileMediaItem;
+export interface AgentryStagedSessionFile {
+  file?: AgentrySessionFile | null;
+  sessionFile?: AgentrySessionFile | null;
+  mediaItem: AgentrySessionFileMediaItem;
 }
 
-export interface HanaMediaDetails {
+export interface AgentryMediaDetails {
   media: {
-    items: HanaSessionFileMediaItem[];
+    items: AgentrySessionFileMediaItem[];
   };
 }
 
-export interface HanaToolContext {
+export interface AgentryToolContext {
   pluginId: string;
   pluginDir: string;
   dataDir: string;
   sessionPath?: string | null;
-  bus: HanaEventBus;
-  config: HanaPluginConfigStore;
-  log: HanaPluginLogger;
-  registerSessionFile?: (input: Record<string, unknown>) => HanaSessionFile;
-  stageFile?: (input: Record<string, unknown>) => HanaStagedSessionFile;
+  bus: AgentryEventBus;
+  config: AgentryPluginConfigStore;
+  log: AgentryPluginLogger;
+  registerSessionFile?: (input: Record<string, unknown>) => AgentrySessionFile;
+  stageFile?: (input: Record<string, unknown>) => AgentryStagedSessionFile;
   [key: string]: unknown;
 }
 
-export interface HanaToolDefinition<Input = unknown, Output = unknown> {
+export interface AgentryToolDefinition<Input = unknown, Output = unknown> {
   name: string;
   description: string;
   parameters?: JsonSchema;
   promptSnippet?: string;
   promptGuidelines?: string;
-  execute(input: Input, ctx: HanaToolContext): MaybePromise<Output>;
+  execute(input: Input, ctx: AgentryToolContext): MaybePromise<Output>;
 }
 
-export type HanaSlashPermission = 'anyone' | 'owner' | 'admin';
-export type HanaSlashScope = 'session' | 'global';
+export type AgentrySlashPermission = 'anyone' | 'owner' | 'admin';
+export type AgentrySlashScope = 'session' | 'global';
 
-export interface HanaCommandContext {
+export interface AgentryCommandContext {
   [key: string]: unknown;
 }
 
-export interface HanaCommandResult {
+export interface AgentryCommandResult {
   reply?: string;
   silent?: boolean;
   error?: string;
   [key: string]: unknown;
 }
 
-export interface HanaCommandDefinition<Context = HanaCommandContext> {
+export interface AgentryCommandDefinition<Context = AgentryCommandContext> {
   name: string;
   aliases?: string[];
   description?: string;
-  scope?: HanaSlashScope;
-  permission?: HanaSlashPermission;
+  scope?: AgentrySlashScope;
+  permission?: AgentrySlashPermission;
   usage?: string;
-  handler?: (ctx: Context) => MaybePromise<HanaCommandResult | void>;
+  handler?: (ctx: Context) => MaybePromise<AgentryCommandResult | void>;
   execute?: (ctx: Context) => MaybePromise<unknown>;
 }
 
-export type HanaProviderRuntimeKind = 'http' | 'oauth-http' | 'local-cli' | 'browser-cli' | 'plugin';
-export type HanaMediaCapabilityName = 'imageGeneration' | 'videoGeneration' | 'speechGeneration' | string;
-export type HanaMediaOutputKind = 'file_glob' | 'json_stdout' | 'url_stdout';
-export type HanaCliBindingSource = 'prompt' | 'modelId' | 'inputFile' | 'outputDir' | 'size' | 'duration';
+export type AgentryProviderRuntimeKind = 'http' | 'oauth-http' | 'local-cli' | 'browser-cli' | 'plugin';
+export type AgentryMediaCapabilityName = 'imageGeneration' | 'videoGeneration' | 'speechGeneration' | string;
+export type AgentryMediaOutputKind = 'file_glob' | 'json_stdout' | 'url_stdout';
+export type AgentryCliBindingSource = 'prompt' | 'modelId' | 'inputFile' | 'outputDir' | 'size' | 'duration';
 
-export type HanaCliArgBinding =
+export type AgentryCliArgBinding =
   | { literal: string }
-  | { option: string; from: HanaCliBindingSource };
+  | { option: string; from: AgentryCliBindingSource };
 
-export interface HanaCliOutputContract {
-  kind: HanaMediaOutputKind;
-  directory?: HanaCliBindingSource | string;
+export interface AgentryCliOutputContract {
+  kind: AgentryMediaOutputKind;
+  directory?: AgentryCliBindingSource | string;
   pattern?: string;
   [key: string]: unknown;
 }
 
-export interface HanaCliCommandSpec {
+export interface AgentryCliCommandSpec {
   executable: string;
-  args: HanaCliArgBinding[];
+  args: AgentryCliArgBinding[];
   timeoutMs: number;
-  output: HanaCliOutputContract;
+  output: AgentryCliOutputContract;
 }
 
-export interface HanaProviderRuntime {
-  kind: HanaProviderRuntimeKind;
+export interface AgentryProviderRuntime {
+  kind: AgentryProviderRuntimeKind;
   protocolId?: string;
-  command?: HanaCliCommandSpec;
+  command?: AgentryCliCommandSpec;
   [key: string]: unknown;
 }
 
-export interface HanaProviderChatCapability {
+export interface AgentryProviderChatCapability {
   projection?: 'models-json' | 'sdk-auth-alias' | 'none' | string;
   runtimeProviderId?: string;
   displayProviderId?: string;
@@ -141,7 +141,7 @@ export interface HanaProviderChatCapability {
   [key: string]: unknown;
 }
 
-export interface HanaProviderMediaModel {
+export interface AgentryProviderMediaModel {
   id: string;
   displayName?: string;
   protocolId: string;
@@ -153,33 +153,33 @@ export interface HanaProviderMediaModel {
   [key: string]: unknown;
 }
 
-export interface HanaProviderCredentialLane {
+export interface AgentryProviderCredentialLane {
   id: string;
   kind?: string;
   label?: string;
   [key: string]: unknown;
 }
 
-export interface HanaProviderMediaCapability {
+export interface AgentryProviderMediaCapability {
   defaultModelId?: string;
-  models: HanaProviderMediaModel[];
-  credentialLanes?: HanaProviderCredentialLane[];
+  models: AgentryProviderMediaModel[];
+  credentialLanes?: AgentryProviderCredentialLane[];
   [key: string]: unknown;
 }
 
-export interface HanaProviderCapabilities {
-  chat?: HanaProviderChatCapability;
-  media?: Partial<Record<HanaMediaCapabilityName, HanaProviderMediaCapability>>;
+export interface AgentryProviderCapabilities {
+  chat?: AgentryProviderChatCapability;
+  media?: Partial<Record<AgentryMediaCapabilityName, AgentryProviderMediaCapability>>;
   [key: string]: unknown;
 }
 
-export interface HanaProviderSource {
+export interface AgentryProviderSource {
   kind: 'builtin' | 'plugin' | 'user' | string;
   pluginId?: string;
   [key: string]: unknown;
 }
 
-export interface HanaProviderDefinition {
+export interface AgentryProviderDefinition {
   id: string;
   displayName?: string;
   name?: string;
@@ -189,39 +189,39 @@ export interface HanaProviderDefinition {
   defaultApi?: string;
   api?: string;
   models?: unknown[];
-  runtime?: HanaProviderRuntime;
-  capabilities?: HanaProviderCapabilities;
-  source?: HanaProviderSource;
+  runtime?: AgentryProviderRuntime;
+  capabilities?: AgentryProviderCapabilities;
+  source?: AgentryProviderSource;
   [key: string]: unknown;
 }
 
-export type HanaExtensionFactory<Pi = unknown> = (pi: Pi) => MaybePromise<void>;
+export type AgentryExtensionFactory<Pi = unknown> = (pi: Pi) => MaybePromise<void>;
 
-export interface HanaPluginConfigStore {
-  get<T = unknown>(key: string, options?: HanaPluginConfigScopeOptions): MaybePromise<T | undefined>;
-  getAll?(options?: HanaPluginConfigScopeOptions & { redacted?: boolean }): MaybePromise<Record<string, unknown>>;
-  set<T = unknown>(key: string, value: T, options?: HanaPluginConfigScopeOptions): MaybePromise<void>;
-  setMany?(values: Record<string, unknown>, options?: HanaPluginConfigScopeOptions): MaybePromise<Record<string, unknown>>;
+export interface AgentryPluginConfigStore {
+  get<T = unknown>(key: string, options?: AgentryPluginConfigScopeOptions): MaybePromise<T | undefined>;
+  getAll?(options?: AgentryPluginConfigScopeOptions & { redacted?: boolean }): MaybePromise<Record<string, unknown>>;
+  set<T = unknown>(key: string, value: T, options?: AgentryPluginConfigScopeOptions): MaybePromise<void>;
+  setMany?(values: Record<string, unknown>, options?: AgentryPluginConfigScopeOptions): MaybePromise<Record<string, unknown>>;
   getSchema?(): JsonSchema;
 }
 
-export interface HanaPluginConfigScopeOptions {
+export interface AgentryPluginConfigScopeOptions {
   scope?: 'global' | 'per-agent' | 'per-session';
   agentId?: string;
   sessionPath?: string;
 }
 
-export interface HanaEventBus {
+export interface AgentryEventBus {
   emit(type: string, payload?: unknown): unknown;
   subscribe(type: string, handler: (payload: unknown) => void): () => void;
   request<T = unknown>(type: string, payload?: unknown, options?: Record<string, unknown>): Promise<T>;
   hasHandler?(type: string): boolean;
   handle?(type: string, handler: (payload: unknown) => MaybePromise<unknown>): () => void;
-  listCapabilities?(): HanaEventBusCapability[];
-  getCapability?(type: string): HanaEventBusCapability | null;
+  listCapabilities?(): AgentryEventBusCapability[];
+  getCapability?(type: string): AgentryEventBusCapability | null;
 }
 
-export interface HanaEventBusCapability {
+export interface AgentryEventBusCapability {
   type: string;
   title: string;
   description: string;
@@ -235,62 +235,62 @@ export interface HanaEventBusCapability {
   available?: boolean;
 }
 
-export interface HanaPluginLogger {
+export interface AgentryPluginLogger {
   debug(...args: unknown[]): void;
   info(...args: unknown[]): void;
   warn(...args: unknown[]): void;
   error(...args: unknown[]): void;
 }
 
-export interface HanaBusHandlerContext {
+export interface AgentryBusHandlerContext {
   pluginId: string;
-  bus: HanaEventBus;
-  config?: HanaPluginConfigStore;
-  log?: HanaPluginLogger;
+  bus: AgentryEventBus;
+  config?: AgentryPluginConfigStore;
+  log?: AgentryPluginLogger;
   [key: string]: unknown;
 }
 
-export interface HanaBusHandlerDefinition<
+export interface AgentryBusHandlerDefinition<
   Payload = unknown,
   Result = unknown,
-  Context extends HanaBusHandlerContext = HanaBusHandlerContext,
+  Context extends AgentryBusHandlerContext = AgentryBusHandlerContext,
 > {
   type: string;
   handle(payload: Payload, ctx: Context): MaybePromise<Result>;
 }
 
-export interface HanaPluginContext {
+export interface AgentryPluginContext {
   pluginId: string;
   pluginDir: string;
   dataDir: string;
-  bus: HanaEventBus;
-  config: HanaPluginConfigStore;
-  log: HanaPluginLogger;
-  registerTool?: (tool: HanaToolDefinition) => () => void;
-  registerSessionFile?: (input: Record<string, unknown>) => HanaSessionFile;
-  stageFile?: (input: Record<string, unknown>) => HanaStagedSessionFile;
+  bus: AgentryEventBus;
+  config: AgentryPluginConfigStore;
+  log: AgentryPluginLogger;
+  registerTool?: (tool: AgentryToolDefinition) => () => void;
+  registerSessionFile?: (input: Record<string, unknown>) => AgentrySessionFile;
+  stageFile?: (input: Record<string, unknown>) => AgentryStagedSessionFile;
   [key: string]: unknown;
 }
 
-export type HanaPluginDisposable = () => void;
+export type AgentryPluginDisposable = () => void;
 
-export interface HanaPluginLifecycleHelpers {
-  register(disposable: HanaPluginDisposable): void;
+export interface AgentryPluginLifecycleHelpers {
+  register(disposable: AgentryPluginDisposable): void;
 }
 
-export interface HanaPluginLifecycle {
-  onload?(ctx: HanaPluginContext, helpers: HanaPluginLifecycleHelpers): MaybePromise<void>;
-  onunload?(ctx: HanaPluginContext): MaybePromise<void>;
+export interface AgentryPluginLifecycle {
+  onload?(ctx: AgentryPluginContext, helpers: AgentryPluginLifecycleHelpers): MaybePromise<void>;
+  onunload?(ctx: AgentryPluginContext): MaybePromise<void>;
 }
 
-export interface HanaPluginInstance {
-  ctx: HanaPluginContext;
-  register: (disposable: HanaPluginDisposable) => void;
+export interface AgentryPluginInstance {
+  ctx: AgentryPluginContext;
+  register: (disposable: AgentryPluginDisposable) => void;
   onload?(): MaybePromise<void>;
   onunload?(): MaybePromise<void>;
 }
 
-export type HanaTaskStatus =
+export type AgentryTaskStatus =
   | 'pending'
   | 'running'
   | 'paused'
@@ -301,22 +301,22 @@ export type HanaTaskStatus =
   | 'canceled'
   | 'aborted';
 
-export interface HanaTaskProgress {
+export interface AgentryTaskProgress {
   current?: number;
   total?: number;
   percent?: number;
   message?: string;
 }
 
-export interface HanaTaskRecord {
+export interface AgentryTaskRecord {
   taskId: string;
   type: string;
   parentSessionPath?: string | null;
   pluginId?: string | null;
   agentId?: string | null;
   meta?: Record<string, unknown>;
-  progress?: HanaTaskProgress | null;
-  status: HanaTaskStatus;
+  progress?: AgentryTaskProgress | null;
+  status: AgentryTaskStatus;
   aborted?: boolean;
   createdAt?: number;
   updatedAt?: number;
@@ -325,7 +325,7 @@ export interface HanaTaskRecord {
   error?: string;
 }
 
-export interface HanaTaskSchedule {
+export interface AgentryTaskSchedule {
   scheduleId: string;
   type: string;
   pluginId?: string | null;
@@ -343,7 +343,7 @@ export interface HanaTaskSchedule {
   runCount?: number;
 }
 
-export interface HanaTaskRegisterInput {
+export interface AgentryTaskRegisterInput {
   taskId: string;
   type: string;
   parentSessionPath?: string | null;
@@ -353,10 +353,10 @@ export interface HanaTaskRegisterInput {
   persist?: boolean;
 }
 
-export interface HanaTaskUpdateInput {
+export interface AgentryTaskUpdateInput {
   taskId: string;
-  status?: HanaTaskStatus;
-  progress?: HanaTaskProgress | null;
+  status?: AgentryTaskStatus;
+  progress?: AgentryTaskProgress | null;
   meta?: Record<string, unknown>;
   result?: unknown;
   error?: unknown;
@@ -365,7 +365,7 @@ export interface HanaTaskUpdateInput {
   agentId?: string | null;
 }
 
-export interface HanaTaskScheduleInput {
+export interface AgentryTaskScheduleInput {
   scheduleId: string;
   type: string;
   pluginId?: string | null;
@@ -381,36 +381,36 @@ export interface HanaTaskScheduleInput {
 const EMPTY_PARAMETERS: JsonSchema = { type: 'object', properties: {} };
 
 export function defineTool<Input = unknown, Output = unknown>(
-  definition: HanaToolDefinition<Input, Output>,
-): HanaToolDefinition<Input, Output> & { parameters: JsonSchema } {
+  definition: AgentryToolDefinition<Input, Output>,
+): AgentryToolDefinition<Input, Output> & { parameters: JsonSchema } {
   return {
     ...definition,
     parameters: definition.parameters ?? EMPTY_PARAMETERS,
   };
 }
 
-export function defineCommand<Context = HanaCommandContext>(
-  definition: HanaCommandDefinition<Context>,
-): HanaCommandDefinition<Context> {
+export function defineCommand<Context = AgentryCommandContext>(
+  definition: AgentryCommandDefinition<Context>,
+): AgentryCommandDefinition<Context> {
   return { ...definition };
 }
 
-export function defineProvider<T extends HanaProviderDefinition>(definition: T): T {
+export function defineProvider<T extends AgentryProviderDefinition>(definition: T): T {
   return definition;
 }
 
 export function defineBusHandler<
   Payload = unknown,
   Result = unknown,
-  Context extends HanaBusHandlerContext = HanaBusHandlerContext,
+  Context extends AgentryBusHandlerContext = AgentryBusHandlerContext,
 >(
-  definition: HanaBusHandlerDefinition<Payload, Result, Context>,
-): HanaBusHandlerDefinition<Payload, Result, Context> {
+  definition: AgentryBusHandlerDefinition<Payload, Result, Context>,
+): AgentryBusHandlerDefinition<Payload, Result, Context> {
   return { ...definition };
 }
 
 export function requestBus<Result = unknown, Payload = unknown>(
-  ctx: { bus?: Pick<HanaEventBus, 'request'> | null },
+  ctx: { bus?: Pick<AgentryEventBus, 'request'> | null },
   type: string,
   payload?: Payload,
   options?: Record<string, unknown>,
@@ -422,37 +422,37 @@ export function requestBus<Result = unknown, Payload = unknown>(
 }
 
 export function registerTask(
-  ctx: { bus?: Pick<HanaEventBus, 'request'> | null },
-  input: HanaTaskRegisterInput,
+  ctx: { bus?: Pick<AgentryEventBus, 'request'> | null },
+  input: AgentryTaskRegisterInput,
 ): Promise<{ ok: true }> {
   return requestBus(ctx, 'task:register', input);
 }
 
 export function updateTask(
-  ctx: { bus?: Pick<HanaEventBus, 'request'> | null },
-  input: HanaTaskUpdateInput,
-): Promise<{ ok: true; task: HanaTaskRecord }> {
+  ctx: { bus?: Pick<AgentryEventBus, 'request'> | null },
+  input: AgentryTaskUpdateInput,
+): Promise<{ ok: true; task: AgentryTaskRecord }> {
   return requestBus(ctx, 'task:update', input);
 }
 
 export function completeTask(
-  ctx: { bus?: Pick<HanaEventBus, 'request'> | null },
+  ctx: { bus?: Pick<AgentryEventBus, 'request'> | null },
   taskId: string,
   result?: unknown,
-): Promise<{ ok: true; task: HanaTaskRecord }> {
+): Promise<{ ok: true; task: AgentryTaskRecord }> {
   return requestBus(ctx, 'task:complete', { taskId, result });
 }
 
 export function failTask(
-  ctx: { bus?: Pick<HanaEventBus, 'request'> | null },
+  ctx: { bus?: Pick<AgentryEventBus, 'request'> | null },
   taskId: string,
   error: unknown,
-): Promise<{ ok: true; task: HanaTaskRecord }> {
+): Promise<{ ok: true; task: AgentryTaskRecord }> {
   return requestBus(ctx, 'task:fail', { taskId, error });
 }
 
 export function cancelTask(
-  ctx: { bus?: Pick<HanaEventBus, 'request'> | null },
+  ctx: { bus?: Pick<AgentryEventBus, 'request'> | null },
   taskId: string,
   reason?: string,
 ): Promise<{ result: string; canceled: boolean }> {
@@ -460,26 +460,26 @@ export function cancelTask(
 }
 
 export function scheduleTask(
-  ctx: { bus?: Pick<HanaEventBus, 'request'> | null },
-  input: HanaTaskScheduleInput,
-): Promise<{ ok: true; schedule: HanaTaskSchedule }> {
+  ctx: { bus?: Pick<AgentryEventBus, 'request'> | null },
+  input: AgentryTaskScheduleInput,
+): Promise<{ ok: true; schedule: AgentryTaskSchedule }> {
   return requestBus(ctx, 'task:schedule', input);
 }
 
 export function unscheduleTask(
-  ctx: { bus?: Pick<HanaEventBus, 'request'> | null },
+  ctx: { bus?: Pick<AgentryEventBus, 'request'> | null },
   scheduleId: string,
 ): Promise<{ ok: true; removed: boolean }> {
   return requestBus(ctx, 'task:unschedule', { scheduleId });
 }
 
-export function sessionFileToMediaItem(file: HanaSessionFile): HanaSessionFileMediaItem {
+export function sessionFileToMediaItem(file: AgentrySessionFile): AgentrySessionFileMediaItem {
   const fileId = firstText(file.fileId, file.id);
   if (!fileId) {
     throw new Error('SessionFile media item requires id or fileId');
   }
 
-  const item: HanaSessionFileMediaItem = {
+  const item: AgentrySessionFileMediaItem = {
     type: 'session_file',
     fileId,
   };
@@ -492,9 +492,9 @@ export function sessionFileToMediaItem(file: HanaSessionFile): HanaSessionFileMe
   return item;
 }
 
-type HanaMediaInput = HanaSessionFile | HanaSessionFileMediaItem | HanaStagedSessionFile;
+type AgentryMediaInput = AgentrySessionFile | AgentrySessionFileMediaItem | AgentryStagedSessionFile;
 
-export function createMediaDetails(items: HanaMediaInput[]): HanaMediaDetails {
+export function createMediaDetails(items: AgentryMediaInput[]): AgentryMediaDetails {
   return {
     media: {
       items: items.map(normalizeMediaItem),
@@ -502,14 +502,14 @@ export function createMediaDetails(items: HanaMediaInput[]): HanaMediaDetails {
   };
 }
 
-export function defineExtension<Pi = unknown>(factory: HanaExtensionFactory<Pi>): HanaExtensionFactory<Pi> {
+export function defineExtension<Pi = unknown>(factory: AgentryExtensionFactory<Pi>): AgentryExtensionFactory<Pi> {
   return factory;
 }
 
-export function definePlugin(lifecycle: HanaPluginLifecycle): new () => HanaPluginInstance {
-  return class DefinedHanaPlugin implements HanaPluginInstance {
-    ctx!: HanaPluginContext;
-    register!: (disposable: HanaPluginDisposable) => void;
+export function definePlugin(lifecycle: AgentryPluginLifecycle): new () => AgentryPluginInstance {
+  return class DefinedHanaPlugin implements AgentryPluginInstance {
+    ctx!: AgentryPluginContext;
+    register!: (disposable: AgentryPluginDisposable) => void;
 
     async onload(): Promise<void> {
       await lifecycle.onload?.(this.ctx, { register: this.register });
@@ -521,7 +521,7 @@ export function definePlugin(lifecycle: HanaPluginLifecycle): new () => HanaPlug
   };
 }
 
-function normalizeMediaItem(input: HanaMediaInput): HanaSessionFileMediaItem {
+function normalizeMediaItem(input: AgentryMediaInput): AgentrySessionFileMediaItem {
   if (isRecord(input) && isRecord(input.mediaItem)) {
     return normalizeSessionFileMediaItem(input.mediaItem);
   }
@@ -534,7 +534,7 @@ function normalizeMediaItem(input: HanaMediaInput): HanaSessionFileMediaItem {
   throw new Error('media details item must be a SessionFile, staged file, or session_file media item');
 }
 
-function normalizeSessionFileMediaItem(input: Record<string, unknown>): HanaSessionFileMediaItem {
+function normalizeSessionFileMediaItem(input: Record<string, unknown>): AgentrySessionFileMediaItem {
   if (input.type !== 'session_file') {
     throw new Error('media details item must be a session_file media item');
   }

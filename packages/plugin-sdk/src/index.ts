@@ -5,47 +5,47 @@ import {
   parsePluginUiMessage,
   type PluginUiError,
   type PluginUiMessage,
-} from '@hana/plugin-protocol';
+} from '@agentry/plugin-protocol';
 
-export interface HanaPluginSize {
+export interface AgentryPluginSize {
   width?: number;
   height?: number;
 }
 
-export interface HanaPluginThemeSnapshot {
+export interface AgentryPluginThemeSnapshot {
   theme?: string;
   cssUrl?: string;
 }
 
-export interface HanaPluginRequestOptions {
+export interface AgentryPluginRequestOptions {
   timeoutMs?: number;
 }
 
-export type HanaToastType = 'success' | 'error' | 'info' | 'warning';
+export type AgentryToastType = 'success' | 'error' | 'info' | 'warning';
 
-export interface HanaToastShowInput {
+export interface AgentryToastShowInput {
   message: string;
-  type?: HanaToastType;
+  type?: AgentryToastType;
   duration?: number;
 }
 
-export interface HanaToastShowResult {
+export interface AgentryToastShowResult {
   shown: boolean;
 }
 
-export type HanaExternalOpenInput = string | { url: string };
+export type AgentryExternalOpenInput = string | { url: string };
 
-export interface HanaExternalOpenResult {
+export interface AgentryExternalOpenResult {
   opened: boolean;
 }
 
-export type HanaClipboardWriteTextInput = string | { text: string };
+export type AgentryClipboardWriteTextInput = string | { text: string };
 
-export interface HanaClipboardWriteTextResult {
+export interface AgentryClipboardWriteTextResult {
   written: boolean;
 }
 
-export interface HanaPluginSdkOptions {
+export interface AgentryPluginSdkOptions {
   parentWindow?: Window;
   targetWindow?: Window;
   targetOrigin?: string;
@@ -53,38 +53,38 @@ export interface HanaPluginSdkOptions {
   idFactory?: () => string;
 }
 
-export interface HanaPluginSdk {
+export interface AgentryPluginSdk {
   ready(payload?: unknown): void;
   ui: {
-    resize(size: HanaPluginSize): void;
+    resize(size: AgentryPluginSize): void;
   };
   theme: {
-    getSnapshot(): HanaPluginThemeSnapshot;
-    subscribe(callback: (theme: HanaPluginThemeSnapshot) => void): () => void;
+    getSnapshot(): AgentryPluginThemeSnapshot;
+    subscribe(callback: (theme: AgentryPluginThemeSnapshot) => void): () => void;
   };
   host: {
     request<T = unknown>(
       type: string,
       payload?: unknown,
-      options?: HanaPluginRequestOptions,
+      options?: AgentryPluginRequestOptions,
     ): Promise<T>;
   };
   toast: {
-    show(input: HanaToastShowInput, options?: HanaPluginRequestOptions): Promise<HanaToastShowResult>;
+    show(input: AgentryToastShowInput, options?: AgentryPluginRequestOptions): Promise<AgentryToastShowResult>;
   };
   external: {
-    open(input: HanaExternalOpenInput, options?: HanaPluginRequestOptions): Promise<HanaExternalOpenResult>;
+    open(input: AgentryExternalOpenInput, options?: AgentryPluginRequestOptions): Promise<AgentryExternalOpenResult>;
   };
   clipboard: {
     writeText(
-      input: HanaClipboardWriteTextInput,
-      options?: HanaPluginRequestOptions,
-    ): Promise<HanaClipboardWriteTextResult>;
+      input: AgentryClipboardWriteTextInput,
+      options?: AgentryPluginRequestOptions,
+    ): Promise<AgentryClipboardWriteTextResult>;
   };
 }
 
-export class HanaPluginError extends Error {
-  override name = 'HanaPluginError';
+export class AgentryPluginError extends Error {
+  override name = 'AgentryPluginError';
   readonly code: string;
   readonly details?: unknown;
 
@@ -107,7 +107,7 @@ function defaultIdFactory(): string {
 
 function getBrowserWindow(): Window {
   if (typeof window === 'undefined') {
-    throw new Error('@hana/plugin-sdk requires a browser iframe window.');
+    throw new Error('@agentry/plugin-sdk requires a browser iframe window.');
   }
   return window;
 }
@@ -130,7 +130,7 @@ function resolveTargetOrigin(targetWindow: Window, explicit?: string): string {
   return safeOriginFromUrl(targetWindow.document.referrer) ?? '*';
 }
 
-function readInitialTheme(targetWindow: Window): HanaPluginThemeSnapshot {
+function readInitialTheme(targetWindow: Window): AgentryPluginThemeSnapshot {
   const params = new URLSearchParams(targetWindow.location.search);
   return {
     theme: params.get('hana-theme') ?? undefined,
@@ -144,22 +144,22 @@ function isTrustedHostEvent(event: MessageEvent, parentWindow: Window, targetOri
   return true;
 }
 
-function externalOpenPayload(input: HanaExternalOpenInput): { url: string } {
+function externalOpenPayload(input: AgentryExternalOpenInput): { url: string } {
   return typeof input === 'string' ? { url: input } : input;
 }
 
-function clipboardWriteTextPayload(input: HanaClipboardWriteTextInput): { text: string } {
+function clipboardWriteTextPayload(input: AgentryClipboardWriteTextInput): { text: string } {
   return typeof input === 'string' ? { text: input } : input;
 }
 
-export function createHanaPluginSdk(options: HanaPluginSdkOptions = {}): HanaPluginSdk {
+export function createHanaPluginSdk(options: AgentryPluginSdkOptions = {}): AgentryPluginSdk {
   const targetWindow = options.targetWindow ?? getBrowserWindow();
   const parentWindow = options.parentWindow ?? targetWindow.parent;
   const targetOrigin = resolveTargetOrigin(targetWindow, options.targetOrigin);
   const requestTimeoutMs = options.requestTimeoutMs ?? 10_000;
   const idFactory = options.idFactory ?? defaultIdFactory;
   let themeSnapshot = readInitialTheme(targetWindow);
-  const themeSubscribers = new Set<(theme: HanaPluginThemeSnapshot) => void>();
+  const themeSubscribers = new Set<(theme: AgentryPluginThemeSnapshot) => void>();
 
   function post(message: PluginUiMessage): void {
     parentWindow.postMessage(message, targetOrigin);
@@ -196,7 +196,7 @@ export function createHanaPluginSdk(options: HanaPluginSdkOptions = {}): HanaPlu
   function request<T = unknown>(
     type: string,
     payload?: unknown,
-    requestOptions: HanaPluginRequestOptions = {},
+    requestOptions: AgentryPluginRequestOptions = {},
   ): Promise<T> {
     const id = idFactory();
     const timeoutMs = requestOptions.timeoutMs ?? requestTimeoutMs;
@@ -221,13 +221,13 @@ export function createHanaPluginSdk(options: HanaPluginSdkOptions = {}): HanaPlu
         }
         if (message.kind === 'error' && message.error) {
           cleanup();
-          reject(new HanaPluginError(message.error));
+          reject(new AgentryPluginError(message.error));
         }
       };
 
       const timeout = targetWindow.setTimeout(() => {
         cleanup();
-        reject(new HanaPluginError({
+        reject(new AgentryPluginError({
           code: 'TIMEOUT',
           message: `Plugin host request timed out: ${type}.`,
         }));
@@ -252,7 +252,7 @@ export function createHanaPluginSdk(options: HanaPluginSdkOptions = {}): HanaPlu
       postEvent('hana.ready', payload);
     },
     ui: {
-      resize(size: HanaPluginSize) {
+      resize(size: AgentryPluginSize) {
         postEvent(PLUGIN_UI_CAPABILITY.UI_RESIZE, size);
       },
     },
@@ -260,7 +260,7 @@ export function createHanaPluginSdk(options: HanaPluginSdkOptions = {}): HanaPlu
       getSnapshot() {
         return { ...themeSnapshot };
       },
-      subscribe(callback: (theme: HanaPluginThemeSnapshot) => void) {
+      subscribe(callback: (theme: AgentryPluginThemeSnapshot) => void) {
         if (themeSubscribers.size === 0) {
           targetWindow.addEventListener('message', onThemeMessage);
         }
@@ -278,18 +278,18 @@ export function createHanaPluginSdk(options: HanaPluginSdkOptions = {}): HanaPlu
       request,
     },
     toast: {
-      show(input: HanaToastShowInput, options?: HanaPluginRequestOptions) {
-        return request<HanaToastShowResult>(PLUGIN_UI_CAPABILITY.TOAST_SHOW, input, options);
+      show(input: AgentryToastShowInput, options?: AgentryPluginRequestOptions) {
+        return request<AgentryToastShowResult>(PLUGIN_UI_CAPABILITY.TOAST_SHOW, input, options);
       },
     },
     external: {
-      open(input: HanaExternalOpenInput, options?: HanaPluginRequestOptions) {
-        return request<HanaExternalOpenResult>(PLUGIN_UI_CAPABILITY.EXTERNAL_OPEN, externalOpenPayload(input), options);
+      open(input: AgentryExternalOpenInput, options?: AgentryPluginRequestOptions) {
+        return request<AgentryExternalOpenResult>(PLUGIN_UI_CAPABILITY.EXTERNAL_OPEN, externalOpenPayload(input), options);
       },
     },
     clipboard: {
-      writeText(input: HanaClipboardWriteTextInput, options?: HanaPluginRequestOptions) {
-        return request<HanaClipboardWriteTextResult>(
+      writeText(input: AgentryClipboardWriteTextInput, options?: AgentryPluginRequestOptions) {
+        return request<AgentryClipboardWriteTextResult>(
           PLUGIN_UI_CAPABILITY.CLIPBOARD_WRITE_TEXT,
           clipboardWriteTextPayload(input),
           options,
@@ -299,19 +299,19 @@ export function createHanaPluginSdk(options: HanaPluginSdkOptions = {}): HanaPlu
   };
 }
 
-let singleton: HanaPluginSdk | null = null;
+let singleton: AgentryPluginSdk | null = null;
 
-function getSingleton(): HanaPluginSdk {
+function getSingleton(): AgentryPluginSdk {
   singleton ??= createHanaPluginSdk();
   return singleton;
 }
 
-export const hana: HanaPluginSdk = {
+export const hana: AgentryPluginSdk = {
   ready(payload?: unknown) {
     return getSingleton().ready(payload);
   },
   ui: {
-    resize(size: HanaPluginSize) {
+    resize(size: AgentryPluginSize) {
       return getSingleton().ui.resize(size);
     },
   },
@@ -319,7 +319,7 @@ export const hana: HanaPluginSdk = {
     getSnapshot() {
       return getSingleton().theme.getSnapshot();
     },
-    subscribe(callback: (theme: HanaPluginThemeSnapshot) => void) {
+    subscribe(callback: (theme: AgentryPluginThemeSnapshot) => void) {
       return getSingleton().theme.subscribe(callback);
     },
   },
@@ -327,23 +327,23 @@ export const hana: HanaPluginSdk = {
     request<T = unknown>(
       type: string,
       payload?: unknown,
-      options?: HanaPluginRequestOptions,
+      options?: AgentryPluginRequestOptions,
     ) {
       return getSingleton().host.request<T>(type, payload, options);
     },
   },
   toast: {
-    show(input: HanaToastShowInput, options?: HanaPluginRequestOptions) {
+    show(input: AgentryToastShowInput, options?: AgentryPluginRequestOptions) {
       return getSingleton().toast.show(input, options);
     },
   },
   external: {
-    open(input: HanaExternalOpenInput, options?: HanaPluginRequestOptions) {
+    open(input: AgentryExternalOpenInput, options?: AgentryPluginRequestOptions) {
       return getSingleton().external.open(input, options);
     },
   },
   clipboard: {
-    writeText(input: HanaClipboardWriteTextInput, options?: HanaPluginRequestOptions) {
+    writeText(input: AgentryClipboardWriteTextInput, options?: AgentryPluginRequestOptions) {
       return getSingleton().clipboard.writeText(input, options);
     },
   },

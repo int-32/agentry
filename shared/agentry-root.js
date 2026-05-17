@@ -1,5 +1,5 @@
 /**
- * hana-root.js — 项目根目录解析
+ * agentry-root.js — 项目根目录解析
  *
  * esbuild bundle 后 import.meta.url 指向 bundle 文件，
  * 不能再用来推算源码相对路径。统一用此模块获取项目根。

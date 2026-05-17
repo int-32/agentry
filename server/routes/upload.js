@@ -8,8 +8,8 @@
  * 不做任何业务判断（PDF 解析、图片识别等由 skill 层处理）。
  *
  * 存储位置：
- * - 无 sessionPath：{hanakoHome}/uploads/，按 24 小时清理旧临时文件
- * - 有 sessionPath：{hanakoHome}/session-files/<session-hash>/，跟随 session 冷却清理
+ * - 无 sessionPath：{agentryHome}/uploads/，按 24 小时清理旧临时文件
+ * - 有 sessionPath：{agentryHome}/session-files/<session-hash>/，跟随 session 冷却清理
  */
 import fs from "fs/promises";
 import path from "path";
@@ -180,13 +180,13 @@ function normalizeSessionPath(value) {
 function resolveUploadTarget(engine, sessionPath) {
   if (sessionPath) {
     return {
-      dir: sessionFilesCacheDir(engine.hanakoHome, sessionPath),
+      dir: sessionFilesCacheDir(engine.agentryHome, sessionPath),
       storageKind: "managed_cache",
       shouldCleanOldUploads: false,
     };
   }
   return {
-    dir: path.join(engine.hanakoHome, "uploads"),
+    dir: path.join(engine.agentryHome, "uploads"),
     storageKind: undefined,
     shouldCleanOldUploads: true,
   };
@@ -248,7 +248,7 @@ export function createUploadRoute(engine) {
           results.push({ src: srcPath, error: "symlink not allowed" });
           continue;
         }
-        if (isSensitivePath(srcPath, engine.hanakoHome)) {
+        if (isSensitivePath(srcPath, engine.agentryHome)) {
           results.push({ src: srcPath, error: "sensitive path blocked" });
           continue;
         }

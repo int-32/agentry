@@ -5,9 +5,9 @@
 If you discover a security vulnerability, please report it through GitHub:
 
 - Open a private vulnerability report in the repository Security tab when available:
-  https://github.com/liliMozi/openhanako/security
+  https://github.com/int-32/agentry/security
 - If private reporting is not available, open an issue:
-  https://github.com/liliMozi/openhanako/issues
+  https://github.com/int-32/agentry/issues
 
 Please include:
 - Description of the vulnerability

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { HanaEngine } from "../core/engine.js";
+import { AgentryEngine } from "../core/engine.js";
 
 function makeFactory(name) {
   return Object.assign(() => {}, { _testName: name });
@@ -10,7 +10,7 @@ function names(factories) {
 }
 
 function makeEngine({ pluginFactories = [] } = {}) {
-  const engine = Object.create(HanaEngine.prototype);
+  const engine = Object.create(AgentryEngine.prototype);
   engine._coreExtensionFactories = [
     makeFactory("core-provider"),
     makeFactory("core-image"),
@@ -26,7 +26,7 @@ function makeEngine({ pluginFactories = [] } = {}) {
   return engine;
 }
 
-describe("HanaEngine extension factories", () => {
+describe("AgentryEngine extension factories", () => {
   it("reloads ResourceLoader after plugin extension factories are synced", async () => {
     const engine = makeEngine({
       pluginFactories: [makeFactory("plugin-a")],

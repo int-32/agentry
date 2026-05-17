@@ -75,7 +75,7 @@ describe("sessions route", () => {
       memoryModelUnavailableReason: null,
       cwd: "/tmp/workspace",
       currentAgentId: "hana",
-      agentName: "Hana",
+      agentName: "Agentry",
       currentModel: { id: "gpt-test", provider: "openai" },
       isSessionStreaming: vi.fn(() => false),
       switchSession: vi.fn(async (sessionPath) => {
@@ -84,7 +84,7 @@ describe("sessions route", () => {
       getSessionByPath: vi.fn((sp) => ({
         messages: [{ role: "assistant", content: "ok" }],
       })),
-      getAgent: vi.fn(() => ({ agentName: "Hana" })),
+      getAgent: vi.fn(() => ({ agentName: "Agentry" })),
       agentIdFromSessionPath: vi.fn((sp) => {
         const rel = path.relative("/tmp/agents", sp);
         return rel.split(path.sep)[0] || null;
@@ -124,7 +124,7 @@ describe("sessions route", () => {
       createSessionForAgent: vi.fn(),
       persistSessionMeta: vi.fn(),
       updateConfig: vi.fn(async (patch) => Object.assign(engine.config, patch)),
-      getAgent: vi.fn(() => ({ agentName: "Hana" })),
+      getAgent: vi.fn(() => ({ agentName: "Agentry" })),
       getSessionWorkspaceFolders: vi.fn(() => [extra]),
     };
 
@@ -162,7 +162,7 @@ describe("sessions route", () => {
         messageCount: 2,
         cwd: "/tmp/work",
         agentId: "hana",
-        agentName: "Hana",
+        agentName: "Agentry",
         pinnedAt,
       }]),
       rcState: null,
@@ -198,7 +198,7 @@ describe("sessions route", () => {
           messageCount: 2,
           cwd: "/tmp/work",
           agentId: "hana",
-          agentName: "Hana",
+          agentName: "Agentry",
         },
         {
           path: "/tmp/agents/hana/sessions/no-summary.jsonl",
@@ -208,7 +208,7 @@ describe("sessions route", () => {
           messageCount: 1,
           cwd: "/tmp/work",
           agentId: "hana",
-          agentName: "Hana",
+          agentName: "Agentry",
         },
       ]),
       getAgent: vi.fn(() => ({ summaryManager })),
@@ -482,7 +482,7 @@ describe("sessions route", () => {
         const rel = path.relative("/tmp/agents", sp);
         return rel.split(path.sep)[0] || null;
       }),
-      getAgent: vi.fn((id) => (id === "hanako" ? { agentName: "Hanako" } : null)),
+      getAgent: vi.fn((id) => (id === "hanako" ? { agentName: "Agentry" } : null)),
     };
 
     app.route("/api", createSessionsRoute(engine));
@@ -495,7 +495,7 @@ describe("sessions route", () => {
     expect(data.blocks[0]).toMatchObject({
       type: "subagent",
       agentId: "hanako",
-      agentName: "Hanako",
+      agentName: "Agentry",
       streamKey: "/tmp/agents/hanako/subagent-sessions/child.jsonl",
     });
   });
@@ -782,7 +782,7 @@ describe("sessions route", () => {
         return rel.split(path.sep)[0] || null;
       }),
       getAgent: vi.fn((id) => {
-        if (id === "hanako") return { agentName: "Hanako" };
+        if (id === "hanako") return { agentName: "Agentry" };
         if (id === "butter") return { agentName: "butter" };
         return null;
       }),
@@ -849,7 +849,7 @@ describe("sessions route", () => {
         const rel = path.relative(agentsDir, sp);
         return rel.split(path.sep)[0] || null;
       }),
-      getAgent: vi.fn((id) => (id === "hanako" ? { agentName: "Hanako" } : null)),
+      getAgent: vi.fn((id) => (id === "hanako" ? { agentName: "Agentry" } : null)),
     };
 
     app.route("/api", createSessionsRoute(engine));
@@ -901,7 +901,7 @@ describe("sessions route", () => {
         const rel = path.relative("/tmp/agents", sp);
         return rel.split(path.sep)[0] || null;
       }),
-      getAgent: vi.fn((id) => (id === "hanako" ? { agentName: "Hanako" } : null)),
+      getAgent: vi.fn((id) => (id === "hanako" ? { agentName: "Agentry" } : null)),
     };
 
     app.route("/api", createSessionsRoute(engine));
@@ -955,7 +955,7 @@ describe("sessions route", () => {
         const rel = path.relative("/tmp/agents", sp);
         return rel.split(path.sep)[0] || null;
       }),
-      getAgent: vi.fn((id) => (id === "hanako" ? { agentName: "Hanako" } : null)),
+      getAgent: vi.fn((id) => (id === "hanako" ? { agentName: "Agentry" } : null)),
     };
 
     app.route("/api", createSessionsRoute(engine));

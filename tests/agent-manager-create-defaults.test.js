@@ -242,7 +242,7 @@ describe("AgentManager.createAgent default skills.enabled", () => {
         compiled: {
           facts: "用户喜欢短句。",
           today: "今天迁移角色卡。",
-          week: "本周迁移 Project Hana。",
+          week: "本周迁移 Project Agentry。",
           longterm: "用户长期关注本地优先迁移。",
         },
         sourceId: "character-card-import-test",

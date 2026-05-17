@@ -24,11 +24,11 @@ describe("Bridge media allowed roots", () => {
   }
 
   it("includes the target agent workspace from getHomeCwd instead of deskManager.homePath", () => {
-    const hanakoHome = makeDir("hana-home");
+    const agentryHome = makeDir("hana-home");
     const ownerHome = makeDir("owner-workspace");
     const otherHome = makeDir("other-workspace");
     const engine = {
-      hanakoHome,
+      agentryHome,
       getHomeCwd: vi.fn((agentId) => {
         if (agentId === "owner") return ownerHome;
         if (agentId === "other") return otherHome;
@@ -42,7 +42,7 @@ describe("Bridge media allowed roots", () => {
 
     const roots = collectBridgeMediaAllowedRoots(engine, { agentId: "owner" });
 
-    expect(roots).toContain(fs.realpathSync(hanakoHome));
+    expect(roots).toContain(fs.realpathSync(agentryHome));
     expect(roots).toContain(fs.realpathSync(ownerHome));
     expect(roots).toContain(fs.realpathSync(otherHome));
     expect(engine.getHomeCwd).toHaveBeenCalledWith("owner");
@@ -52,13 +52,13 @@ describe("Bridge media allowed roots", () => {
   it("includes the real POSIX /tmp root when it exists", () => {
     if (!fs.existsSync("/tmp")) return;
 
-    const hanakoHome = makeDir("hana-home");
+    const agentryHome = makeDir("hana-home");
     const posixTmpDir = fs.mkdtempSync(path.join("/tmp", "hana-bridge-roots-posix-"));
     extraTmpDirs.push(posixTmpDir);
     const filePath = path.join(posixTmpDir, "out.txt");
     fs.writeFileSync(filePath, "ok");
 
-    const roots = collectBridgeMediaAllowedRoots({ hanakoHome });
+    const roots = collectBridgeMediaAllowedRoots({ agentryHome });
     const realTmp = fs.realpathSync("/tmp");
 
     expect(roots).toContain(realTmp);

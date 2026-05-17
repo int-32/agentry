@@ -332,12 +332,12 @@ describe("session:list", () => {
 describe("agent:list", () => {
   it("returns agents with isCurrent and isPrimary", async () => {
     mockEngine.listAgents.mockReturnValue([
-      { id: "a1", name: "Hana", isCurrent: true, isPrimary: true, extraField: "ignored" },
+      { id: "a1", name: "Agentry", isCurrent: true, isPrimary: true, extraField: "ignored" },
       { id: "a2", name: "Kuro", isCurrent: false, isPrimary: false, extraField: "ignored" },
     ]);
     const result = await bus.request("agent:list", {});
     expect(result.agents).toHaveLength(2);
-    expect(result.agents[0]).toEqual({ id: "a1", name: "Hana", isCurrent: true, isPrimary: true });
+    expect(result.agents[0]).toEqual({ id: "a1", name: "Agentry", isCurrent: true, isPrimary: true });
     expect(result.agents[1]).toEqual({ id: "a2", name: "Kuro", isCurrent: false, isPrimary: false });
     // extraField should not leak through
     expect(result.agents[0]).not.toHaveProperty("extraField");

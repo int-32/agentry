@@ -22,17 +22,17 @@ import { migrateLegacyApiKeyAuthToProviders } from "./provider-auth-migration.js
 export class ModelManager {
   /**
    * @param {object} opts
-   * @param {string} opts.hanakoHome - 用户数据根目录
+   * @param {string} opts.agentryHome - 用户数据根目录
    */
-  constructor({ hanakoHome }) {
-    this._hanakoHome = hanakoHome;
+  constructor({ agentryHome }) {
+    this._hanakoHome = agentryHome;
     this._authStorage = null;
     this._modelRegistry = null;
     this._defaultModel = null;   // 设置页面选的，持久化，bridge 用这个
     this._availableModels = [];
 
     // 新架构模块（init() 后可用）
-    this.providerRegistry = new ProviderRegistry(hanakoHome);
+    this.providerRegistry = new ProviderRegistry(agentryHome);
     this.executionRouter = null;
   }
 
@@ -189,14 +189,14 @@ export class ModelManager {
   }
 
   /**
-   * Hana 的 API-key provider 凭证源是 added-models.yaml → models.json。
+   * Agentry 的 API-key provider 凭证源是 added-models.yaml → models.json。
    * AuthStorage 只保留 OAuth 条目，避免 Pi SDK 优先读取 stale auth.json。
    * @private
    */
   _removeApiKeyProviderAuthEntries() {
     if (!this._authStorage || !this.providerRegistry) return;
     migrateLegacyApiKeyAuthToProviders({
-      hanakoHome: this._hanakoHome,
+      agentryHome: this._hanakoHome,
       providerRegistry: this.providerRegistry,
     });
     this._authStorage.reload?.();

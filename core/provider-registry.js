@@ -14,7 +14,7 @@ import fs from "fs";
 import path from "path";
 import YAML from "js-yaml";
 import { safeReadYAMLSync } from "../shared/safe-fs.js";
-import { fromRoot } from "../shared/hana-root.js";
+import { fromRoot } from "../shared/agentry-root.js";
 import { lookupKnown } from "../shared/known-models.js";
 import {
   normalizeProviderAuthType,
@@ -329,10 +329,10 @@ const BUILTIN_PLUGINS = [
 
 export class ProviderRegistry {
   /**
-   * @param {string} hanakoHome - 用户数据根目录（如 ~/.hanako-dev）
+   * @param {string} agentryHome - 用户数据根目录（如 ~/.hanako-dev）
    */
-  constructor(hanakoHome) {
-    this._hanakoHome = hanakoHome;
+  constructor(agentryHome) {
+    this._hanakoHome = agentryHome;
     /** @type {Map<string, ProviderPlugin>} id → plugin */
     this._plugins = new Map();
     /** @type {Map<string, ProviderEntry>} id → entry（合并后） */
@@ -434,7 +434,7 @@ export class ProviderRegistry {
         if (Object.keys(overrides).length === 0) {
           delete cfg.models.overrides;
         }
-        const header = "# Hanako Agent 配置\n# 由设置页面管理，手动编辑也可以\n\n";
+        const header = "# Agentry Agent 配置\n# 由设置页面管理，手动编辑也可以\n\n";
         const yamlStr = header + YAML.dump(cfg, { indent: 2, lineWidth: -1, sortKeys: false, quotingType: '"', forceQuotes: false });
         fs.writeFileSync(cfgPath, yamlStr, "utf-8");
       }
@@ -469,7 +469,7 @@ export class ProviderRegistry {
     // 读取现有文件以保留 _migrated 等顶层元数据
     const existing = safeReadYAMLSync(ymlPath, {}, YAML) || {};
     const header =
-      "# Hanako 供应商配置（全局，跨 agent 共享）\n" +
+      "# Agentry 供应商配置（全局，跨 agent 共享）\n" +
       "# 由设置页面管理\n\n";
     const data = { ...existing, providers: stripProviderRuntimeMetaMap(providers) };
     const yamlStr = header + YAML.dump(data, {

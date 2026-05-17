@@ -3,9 +3,17 @@
  */
 
 import React from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStore } from '../../stores';
+
+const { hanaFetchMock } = vi.hoisted(() => ({
+  hanaFetchMock: vi.fn(),
+}));
+
+vi.mock('../../hooks/use-hana-fetch', () => ({
+  hanaFetch: (...args: unknown[]) => hanaFetchMock(...args),
+}));
 
 const translations: Record<string, string | string[] | Record<string, { avatar: string }>> = {
   'input.workspace': '工作空间：',
@@ -24,6 +32,15 @@ const translations: Record<string, string | string[] | Record<string, { avatar: 
 describe('WelcomeScreen workspace picker', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hanaFetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/agents/') && url.endsWith('/config')) {
+        return { json: async () => ({ desk: {}, models: {} }) };
+      }
+      if (url === '/api/desk') {
+        return { json: async () => ({ files: [] }) };
+      }
+      return { json: async () => ({ ok: true, models: [] }) };
+    });
     const t = vi.fn((key: string) => translations[key] ?? key);
     vi.stubGlobal('t', t);
     window.t = t as typeof window.t;
@@ -31,7 +48,7 @@ describe('WelcomeScreen workspace picker', () => {
     useStore.setState({
       welcomeVisible: true,
       agents: [],
-      agentName: 'Hanako',
+      agentName: 'Agentry',
       agentAvatarUrl: null,
       agentYuan: 'hanako',
       currentAgentId: null,
@@ -69,7 +86,7 @@ describe('WelcomeScreen workspace picker', () => {
   it('disables the memory toggle when the selected agent has memory disabled in settings', async () => {
     useStore.setState({
       agents: [
-        { id: 'hana', name: 'Hanako', yuan: 'hanako', isPrimary: true, memoryMasterEnabled: false },
+        { id: 'hana', name: 'Agentry', yuan: 'hanako', isPrimary: true, memoryMasterEnabled: false },
       ],
       currentAgentId: 'hana',
       memoryEnabled: true,
@@ -82,5 +99,87 @@ describe('WelcomeScreen workspace picker', () => {
 
     expect((button as HTMLButtonElement).disabled).toBe(true);
     expect(useStore.getState().memoryEnabled).toBe(true);
+  });
+
+  it('loads the selected agent default workspace into the welcome page and right workspace', async () => {
+    hanaFetchMock.mockImplementation(async (url: string) => {
+      if (url === '/api/agents/artist/config') {
+        return {
+          json: async () => ({
+            desk: { home_folder: '/workspace/ArtistHome' },
+            models: { chat: { id: 'artist-chat', provider: 'deepseek' } },
+          }),
+        };
+      }
+      if (url === '/api/desk') {
+        return { json: async () => ({ files: [] }) };
+      }
+      return { json: async () => ({ ok: true, models: [] }) };
+    });
+    useStore.setState({
+      agents: [
+        { id: 'hana', name: 'Agentry', yuan: 'hanako', isPrimary: true, memoryMasterEnabled: true },
+        { id: 'artist', name: 'Artist', yuan: 'ming', isPrimary: false, memoryMasterEnabled: true },
+      ],
+      currentAgentId: 'hana',
+      selectedAgentId: null,
+      selectedFolder: '/workspace/agentry',
+      homeFolder: '/workspace/agentry',
+      deskBasePath: '/workspace/agentry',
+      workspaceFolders: ['/workspace/Reference'],
+    } as never);
+    const { WelcomeScreen } = await import('../../components/WelcomeScreen');
+
+    render(<WelcomeScreen />);
+    fireEvent.click(screen.getByRole('button', { name: /Artist/ }));
+    await waitFor(() => {
+      expect(useStore.getState().selectedFolder).toBe('/workspace/ArtistHome');
+    });
+
+    expect(useStore.getState().homeFolder).toBe('/workspace/ArtistHome');
+    expect(useStore.getState().deskBasePath).toBe('/workspace/ArtistHome');
+    expect(useStore.getState().workspaceFolders).toEqual([]);
+    expect(hanaFetchMock).toHaveBeenCalledWith('/api/agents/artist/config');
+    expect(hanaFetchMock).toHaveBeenCalledWith('/api/models/set', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ modelId: 'artist-chat', provider: 'deepseek' }),
+    }));
+  });
+
+  it('clears the inherited workspace when the selected agent has no configured home folder', async () => {
+    hanaFetchMock.mockImplementation(async (url: string) => {
+      if (url === '/api/agents/master/config') {
+        return {
+          json: async () => ({
+            desk: { home_folder: '' },
+            models: { chat: { id: 'master-chat', provider: 'openai' } },
+          }),
+        };
+      }
+      return { json: async () => ({ ok: true, models: [] }) };
+    });
+    useStore.setState({
+      agents: [
+        { id: 'hana', name: 'Agentry', yuan: 'hanako', isPrimary: true, memoryMasterEnabled: true },
+        { id: 'master', name: 'Master', yuan: 'kong', isPrimary: false, memoryMasterEnabled: true },
+      ],
+      currentAgentId: 'hana',
+      selectedAgentId: null,
+      selectedFolder: '/workspace/agentry',
+      homeFolder: '/workspace/agentry',
+      deskBasePath: '/workspace/agentry',
+      workspaceFolders: ['/workspace/Reference'],
+    } as never);
+    const { WelcomeScreen } = await import('../../components/WelcomeScreen');
+
+    render(<WelcomeScreen />);
+    fireEvent.click(screen.getByRole('button', { name: /Master/ }));
+    await waitFor(() => {
+      expect(useStore.getState().selectedFolder).toBeNull();
+    });
+
+    expect(useStore.getState().homeFolder).toBeNull();
+    expect(useStore.getState().deskBasePath).toBe('');
+    expect(useStore.getState().workspaceFolders).toEqual([]);
   });
 });

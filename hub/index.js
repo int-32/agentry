@@ -1,7 +1,7 @@
 /**
  * Hub — 消息调度中枢
  *
- * 同进程模式：Hub 和 HanaEngine 跑在同一个 Node 进程里。
+ * 同进程模式：Hub 和 AgentryEngine 跑在同一个 Node 进程里。
  * hub.send() 内部直接调 engine 方法，行为零变化。
  * EventBus 通过 engine.setEventBus() 注入，统一事件广播。
  *
@@ -32,7 +32,7 @@ import { extOfName, inferFileKind } from "../lib/file-metadata.js";
 export class Hub {
   /**
    * @param {object} opts
-   * @param {import('../core/engine.js').HanaEngine} opts.engine
+   * @param {import('../core/engine.js').AgentryEngine} opts.engine
    */
   constructor({ engine }) {
     this._engine = engine;
@@ -66,7 +66,7 @@ export class Hub {
     this._setupDmHandler();
   }
 
-  /** @returns {import('../core/engine.js').HanaEngine} */
+  /** @returns {import('../core/engine.js').AgentryEngine} */
   get engine() { return this._engine; }
 
   /** @returns {EventBus} */
@@ -142,11 +142,11 @@ export class Hub {
     // 在路由之前统一处理，所有消息路径（WS / Bridge DM / Bridge Group）共享
     if (
       o.images?.length
-      && this._engine.hanakoHome
+      && this._engine.agentryHome
       && !o.inboundFiles?.length
       && !hasDisplayImageAttachments(o.displayMessage)
     ) {
-      const attachDir = path.join(this._engine.hanakoHome, "attachments");
+      const attachDir = path.join(this._engine.agentryHome, "attachments");
       await fs.promises.mkdir(attachDir, { recursive: true });
       const savedPaths = [];
       for (const img of o.images) {
@@ -166,11 +166,11 @@ export class Hub {
     }
     if (
       o.videos?.length
-      && this._engine.hanakoHome
+      && this._engine.agentryHome
       && !o.inboundFiles?.length
       && !hasDisplayVideoAttachments(o.displayMessage)
     ) {
-      const attachDir = path.join(this._engine.hanakoHome, "attachments");
+      const attachDir = path.join(this._engine.agentryHome, "attachments");
       await fs.promises.mkdir(attachDir, { recursive: true });
       const savedPaths = [];
       for (const video of o.videos) {

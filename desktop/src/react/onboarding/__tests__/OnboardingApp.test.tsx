@@ -52,7 +52,7 @@ describe('OnboardingApp locale switching', () => {
 
     const i18nMock = {
       locale: 'zh',
-      defaultName: 'Hanako',
+      defaultName: 'Agentry',
       _data: {},
       _agentOverrides: {},
       load: vi.fn(async (locale: string) => {
@@ -76,7 +76,7 @@ describe('OnboardingApp locale switching', () => {
     vi.stubGlobal('hana', {
       getServerPort: vi.fn(async () => '62950'),
       getServerToken: vi.fn(async () => 'token'),
-      getSplashInfo: vi.fn(async () => ({ locale: 'zh-CN', agentName: 'Hanako' })),
+      getSplashInfo: vi.fn(async () => ({ locale: 'zh-CN', agentName: 'Agentry' })),
       getAvatarPath: vi.fn(async () => null),
     });
     vi.stubGlobal('platform', {

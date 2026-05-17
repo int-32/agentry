@@ -167,7 +167,7 @@ function makeSubagentDeps(overrides = {}) {
     }),
     getSessionPath: () => "/test/session.jsonl",
     listAgents: vi.fn(() => [
-      { id: "hana", name: "Hana", model: "claude-3-5-sonnet", summary: "主 agent" },
+      { id: "hana", name: "Agentry", model: "claude-3-5-sonnet", summary: "主 agent" },
     ]),
     currentAgentId: "hana",
     agentDir: "/test/agents/hana",
@@ -412,10 +412,10 @@ describe("resolveAgent 并发安全", () => {
   it("returns explicit agent when agentId is valid", () => {
     const engine = mockEngine({
       _focus: { id: "_focus" },
-      hana: { id: "hana", name: "Hana" },
+      hana: { id: "hana", name: "Agentry" },
     });
     const agent = resolveAgent(engine, mockReqCtx("hana"));
-    expect(agent).toEqual({ id: "hana", name: "Hana" });
+    expect(agent).toEqual({ id: "hana", name: "Agentry" });
   });
 
   it("throws AgentNotFoundError when explicit agentId not found", () => {

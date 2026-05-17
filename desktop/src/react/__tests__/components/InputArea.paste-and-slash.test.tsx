@@ -287,7 +287,7 @@ describe('InputArea paste and slash menu behavior', () => {
       pendingNewSession: true,
       welcomeVisible: true,
     });
-    mocks.editorText = '你好 Hana';
+    mocks.editorText = '你好 Agentry';
     render(React.createElement(InputArea));
 
     const preventDefault = vi.fn();

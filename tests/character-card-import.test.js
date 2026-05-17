@@ -50,7 +50,7 @@ describe("character-card import service", () => {
 
     factStore = { importAll: vi.fn() };
     engine = {
-      hanakoHome: tempDir,
+      agentryHome: tempDir,
       agentsDir,
       userSkillsDir: skillsDir,
       skillsDir,
@@ -130,7 +130,7 @@ describe("character-card import service", () => {
   it("does not create skill bundle metadata for character cards without skills", async () => {
     writeJson(path.join(packageDir, "card.json"), {
       kind: "CharacterCard",
-      agent: { name: "No Skill Hana", id: "no-skill-hana", yuan: "hanako" },
+      agent: { name: "No Skill Agentry", id: "no-skill-hana", yuan: "hanako" },
     });
 
     const service = createCharacterCardService(engine);
@@ -145,7 +145,7 @@ describe("character-card import service", () => {
   it("imports memory facts only when the commit option enables memory import", async () => {
     writeJson(path.join(packageDir, "card.json"), {
       kind: "CharacterCard",
-      agent: { name: "Hana Writer", id: "hana-writer", yuan: "hanako" },
+      agent: { name: "Agentry Writer", id: "hana-writer", yuan: "hanako" },
       memory: {
         facts: [
           { fact: "喜欢把章节标题写得短一点", tags: ["writing"], time: "2026-05-14" },
@@ -174,13 +174,13 @@ describe("character-card import service", () => {
   it("imports packaged compiled memory before agent init can run memory tick", async () => {
     writeJson(path.join(packageDir, "card.json"), {
       kind: "CharacterCard",
-      agent: { name: "Today Hana", id: "today-hana", yuan: "hanako" },
+      agent: { name: "Today Agentry", id: "today-hana", yuan: "hanako" },
       memory: {
         compiled: {
           facts: "用户喜欢短句。",
           today: "今天正在调试角色卡记忆预览。",
           week: "这周在推进角色卡导入导出。",
-          longterm: "用户长期关注 Project Hana 的记忆系统。",
+          longterm: "用户长期关注 Project Agentry 的记忆系统。",
         },
       },
     });
@@ -196,7 +196,7 @@ describe("character-card import service", () => {
         facts: "用户喜欢短句。",
         today: "今天正在调试角色卡记忆预览。",
         week: "这周在推进角色卡导入导出。",
-        longterm: "用户长期关注 Project Hana 的记忆系统。",
+        longterm: "用户长期关注 Project Agentry 的记忆系统。",
       },
     });
 
@@ -212,14 +212,14 @@ describe("character-card import service", () => {
     expect(fs.readFileSync(path.join(memoryDir, "facts.md"), "utf-8")).toBe("用户喜欢短句。");
     expect(fs.readFileSync(path.join(memoryDir, "today.md"), "utf-8")).toBe("今天正在调试角色卡记忆预览。");
     expect(fs.readFileSync(path.join(memoryDir, "week.md"), "utf-8")).toBe("这周在推进角色卡导入导出。");
-    expect(fs.readFileSync(path.join(memoryDir, "longterm.md"), "utf-8")).toBe("用户长期关注 Project Hana 的记忆系统。");
+    expect(fs.readFileSync(path.join(memoryDir, "longterm.md"), "utf-8")).toBe("用户长期关注 Project Agentry 的记忆系统。");
     expect(fs.readFileSync(path.join(memoryDir, "memory.md"), "utf-8")).toContain("今天正在调试角色卡记忆预览。");
   });
 
   it("shows a 20 character important-facts memory preview in preview plans", async () => {
     writeJson(path.join(packageDir, "card.json"), {
       kind: "CharacterCard",
-      agent: { name: "Memory Hana", id: "memory-hana", yuan: "hanako" },
+      agent: { name: "Memory Agentry", id: "memory-hana", yuan: "hanako" },
       memory: {
         compiled: {
           facts: "重要事实内容用于角色卡预览摘要，应该优先于今天记忆显示。",
@@ -251,7 +251,7 @@ describe("character-card import service", () => {
     writeJson(path.join(packageDir, "card.json"), {
       kind: "CharacterCard",
       agent: {
-        name: "Ishiki Hana",
+        name: "Ishiki Agentry",
         id: "local-only-id",
         yuan: "hanako",
         description: "花名册里的描述",
@@ -268,7 +268,7 @@ describe("character-card import service", () => {
     const plan = await service.createImportPlanFromPath(packageDir);
 
     expect(plan.agent).toEqual({
-      name: "Ishiki Hana",
+      name: "Ishiki Agentry",
       yuan: "hanako",
       description: "花名册里的描述",
       identitySummary: "沉静的手账写作者",
@@ -301,7 +301,7 @@ describe("character-card import service", () => {
     writeSkill(packageDir, "skills/research", "research");
     writeJson(path.join(packageDir, "card.json"), {
       kind: "CharacterCard",
-      agent: { name: "Research Hana", id: "research-hana", yuan: "hanako" },
+      agent: { name: "Research Agentry", id: "research-hana", yuan: "hanako" },
       skills: [{ path: "skills/research" }],
     });
 
@@ -317,7 +317,7 @@ describe("character-card import service", () => {
     expect(planRes.status).toBe(200);
     expect(planData.plan).toMatchObject({
       packageName: "package",
-      agent: { name: "Research Hana", yuan: "hanako" },
+      agent: { name: "Research Agentry", yuan: "hanako" },
       skills: { count: 1 },
     });
     expect(planData.plan.agent.id).toBeUndefined();
@@ -329,8 +329,8 @@ describe("character-card import service", () => {
     });
     const importData = await importRes.json();
     expect(importRes.status).toBe(200);
-    expect(importData.agent).toEqual({ id: "research-hana", name: "Research Hana" });
-    expectAppEvent(engine.emitEvent, "agent-created", { agentId: "research-hana", name: "Research Hana" });
+    expect(importData.agent).toEqual({ id: "research-hana", name: "Research Agentry" });
+    expectAppEvent(engine.emitEvent, "agent-created", { agentId: "research-hana", name: "Research Agentry" });
     expectAppEvent(engine.emitEvent, "skills-changed", { agentId: "research-hana" });
   });
 
@@ -339,7 +339,7 @@ describe("character-card import service", () => {
     fs.mkdirSync(path.join(agentDir, "memory"), { recursive: true });
     fs.writeFileSync(path.join(agentDir, "config.yaml"), [
       "agent:",
-      "  name: Hana",
+      "  name: Agentry",
       "  yuan: hanako",
       "skills:",
       "  enabled:",
@@ -384,8 +384,8 @@ describe("character-card import service", () => {
     expect(preview).toMatchObject({
       mode: "export",
       agentId: "hana",
-      packageName: "hana-charactercard.zip",
-      agent: { name: "Hana", yuan: "hanako", description: "花名册描述" },
+      packageName: "agentry-charactercard.zip",
+      agent: { name: "Agentry", yuan: "hanako", description: "花名册描述" },
       memory: {
         available: true,
         count: 5,
@@ -409,19 +409,19 @@ describe("character-card import service", () => {
       exportMemory: true,
       targetDir: tempDir,
     });
-    expect(exported.filePath).toBe(path.join(tempDir, "hana-charactercard.zip"));
+    expect(exported.filePath).toBe(path.join(tempDir, "agentry-charactercard.zip"));
     expect(fs.existsSync(exported.filePath)).toBe(true);
     const secondExport = await service.exportAgentPackage("hana", {
       exportMemory: false,
       targetDir: tempDir,
     });
-    expect(secondExport.filePath).toBe(path.join(tempDir, "hana-charactercard-2.zip"));
+    expect(secondExport.filePath).toBe(path.join(tempDir, "agentry-charactercard-2.zip"));
 
     const outDir = path.join(tempDir, "unzipped-export");
     fs.mkdirSync(outDir);
     await extractZip(exported.filePath, outDir);
     const card = JSON.parse(fs.readFileSync(path.join(outDir, "card.json"), "utf-8"));
-    expect(card.agent).toEqual({ name: "Hana", yuan: "hanako", description: "花名册描述" });
+    expect(card.agent).toEqual({ name: "Agentry", yuan: "hanako", description: "花名册描述" });
     expect(card.prompts).toMatchObject({
       identity: "Writer identity",
       ishiki: "Writer ishiki",
@@ -451,11 +451,11 @@ describe("character-card import service", () => {
     fs.mkdirSync(processDir, { recursive: true });
     fs.writeFileSync(path.join(agentDir, "config.yaml"), [
       "agent:",
-      "  name: Hana",
+      "  name: Agentry",
       "  yuan: hanako",
     ].join("\n"), "utf-8");
     fs.writeFileSync(path.join(agentDir, "identity.md"), "Writer identity", "utf-8");
-    fs.writeFileSync(path.join(deskDir, "hana-charactercard.zip"), "existing", "utf-8");
+    fs.writeFileSync(path.join(deskDir, "agentry-charactercard.zip"), "existing", "utf-8");
     engine.cwd = processDir;
     engine.deskCwd = deskDir;
     engine.getAgent = vi.fn((id) => id === "hana"
@@ -465,8 +465,8 @@ describe("character-card import service", () => {
     const service = createCharacterCardService(engine);
     const exported = await service.exportAgentPackage("hana");
 
-    expect(exported.filePath).toBe(path.join(deskDir, "hana-charactercard-2.zip"));
-    expect(fs.existsSync(path.join(processDir, "hana-charactercard.zip"))).toBe(false);
+    expect(exported.filePath).toBe(path.join(deskDir, "agentry-charactercard-2.zip"));
+    expect(fs.existsSync(path.join(processDir, "agentry-charactercard.zip"))).toBe(false);
   });
 
   it("exports compiled memory from memory.md when section files are missing", async () => {
@@ -474,7 +474,7 @@ describe("character-card import service", () => {
     fs.mkdirSync(path.join(agentDir, "memory"), { recursive: true });
     fs.writeFileSync(path.join(agentDir, "config.yaml"), [
       "agent:",
-      "  name: Hana",
+      "  name: Agentry",
       "  yuan: hanako",
     ].join("\n"), "utf-8");
     fs.writeFileSync(path.join(agentDir, "identity.md"), "Writer identity", "utf-8");
@@ -554,7 +554,7 @@ describe("character-card import service", () => {
     fs.mkdirSync(path.join(agentDir, "memory"), { recursive: true });
     fs.writeFileSync(path.join(agentDir, "config.yaml"), [
       "agent:",
-      "  name: Hana",
+      "  name: Agentry",
       "  yuan: hanako",
     ].join("\n"), "utf-8");
     fs.writeFileSync(path.join(agentDir, "identity.md"), "Writer identity", "utf-8");
@@ -585,7 +585,7 @@ describe("character-card import service", () => {
     });
     const exportData = await exportRes.json();
     expect(exportRes.status).toBe(200);
-    expect(exportData.filePath).toBe(path.join(tempDir, "hana-charactercard.zip"));
+    expect(exportData.filePath).toBe(path.join(tempDir, "agentry-charactercard.zip"));
 
     const outDir = path.join(tempDir, "unzipped-route-export");
     fs.mkdirSync(outDir);

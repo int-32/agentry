@@ -504,7 +504,7 @@ export function createSkillsRoute(engine) {
 
       // 重新加载 skills
       await engine.reloadSkills();
-      if (engine.hanakoHome) {
+      if (engine.agentryHome) {
         removeSkillsFromBundles(engine, [name]);
       }
 

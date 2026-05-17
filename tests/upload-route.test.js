@@ -27,7 +27,7 @@ describe("upload route", () => {
     fs.symlinkSync(targetFile, linkPath);
 
     const app = new Hono();
-    app.route("/api", createUploadRoute({ hanakoHome: path.join(tmpDir, "hana-home") }));
+    app.route("/api", createUploadRoute({ agentryHome: path.join(tmpDir, "hana-home") }));
 
     const res = await app.request("/api/upload", {
       method: "POST",
@@ -51,7 +51,7 @@ describe("upload route", () => {
     fs.symlinkSync(dirPath, path.join(dirPath, "loop"));
 
     const app = new Hono();
-    app.route("/api", createUploadRoute({ hanakoHome: path.join(tmpDir, "hana-home") }));
+    app.route("/api", createUploadRoute({ agentryHome: path.join(tmpDir, "hana-home") }));
 
     const res = await app.request("/api/upload", {
       method: "POST",
@@ -81,9 +81,9 @@ describe("upload route", () => {
 
   it("upload-blob writes base64 image to uploads dir with sanitized name", async () => {
     tmpDir = mktemp();
-    const hanakoHome = path.join(tmpDir, "hana-home");
+    const agentryHome = path.join(tmpDir, "hana-home");
     const app = new Hono();
-    app.route("/api", createUploadRoute({ hanakoHome }));
+    app.route("/api", createUploadRoute({ agentryHome }));
 
     // 1x1 PNG
     const png = Buffer.from(
@@ -112,7 +112,7 @@ describe("upload route", () => {
     tmpDir = mktemp();
     const source = path.join(tmpDir, "note.txt");
     fs.writeFileSync(source, "hello", "utf-8");
-    const hanakoHome = path.join(tmpDir, "hana-home");
+    const agentryHome = path.join(tmpDir, "hana-home");
     const sessionPath = "/sessions/upload.jsonl";
     const registerSessionFile = vi.fn(({ sessionPath, filePath, label, origin, storageKind }) => ({
       id: "sf_upload",
@@ -131,7 +131,7 @@ describe("upload route", () => {
       createdAt: 1,
     }));
     const app = new Hono();
-    app.route("/api", createUploadRoute({ hanakoHome, registerSessionFile }));
+    app.route("/api", createUploadRoute({ agentryHome, registerSessionFile }));
 
     const res = await app.request("/api/upload", {
       method: "POST",
@@ -148,7 +148,7 @@ describe("upload route", () => {
       origin: "user_upload",
       storageKind: "managed_cache",
     });
-    expect(data.uploads[0].dest.startsWith(path.join(hanakoHome, "session-files"))).toBe(true);
+    expect(data.uploads[0].dest.startsWith(path.join(agentryHome, "session-files"))).toBe(true);
     expect(data.uploads[0]).toMatchObject({
       src: source,
       name: "note.txt",
@@ -163,7 +163,7 @@ describe("upload route", () => {
 
   it("upload-blob stores session-owned pasted images under session file cache", async () => {
     tmpDir = mktemp();
-    const hanakoHome = path.join(tmpDir, "hana-home");
+    const agentryHome = path.join(tmpDir, "hana-home");
     const sessionPath = "/sessions/blob.jsonl";
     const registerSessionFile = vi.fn(({ sessionPath, filePath, label, origin, storageKind }) => ({
       id: "sf_blob",
@@ -182,7 +182,7 @@ describe("upload route", () => {
       createdAt: 1,
     }));
     const app = new Hono();
-    app.route("/api", createUploadRoute({ hanakoHome, registerSessionFile }));
+    app.route("/api", createUploadRoute({ agentryHome, registerSessionFile }));
     const png = Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
       "base64",
@@ -196,7 +196,7 @@ describe("upload route", () => {
     const data = await res.json();
 
     expect(res.status).toBe(200);
-    expect(data.uploads[0].dest.startsWith(path.join(hanakoHome, "session-files"))).toBe(true);
+    expect(data.uploads[0].dest.startsWith(path.join(agentryHome, "session-files"))).toBe(true);
     expect(registerSessionFile).toHaveBeenCalledWith({
       sessionPath,
       filePath: data.uploads[0].dest,
@@ -214,7 +214,7 @@ describe("upload route", () => {
   it("upload-blob rejects non-image mimeType", async () => {
     tmpDir = mktemp();
     const app = new Hono();
-    app.route("/api", createUploadRoute({ hanakoHome: path.join(tmpDir, "hana-home") }));
+    app.route("/api", createUploadRoute({ agentryHome: path.join(tmpDir, "hana-home") }));
 
     const res = await app.request("/api/upload-blob", {
       method: "POST",
@@ -232,7 +232,7 @@ describe("upload route", () => {
   it("upload-blob rejects image mimeTypes that the chat send path cannot accept", async () => {
     tmpDir = mktemp();
     const app = new Hono();
-    app.route("/api", createUploadRoute({ hanakoHome: path.join(tmpDir, "hana-home") }));
+    app.route("/api", createUploadRoute({ agentryHome: path.join(tmpDir, "hana-home") }));
 
     const res = await app.request("/api/upload-blob", {
       method: "POST",
@@ -250,9 +250,9 @@ describe("upload route", () => {
 
   it("upload-blob forces extension to match mimeType (defends against name spoofing)", async () => {
     tmpDir = mktemp();
-    const hanakoHome = path.join(tmpDir, "hana-home");
+    const agentryHome = path.join(tmpDir, "hana-home");
     const app = new Hono();
-    app.route("/api", createUploadRoute({ hanakoHome }));
+    app.route("/api", createUploadRoute({ agentryHome }));
 
     const png = Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
@@ -274,13 +274,13 @@ describe("upload route", () => {
     // basename + 强制扩展名
     expect(up.name).toBe("passwd.png");
     // 确保落点在 uploads 目录内
-    expect(up.dest.startsWith(path.join(hanakoHome, "uploads"))).toBe(true);
+    expect(up.dest.startsWith(path.join(agentryHome, "uploads"))).toBe(true);
   });
 
   it("upload-blob takes the basename from Windows-style paths before sanitizing", async () => {
     tmpDir = mktemp();
     const app = new Hono();
-    app.route("/api", createUploadRoute({ hanakoHome: path.join(tmpDir, "hana-home") }));
+    app.route("/api", createUploadRoute({ agentryHome: path.join(tmpDir, "hana-home") }));
 
     const png = Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
@@ -306,7 +306,7 @@ describe("upload route", () => {
   it("upload-blob avoids Windows reserved device filenames", async () => {
     tmpDir = mktemp();
     const app = new Hono();
-    app.route("/api", createUploadRoute({ hanakoHome: path.join(tmpDir, "hana-home") }));
+    app.route("/api", createUploadRoute({ agentryHome: path.join(tmpDir, "hana-home") }));
 
     const png = Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
@@ -332,7 +332,7 @@ describe("upload route", () => {
   it("upload-blob rejects oversized blob", async () => {
     tmpDir = mktemp();
     const app = new Hono();
-    app.route("/api", createUploadRoute({ hanakoHome: path.join(tmpDir, "hana-home") }));
+    app.route("/api", createUploadRoute({ agentryHome: path.join(tmpDir, "hana-home") }));
 
     // 16 MiB 原始数据会膨胀成超过 20 MiB 的 base64，发送路径会拒绝，上传路径也必须提前拒绝。
     const big = Buffer.alloc(16 * 1024 * 1024);

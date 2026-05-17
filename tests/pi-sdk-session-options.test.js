@@ -21,7 +21,7 @@ function makeAgentTool(name) {
 }
 
 describe("Pi SDK session option normalization", () => {
-  it("exposes stable Hana built-in tool names without SDK prebuilt objects", () => {
+  it("exposes stable Agentry built-in tool names without SDK prebuilt objects", () => {
     expect(PI_BUILTIN_TOOL_NAMES).toEqual(["read", "write", "edit", "bash", "grep", "find", "ls"]);
     expect(Object.isFrozen(PI_BUILTIN_TOOL_NAMES)).toBe(true);
   });
@@ -43,7 +43,7 @@ describe("Pi SDK session option normalization", () => {
     expect(result.content[0].text).toBe("ok");
   });
 
-  it("normalizes Hana Tool[] plus customTools into Pi 0.68+ name allowlist and SDK custom tools", () => {
+  it("normalizes Agentry Tool[] plus customTools into Pi 0.68+ name allowlist and SDK custom tools", () => {
     const read = makeAgentTool("read");
     const bash = makeAgentTool("bash");
     const custom = {

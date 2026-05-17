@@ -19,7 +19,7 @@ describe("skill bundle store", () => {
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-skill-bundles-"));
-    engine = { hanakoHome: tempDir };
+    engine = { agentryHome: tempDir };
   });
 
   afterEach(() => {
@@ -79,7 +79,7 @@ describe("skill bundle store", () => {
 
   it("detaches deleted agents from imported bundles while keeping bundle membership", () => {
     const bundle = createSkillBundle(engine, {
-      name: "Hanako Bundle",
+      name: "Agentry Bundle",
       skillNames: ["quiet-musing", "skill-creator"],
       source: "character-card-import",
       agentId: "hanako-2",

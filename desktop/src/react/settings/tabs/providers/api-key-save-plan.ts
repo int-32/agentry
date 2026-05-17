@@ -23,6 +23,17 @@ export function getApiKeySavePlan(input: ApiKeySavePlanInput): ApiKeySavePlan {
   const key = input.keyVal.trim();
   const effectiveUrl = input.urlVal.trim() || input.derivedBaseUrl;
 
+  if (!input.keyEdited && input.urlEdited && !input.isPresetSetup) {
+    return {
+      shouldSave: true,
+      shouldVerify: true,
+      payload: { base_url: effectiveUrl },
+      effectiveUrl,
+      api: input.api,
+      key,
+    };
+  }
+
   if (!input.keyEdited) {
     return {
       shouldSave: false,

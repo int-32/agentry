@@ -165,14 +165,14 @@ describe('initApp bridge indicator', () => {
     };
     (globalThis as Record<string, unknown>).i18n = {
       locale: 'zh-CN',
-      defaultName: 'Hanako',
+      defaultName: 'Agentry',
       load: vi.fn(async () => {}),
     };
     (globalThis as Record<string, unknown>).t = vi.fn((key: string) => key);
 
     mockHanaFetch
       .mockResolvedValueOnce(serverIdentityResponse())
-      .mockResolvedValueOnce(jsonResponse({ agent: 'Hanako', user: 'User', avatars: {} }))
+      .mockResolvedValueOnce(jsonResponse({ agent: 'Agentry', user: 'User', avatars: {} }))
       .mockResolvedValueOnce(jsonResponse({ locale: 'zh-CN', desk: { home_folder: null }, cwd_history: [] }))
       .mockResolvedValueOnce(jsonResponse({ jobs: [] }))
       .mockResolvedValueOnce(jsonResponse({
@@ -220,7 +220,7 @@ describe('initApp bridge indicator', () => {
     };
     (globalThis as Record<string, unknown>).i18n = {
       locale: 'zh-CN',
-      defaultName: 'Hanako',
+      defaultName: 'Agentry',
       load: vi.fn(async () => {}),
     };
     (globalThis as Record<string, unknown>).t = vi.fn((key: string) => key);
@@ -254,14 +254,14 @@ describe('initApp bridge indicator', () => {
     };
     (globalThis as Record<string, unknown>).i18n = {
       locale: 'zh-CN',
-      defaultName: 'Hanako',
+      defaultName: 'Agentry',
       load: vi.fn(async () => {}),
     };
     (globalThis as Record<string, unknown>).t = vi.fn((key: string) => key);
 
     mockHanaFetch
       .mockResolvedValueOnce(serverIdentityResponse())
-      .mockResolvedValueOnce(jsonResponse({ agent: 'Hanako', user: 'User', avatars: {} }))
+      .mockResolvedValueOnce(jsonResponse({ agent: 'Agentry', user: 'User', avatars: {} }))
       .mockResolvedValueOnce(jsonResponse({
         locale: 'zh-CN',
         desk: { home_folder: '/agent-home' },
@@ -305,14 +305,14 @@ describe('initApp bridge indicator', () => {
     };
     (globalThis as Record<string, unknown>).i18n = {
       locale: 'zh-CN',
-      defaultName: 'Hanako',
+      defaultName: 'Agentry',
       load: vi.fn(async () => {}),
     };
     (globalThis as Record<string, unknown>).t = vi.fn((key: string) => key);
 
     mockHanaFetch
       .mockResolvedValueOnce(serverIdentityResponse())
-      .mockResolvedValueOnce(jsonResponse({ agent: 'Hanako', user: 'User', avatars: {} }))
+      .mockResolvedValueOnce(jsonResponse({ agent: 'Agentry', user: 'User', avatars: {} }))
       .mockResolvedValueOnce(jsonResponse({ locale: 'zh-CN', desk: { home_folder: '/old-home' }, cwd_history: [] }))
       .mockResolvedValueOnce(jsonResponse({ jobs: [] }))
       .mockResolvedValueOnce(jsonResponse({
@@ -365,14 +365,14 @@ describe('initApp bridge indicator', () => {
     };
     (globalThis as Record<string, unknown>).i18n = {
       locale: 'zh-CN',
-      defaultName: 'Hanako',
+      defaultName: 'Agentry',
       load: vi.fn(async () => {}),
     };
     (globalThis as Record<string, unknown>).t = vi.fn((key: string) => key);
 
     mockHanaFetch
       .mockResolvedValueOnce(serverIdentityResponse())
-      .mockResolvedValueOnce(jsonResponse({ agent: 'Hanako', user: 'User', avatars: {} }))
+      .mockResolvedValueOnce(jsonResponse({ agent: 'Agentry', user: 'User', avatars: {} }))
       .mockResolvedValueOnce(jsonResponse({ locale: 'zh-CN', desk: { home_folder: '/old-home' }, cwd_history: [] }))
       .mockResolvedValueOnce(jsonResponse({ jobs: [] }))
       .mockResolvedValueOnce(jsonResponse({
@@ -425,14 +425,14 @@ describe('initApp bridge indicator', () => {
     };
     (globalThis as Record<string, unknown>).i18n = {
       locale: 'zh-CN',
-      defaultName: 'Hanako',
+      defaultName: 'Agentry',
       load: vi.fn(async () => {}),
     };
     (globalThis as Record<string, unknown>).t = vi.fn((key: string) => key);
 
     mockHanaFetch
       .mockResolvedValueOnce(serverIdentityResponse())
-      .mockResolvedValueOnce(jsonResponse({ agent: 'Hanako', user: 'User', avatars: {} }))
+      .mockResolvedValueOnce(jsonResponse({ agent: 'Agentry', user: 'User', avatars: {} }))
       .mockResolvedValueOnce(jsonResponse({ locale: 'zh-CN', desk: { home_folder: '/old-home' }, cwd_history: [] }))
       .mockResolvedValueOnce(jsonResponse({ jobs: [] }))
       .mockResolvedValueOnce(jsonResponse({
@@ -487,7 +487,7 @@ describe('initApp bridge indicator', () => {
     };
     (globalThis as Record<string, unknown>).i18n = {
       locale: 'zh-CN',
-      defaultName: 'Hanako',
+      defaultName: 'Agentry',
       load: vi.fn(async () => {}),
     };
     (globalThis as Record<string, unknown>).t = vi.fn((key: string) => key);
@@ -496,7 +496,7 @@ describe('initApp bridge indicator', () => {
     mockGetWebSocket.mockReturnValue({ readyState: 1, send } as unknown as WebSocket);
     mockHanaFetch
       .mockResolvedValueOnce(serverIdentityResponse())
-      .mockResolvedValueOnce(jsonResponse({ agent: 'Hanako', user: 'User', avatars: {} }))
+      .mockResolvedValueOnce(jsonResponse({ agent: 'Agentry', user: 'User', avatars: {} }))
       .mockResolvedValueOnce(jsonResponse({ locale: 'zh-CN', desk: { home_folder: null }, cwd_history: [] }))
       .mockResolvedValueOnce(jsonResponse({ jobs: [] }))
       .mockResolvedValueOnce(jsonResponse({
@@ -554,14 +554,14 @@ describe('initApp bridge indicator', () => {
     };
     (globalThis as Record<string, unknown>).i18n = {
       locale: 'zh-CN',
-      defaultName: 'Hanako',
+      defaultName: 'Agentry',
       load: vi.fn(async () => {}),
     };
     (globalThis as Record<string, unknown>).t = vi.fn((key: string) => key);
 
     mockHanaFetch
       .mockResolvedValueOnce(serverIdentityResponse())
-      .mockResolvedValueOnce(jsonResponse({ agent: 'Hanako', user: 'User', avatars: {} }))
+      .mockResolvedValueOnce(jsonResponse({ agent: 'Agentry', user: 'User', avatars: {} }))
       .mockResolvedValueOnce(jsonResponse({ locale: 'zh-CN', desk: { home_folder: null }, cwd_history: [] }))
       .mockResolvedValueOnce(jsonResponse({ jobs: [] }))
       .mockResolvedValueOnce(jsonResponse({

@@ -9,7 +9,7 @@
     "sourceMap": true,
     "noEmit": false,
     "paths": {
-      "@hana/plugin-protocol": [
+      "@agentry/plugin-protocol": [
         "../plugin-protocol/dist/index.d.ts"
       ]
     }

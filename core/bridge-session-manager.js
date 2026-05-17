@@ -534,7 +534,7 @@ export class BridgeSessionManager {
       }
       if (opts.inboundFiles?.length && activeSessionPath) {
         const materialized = await materializeBridgeInboundFiles({
-          hanakoHome: this._deps.getHanakoHome?.(),
+          agentryHome: this._deps.getHanakoHome?.(),
           sessionPath: activeSessionPath,
           files: opts.inboundFiles,
           registerSessionFile: this._deps.registerSessionFile,

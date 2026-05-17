@@ -874,6 +874,7 @@
       "empty": "プロバイダーはまだ登録されていません",
       "fetchModels": "モデルを取得",
       "delete": "プロバイダーを削除",
+      "clearConfig": "設定をクリア",
       "modelCount": "{n} モデル",
       "fetchSuccess": "{name} から {n} モデルを取得しました",
       "fetchFailed": "取得に失敗しました",
@@ -882,6 +883,7 @@
       "apiRequired": "API プロトコルは必須です",
       "added": "{name} を追加しました",
       "deleted": "{name} を削除しました",
+      "clearedConfig": "{name} の設定をクリアしました",
       "noModels": "モデルはまだありません",
       "resetModels": "モデルをリセット",
       "apiType": "API タイプ",
@@ -896,7 +898,8 @@
       "addCustom": "カスタムプロバイダーを追加",
       "noKey": "未設定",
       "remove": "削除",
-      "deleteConfirm": "プロバイダー {name} を削除しますか？関連するモデルも削除されます。"
+      "deleteConfirm": "プロバイダー {name} を削除しますか？関連するモデルも削除されます。",
+      "clearConfigConfirm": "{name} の API Key、Base URL、モデルをクリアしますか？組み込みプロバイダーの入口は再設定用に残ります。"
     },
     "oauth": {
       "title": "クイックログイン",

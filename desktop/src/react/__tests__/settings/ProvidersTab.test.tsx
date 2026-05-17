@@ -124,4 +124,77 @@ describe('ProvidersTab provider-scoped form state', () => {
     const groqKeyInput = container.querySelector('input[type="password"]');
     expect(groqKeyInput).toHaveValue('');
   });
+
+  it('uses a saved display name before the preset label in the provider list', async () => {
+    const customSummary = {
+      ...providersSummary,
+      deepseek: providerSummary({
+        display_name: '工作 DeepSeek',
+        base_url: 'https://api.deepseek.com',
+        api_key: 'saved-deepseek-key',
+        has_credentials: true,
+      }),
+    };
+    mocks.hanaFetch.mockImplementation((path: string) => {
+      if (path === '/api/providers/summary') {
+        return Promise.resolve(jsonResponse({ providers: customSummary }));
+      }
+      return Promise.resolve(jsonResponse({ ok: true }));
+    });
+    useSettingsStore.setState({
+      providersSummary: customSummary,
+      selectedProviderId: 'deepseek',
+    });
+
+    render(<ProvidersTab />);
+
+    expect(await screen.findByRole('button', { name: /工作 DeepSeek/ })).toBeInTheDocument();
+  });
+
+  it('saves provider display name edits', async () => {
+    render(<ProvidersTab />);
+
+    const nameInput = await screen.findByLabelText('settings.api.displayName');
+    fireEvent.change(nameInput, { target: { value: '研发 DeepSeek' } });
+    fireEvent.blur(nameInput);
+
+    await waitFor(() => {
+      expect(mocks.hanaFetch.mock.calls.some(([path]) => path === '/api/config')).toBe(true);
+    });
+    const configCall = mocks.hanaFetch.mock.calls.find(([path]) => path === '/api/config');
+    const [, options] = configCall || [];
+    expect(JSON.parse(String((options as RequestInit).body))).toEqual({
+      providers: {
+        deepseek: { display_name: '研发 DeepSeek' },
+      },
+    });
+  });
+
+  it('labels preset provider removal as clearing config', async () => {
+    const configuredPreset = {
+      ...providersSummary,
+      deepseek: providerSummary({
+        display_name: 'DeepSeek',
+        base_url: 'https://api.deepseek.com',
+        api_key: 'saved-deepseek-key',
+        has_credentials: true,
+        can_delete: true,
+      }),
+    };
+    mocks.hanaFetch.mockImplementation((path: string) => {
+      if (path === '/api/providers/summary') {
+        return Promise.resolve(jsonResponse({ providers: configuredPreset }));
+      }
+      return Promise.resolve(jsonResponse({ ok: true }));
+    });
+    useSettingsStore.setState({
+      providersSummary: configuredPreset,
+      selectedProviderId: 'deepseek',
+    });
+
+    render(<ProvidersTab />);
+
+    expect(await screen.findByRole('button', { name: 'settings.providers.clearConfig' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'settings.providers.delete' })).not.toBeInTheDocument();
+  });
 });

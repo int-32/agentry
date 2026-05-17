@@ -40,7 +40,7 @@ function makeDeps(overrides = {}) {
     }),
     getSessionPath: () => "/test/session.jsonl",
     listAgents: vi.fn(() => [
-      { id: "hana", name: "Hana", model: "claude-3-5-sonnet", summary: "主 agent" },
+      { id: "hana", name: "Agentry", model: "claude-3-5-sonnet", summary: "主 agent" },
       { id: "other-agent", name: "Other", model: "gpt-4", summary: "专家 agent" },
     ]),
     currentAgentId: "hana",
@@ -81,11 +81,11 @@ describe("subagent-tool (executeIsolated 原子模式)", () => {
     expect(result.details.task).toBe(task);
     expect(result.details.taskTitle).toBe("任务：查一下项目状态");
     expect(result.details.agentId).toBe("hana");
-    expect(result.details.agentName).toBe("Hana");
+    expect(result.details.agentName).toBe("Agentry");
     expect(result.details.requestedAgentId).toBe("hana");
-    expect(result.details.requestedAgentNameSnapshot).toBe("Hana");
+    expect(result.details.requestedAgentNameSnapshot).toBe("Agentry");
     expect(result.details.executorAgentId).toBe("hana");
-    expect(result.details.executorAgentNameSnapshot).toBe("Hana");
+    expect(result.details.executorAgentNameSnapshot).toBe("Agentry");
     expect(result.details.executorMetaVersion).toBe(1);
 
     // store.defer is called before returning
@@ -116,11 +116,11 @@ describe("subagent-tool (executeIsolated 原子模式)", () => {
           patch: expect.objectContaining({
             streamKey: "/test/child.jsonl",
             agentId: "hana",
-            agentName: "Hana",
+            agentName: "Agentry",
             requestedAgentId: "hana",
-            requestedAgentNameSnapshot: "Hana",
+            requestedAgentNameSnapshot: "Agentry",
             executorAgentId: "hana",
-            executorAgentNameSnapshot: "Hana",
+            executorAgentNameSnapshot: "Agentry",
           }),
         }),
         "/test/session.jsonl",
@@ -132,7 +132,7 @@ describe("subagent-tool (executeIsolated 原子模式)", () => {
         "/test/child.jsonl",
         expect.objectContaining({
           executorAgentId: "hana",
-          executorAgentNameSnapshot: "Hana",
+          executorAgentNameSnapshot: "Agentry",
           executorMetaVersion: 1,
         }),
       );
@@ -298,7 +298,7 @@ describe("subagent-tool (executeIsolated 原子模式)", () => {
       getDeferredStore: () => mockStore,
       emitEvent,
       listAgents: vi.fn(() => [
-        { id: "hana", name: "Hana" },
+        { id: "hana", name: "Agentry" },
         { id: "butter", name: "butter" },
       ]),
     }));
@@ -528,7 +528,7 @@ describe("subagent-tool (executeIsolated 原子模式)", () => {
     const tool = createSubagentTool(makeDeps({
       executeIsolated: noopExecute,
       listAgents: () => [
-        { id: "hana", name: "Hana", model: "claude-3-5-sonnet", summary: "主 agent" },
+        { id: "hana", name: "Agentry", model: "claude-3-5-sonnet", summary: "主 agent" },
         { id: "other-agent", name: "Other", model: "gpt-4", summary: "专家 agent" },
       ],
       currentAgentId: "hana",
@@ -596,7 +596,7 @@ describe("subagent-tool (executeIsolated 原子模式)", () => {
       executeIsolated: captureExecute,
       getDeferredStore: () => mockStore,
       listAgents: () => [
-        { id: "hana", name: "Hana" },
+        { id: "hana", name: "Agentry" },
         { id: "ming", name: "明" },
       ],
       currentAgentId: "hana",

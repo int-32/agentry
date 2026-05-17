@@ -71,9 +71,9 @@ const migrations = {
   18: migrateLocalIdentityRegistries,
   // API-key provider 凭证真相源迁移：auth.json → added-models.yaml
   19: migrateLegacyApiKeyAuthEntriesToProviders,
-  // Pi SDK 0.70+ 严格限制 model.input，只允许 text/image；Hana 视频能力迁入 compat
+  // Pi SDK 0.70+ 严格限制 model.input，只允许 text/image；Agentry 视频能力迁入 compat
   20: migratePiInputSchemaVideoCompat,
-  // 刷新高确定性视频模型能力；补齐已升级用户 models.json 里的 Hana compat
+  // 刷新高确定性视频模型能力；补齐已升级用户 models.json 里的 Agentry compat
   21: refreshVideoCapabilityProjection,
   // 频道 phone 设置显式化：主动提醒默认 31 分钟，模型覆写默认关闭
   22: migrateChannelPhoneSettingsDefaults,
@@ -89,7 +89,7 @@ const migrations = {
 
 /**
  * @param {object} ctx
- * @param {string}   ctx.hanakoHome
+ * @param {string}   ctx.agentryHome
  * @param {string}   ctx.agentsDir
  * @param {import('./preferences-manager.js').PreferencesManager} ctx.prefs
  * @param {import('./provider-registry.js').ProviderRegistry}     ctx.providerRegistry
@@ -327,7 +327,7 @@ function migrateBridgeToPerAgent(ctx) {
 }
 
 function migrateSubagentExecutorMetadata(ctx) {
-  const { agentsDir, hanakoHome, log } = ctx;
+  const { agentsDir, agentryHome, log } = ctx;
   const agentSnapshots = new Map();
   const childSessionCandidates = new Map();
 
@@ -486,7 +486,7 @@ function migrateSubagentExecutorMetadata(ctx) {
     log(`[migrations] subagent session sidecar patched: ${metaPath}`);
   }
 
-  const deferredTasksPath = path.join(hanakoHome, ".ephemeral", "deferred-tasks.json");
+  const deferredTasksPath = path.join(agentryHome, ".ephemeral", "deferred-tasks.json");
   try {
     if (!fs.existsSync(deferredTasksPath)) return;
     const deferredTasks = JSON.parse(fs.readFileSync(deferredTasksPath, "utf-8"));
@@ -873,12 +873,12 @@ function migrateWorkspaceToPerAgent(ctx) {
  * 配合读时兼容（model-sync.js、provider-registry.js）形成双保险。
  */
 function migrateVisionToImage(ctx) {
-  const { hanakoHome, agentsDir, log } = ctx;
+  const { agentryHome, agentsDir, log } = ctx;
   let ymlCount = 0;
   let overrideCount = 0;
 
   // ── 1. added-models.yaml ──
-  const ymlPath = path.join(hanakoHome, "added-models.yaml");
+  const ymlPath = path.join(agentryHome, "added-models.yaml");
   const raw = safeReadYAMLSync(ymlPath, null, YAML);
   if (raw?.providers && typeof raw.providers === "object") {
     let changed = false;
@@ -895,7 +895,7 @@ function migrateVisionToImage(ctx) {
     }
     if (changed) {
       const header =
-        "# Hanako 供应商配置（全局，跨 agent 共享）\n" +
+        "# Agentry 供应商配置（全局，跨 agent 共享）\n" +
         "# 由设置页面管理\n\n";
       const yamlStr = header + YAML.dump(raw, {
         indent: 2,
@@ -1122,11 +1122,11 @@ function cleanupSummarizerCompilerRemnants(ctx) {
  * path 回填 block 的生命周期字段。
  */
 function backfillLegacySessionFiles(ctx) {
-  const { hanakoHome, agentsDir, log } = ctx;
-  if (!hanakoHome || !agentsDir) return;
+  const { agentryHome, agentsDir, log } = ctx;
+  if (!agentryHome || !agentsDir) return;
 
   const registry = new SessionFileRegistry({
-    managedCacheRoot: path.join(hanakoHome, "session-files"),
+    managedCacheRoot: path.join(agentryHome, "session-files"),
   });
   const sessionPaths = collectLegacySessionJsonlPaths(agentsDir);
   let registered = 0;
@@ -1155,7 +1155,7 @@ function backfillLegacySessionFiles(ctx) {
       if (entry?.type !== "message" || msg?.role !== "toolResult") continue;
 
       for (const ref of legacySessionFileRefs(msg)) {
-        const ok = registerLegacySessionFile({ registry, sessionPath, ref, hanakoHome, log });
+        const ok = registerLegacySessionFile({ registry, sessionPath, ref, agentryHome, log });
         if (ok) registered++;
         else skipped++;
       }
@@ -1164,7 +1164,7 @@ function backfillLegacySessionFiles(ctx) {
       if (screenshot?.base64) {
         try {
           persistBrowserScreenshotFileSync({
-            hanakoHome,
+            agentryHome,
             sessionPath,
             base64: screenshot.base64,
             mimeType: screenshot.mimeType || "image/png",
@@ -1219,8 +1219,8 @@ function classifyOfficialGeminiBaseUrl(value) {
 }
 
 function migrateGeminiOpenAICompatToNative(ctx) {
-  const { hanakoHome, log } = ctx;
-  const ymlPath = path.join(hanakoHome, "added-models.yaml");
+  const { agentryHome, log } = ctx;
+  const ymlPath = path.join(agentryHome, "added-models.yaml");
   const raw = safeReadYAMLSync(ymlPath, null, YAML);
   if (!raw?.providers || typeof raw.providers !== "object") {
     log?.("[migrations] #14: Gemini native API migration skipped (no providers)");
@@ -1268,7 +1268,7 @@ function migrateGeminiOpenAICompatToNative(ctx) {
 
   if (patched > 0) {
     const header =
-      "# Hanako 供应商配置（全局，跨 agent 共享）\n" +
+      "# Agentry 供应商配置（全局，跨 agent 共享）\n" +
       "# 由设置页面管理\n\n";
     const yamlStr = header + YAML.dump(raw, {
       indent: 2,
@@ -1312,7 +1312,7 @@ function repairLegacySessionSidecarThinkingLevels(ctx) {
  *   1. models.json 是投影文件，老版本里已存在的已知视频模型可能只有 ["text","image"]；
  *   2. 少量手写 agent config.models.overrides 可能已经带 video，需要提升到 added-models.yaml。
  *
- * 幂等：视频能力写入 Hana compat，Pi-facing input 只保留 text/image；运行期模型对象不保留 video 字段。
+ * 幂等：视频能力写入 Agentry compat，Pi-facing input 只保留 text/image；运行期模型对象不保留 video 字段。
  */
 function migrateVideoCapabilityProjection(ctx) {
   const modelsPatched = repairModelsJsonPiInputSchema(ctx);
@@ -1323,7 +1323,7 @@ function migrateVideoCapabilityProjection(ctx) {
 /**
  * #20 — 修复已运行过 #16 或新版本投影留下的非法 Pi input 模态
  *
- * Pi SDK models.json 的 input 是外部契约，只允许 text/image。Hana 自己的
+ * Pi SDK models.json 的 input 是外部契约，只允许 text/image。Agentry 自己的
  * video 能力必须放在 compat.hanaVideoInput，避免 ModelRegistry 因单个非法
  * 模型把整张模型表判空。
  */
@@ -1338,7 +1338,7 @@ function migratePiInputSchemaVideoCompat(ctx) {
  * 这次变更把"模型会看视频"与"provider 协议能直传视频"拆开。新增的已知
  * 视频模型仍复用 compat.hanaVideoInput 表示语义能力，传输能力由运行时根据
  * provider/api/baseUrl 推导。老用户已存在的 models.json 需要重跑一次投影修补，
- * 否则新增的 Kimi 等模型不会拿到 Hana 视频能力字段。
+ * 否则新增的 Kimi 等模型不会拿到 Agentry 视频能力字段。
  */
 function refreshVideoCapabilityProjection(ctx) {
   const patched = repairModelsJsonPiInputSchema(ctx);
@@ -1466,7 +1466,7 @@ function serializeBridgeIndexEntryForMigration(previousRaw, entry) {
 }
 
 function repairModelsJsonPiInputSchema(ctx) {
-  const modelsJsonPath = path.join(ctx.hanakoHome, "models.json");
+  const modelsJsonPath = path.join(ctx.agentryHome, "models.json");
   let raw;
   try {
     raw = JSON.parse(fs.readFileSync(modelsJsonPath, "utf-8"));
@@ -1558,8 +1558,8 @@ function ensureHanaVideoInputCompat(record) {
 }
 
 function promoteAgentVideoOverrides(ctx) {
-  const { hanakoHome, agentsDir } = ctx;
-  const ymlPath = path.join(hanakoHome, "added-models.yaml");
+  const { agentryHome, agentsDir } = ctx;
+  const ymlPath = path.join(agentryHome, "added-models.yaml");
   const raw = safeReadYAMLSync(ymlPath, null, YAML);
   if (!raw?.providers || typeof raw.providers !== "object") return 0;
 
@@ -1612,7 +1612,7 @@ function promoteAgentVideoOverrides(ctx) {
 
   if (addedModelsChanged) {
     const header =
-      "# Hanako 供应商配置（全局，跨 agent 共享）\n" +
+      "# Agentry 供应商配置（全局，跨 agent 共享）\n" +
       "# 由设置页面管理\n\n";
     const tmp = ymlPath + ".tmp";
     fs.writeFileSync(
@@ -1772,8 +1772,8 @@ function defaultDeepSeekModelsForMigration(ctx, providerId) {
 }
 
 function repairLegacyDeepSeekProviderModelIds(ctx) {
-  const { hanakoHome, log } = ctx;
-  const ymlPath = path.join(hanakoHome, "added-models.yaml");
+  const { agentryHome, log } = ctx;
+  const ymlPath = path.join(agentryHome, "added-models.yaml");
   const raw = safeReadYAMLSync(ymlPath, null, YAML);
   if (!raw?.providers || typeof raw.providers !== "object") return 0;
 
@@ -1803,7 +1803,7 @@ function repairLegacyDeepSeekProviderModelIds(ctx) {
 
   if (patched > 0) {
     const header =
-      "# Hanako 供应商配置（全局，跨 agent 共享）\n" +
+      "# Agentry 供应商配置（全局，跨 agent 共享）\n" +
       "# 由设置页面管理\n\n";
     const tmp = ymlPath + ".tmp";
     fs.writeFileSync(
@@ -1975,7 +1975,7 @@ function pushLegacyFileRef(refs, candidate, defaults = {}) {
   });
 }
 
-function registerLegacySessionFile({ registry, sessionPath, ref, hanakoHome, log }) {
+function registerLegacySessionFile({ registry, sessionPath, ref, agentryHome, log }) {
   if (!ref?.filePath || !path.isAbsolute(ref.filePath)) return false;
   if (!fs.existsSync(ref.filePath)) return false;
 
@@ -1985,7 +1985,7 @@ function registerLegacySessionFile({ registry, sessionPath, ref, hanakoHome, log
       filePath: ref.filePath,
       label: ref.label || path.basename(ref.filePath),
       origin: ref.origin || "unknown",
-      storageKind: normalizeLegacyStorageKind(ref, hanakoHome),
+      storageKind: normalizeLegacyStorageKind(ref, agentryHome),
     });
     return true;
   } catch (err) {
@@ -1994,11 +1994,11 @@ function registerLegacySessionFile({ registry, sessionPath, ref, hanakoHome, log
   }
 }
 
-function normalizeLegacyStorageKind(ref, hanakoHome) {
+function normalizeLegacyStorageKind(ref, agentryHome) {
   const storageKind = ref.storageKind || "external";
   if (storageKind !== "managed_cache") return storageKind;
 
-  const managedRoot = path.join(hanakoHome, "session-files");
+  const managedRoot = path.join(agentryHome, "session-files");
   const resolved = normalizeExistingOrResolvedPathForMigration(ref.filePath);
   const root = normalizeExistingOrResolvedPathForMigration(managedRoot);
   const rel = path.relative(root, resolved);
@@ -2032,8 +2032,8 @@ function legacyBrowserScreenshot(msg) {
 }
 
 function migrateLocalIdentityRegistries(ctx) {
-  const { hanakoHome, log } = ctx;
-  const { created } = ensureLocalIdentityRegistries(hanakoHome);
+  const { agentryHome, log } = ctx;
+  const { created } = ensureLocalIdentityRegistries(agentryHome);
   log?.(`[migrations] #18: local identity registries ready${created.length ? ` (created=${created.join(",")})` : ""}`);
 }
 
@@ -2043,8 +2043,8 @@ function migrateLegacyApiKeyAuthEntriesToProviders(ctx) {
 }
 
 function migrateChannelPhoneSettingsDefaults(ctx) {
-  const { hanakoHome, log } = ctx;
-  const channelsDir = path.join(hanakoHome, "channels");
+  const { agentryHome, log } = ctx;
+  const channelsDir = path.join(agentryHome, "channels");
   if (!fs.existsSync(channelsDir)) {
     log?.("[migrations] #22: no channels dir");
     return;
@@ -2067,7 +2067,7 @@ function migrateChannelPhoneSettingsDefaults(ctx) {
 }
 
 function removeAgentPhoneReplyInstructions(ctx) {
-  const { hanakoHome, agentsDir, log } = ctx;
+  const { agentryHome, agentsDir, log } = ctx;
   let channelPatched = 0;
   let projectionPatched = 0;
 
@@ -2081,7 +2081,7 @@ function removeAgentPhoneReplyInstructions(ctx) {
     return true;
   };
 
-  const channelsDir = path.join(hanakoHome, "channels");
+  const channelsDir = path.join(agentryHome, "channels");
   if (fs.existsSync(channelsDir)) {
     for (const entry of fs.readdirSync(channelsDir, { withFileTypes: true })) {
       if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
@@ -2109,8 +2109,8 @@ function removeAgentPhoneReplyInstructions(ctx) {
 }
 
 function migrateChannelPhoneGuardLimitDefaults(ctx) {
-  const { hanakoHome, log } = ctx;
-  const channelsDir = path.join(hanakoHome, "channels");
+  const { agentryHome, log } = ctx;
+  const channelsDir = path.join(agentryHome, "channels");
   if (!fs.existsSync(channelsDir)) {
     log?.("[migrations] #24: no channels dir");
     return;
@@ -2133,8 +2133,8 @@ function migrateChannelPhoneGuardLimitDefaults(ctx) {
 }
 
 function migrateChannelPhoneProactiveDefaults(ctx) {
-  const { hanakoHome, log } = ctx;
-  const channelsDir = path.join(hanakoHome, "channels");
+  const { agentryHome, log } = ctx;
+  const channelsDir = path.join(agentryHome, "channels");
   if (!fs.existsSync(channelsDir)) {
     log?.("[migrations] #25: no channels dir");
     return;

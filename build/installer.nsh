@@ -17,7 +17,7 @@ CRCCheck off
 !macroend
 
 !macro hanakoFindRunningProcesses _RETURN
-  !insertmacro hanakoFindProcess Hanako.exe ${_RETURN}
+  !insertmacro hanakoFindProcess Agentry.exe ${_RETURN}
   ${If} ${_RETURN} != 0
     !insertmacro hanakoFindProcess hana-server.exe ${_RETURN}
   ${EndIf}
@@ -38,7 +38,7 @@ CRCCheck off
 !macroend
 
 !macro hanakoKillRunningProcesses _FORCE
-  !insertmacro hanakoKillProcess Hanako.exe ${_FORCE}
+  !insertmacro hanakoKillProcess Agentry.exe ${_FORCE}
   !insertmacro hanakoKillProcess hana-server.exe ${_FORCE}
 !macroend
 
@@ -217,7 +217,7 @@ CRCCheck off
   ${IfNot} ${isUpdated}
   !insertmacro hanakoFindRunningProcesses $R0
   ${If} $R0 == 0
-    DetailPrint "Detected Hanako.exe or hana-server.exe; closing them before install."
+    DetailPrint "Detected Agentry.exe or hana-server.exe; closing them before install."
     !insertmacro hanakoKillRunningProcesses 0
     Sleep 500
 
@@ -232,9 +232,9 @@ CRCCheck off
       !insertmacro hanakoFindRunningProcesses $R0
       ${If} $R0 == 0
         IntOp $R1 $R1 + 1
-        DetailPrint "Waiting for Hanako.exe or hana-server.exe to close."
+        DetailPrint "Waiting for Agentry.exe or hana-server.exe to close."
         ${If} $R1 > 2
-          DetailPrint "Hanako.exe or hana-server.exe still running; asking user to retry."
+          DetailPrint "Agentry.exe or hana-server.exe still running; asking user to retry."
           MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(appCannotBeClosed)" /SD IDCANCEL IDRETRY hanako_retry_close
           Quit
           hanako_retry_close:

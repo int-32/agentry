@@ -102,7 +102,7 @@ function createChildProcess({ stdout = "", stderr = "", code = 0 } = {}) {
   return child;
 }
 
-describe("Hana Pi SDK search tools", () => {
+describe("Agentry Pi SDK search tools", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     spawnSync.mockReturnValue({ status: 0, stdout: "tool version\n", stderr: "" });

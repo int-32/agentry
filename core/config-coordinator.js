@@ -99,7 +99,7 @@ export function normalizeSharedModelsPatch(partial) {
 export class ConfigCoordinator {
   /**
    * @param {object} deps
-   * @param {string} deps.hanakoHome
+   * @param {string} deps.agentryHome
    * @param {string} deps.agentsDir
    * @param {() => object} deps.getAgent - 当前焦点 agent
    * @param {(id: string) => object|null} deps.getAgentById - 按 ID 查找 agent

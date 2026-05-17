@@ -5,12 +5,12 @@
 import { useState, useCallback } from 'react';
 import { LOCALES } from '../constants';
 import { saveLocale } from '../onboarding-actions';
-import type { HanaFetch } from '../onboarding-actions';
+import type { AgentryFetch } from '../onboarding-actions';
 import { StepContainer, Multiline } from '../onboarding-ui';
 
 interface LocaleStepProps {
   preview: boolean;
-  hanaFetch: HanaFetch;
+  hanaFetch: AgentryFetch;
   avatarSrc: string;
   initialLocale: string;
   goToStep: (index: number) => void;

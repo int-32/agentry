@@ -8,7 +8,7 @@ describe('grapheme utilities', () => {
   });
 
   it('keeps zero-width-joiner emoji sequences intact', () => {
-    expect(firstGrapheme('👩‍💻 Hana')).toBe('👩‍💻');
+    expect(firstGrapheme('👩‍💻 Agentry')).toBe('👩‍💻');
   });
 
   it('splits text by user-visible characters', () => {

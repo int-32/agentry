@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { PluginManager } from '../core/plugin-manager.js';
-import { PLUGIN_UI_CAPABILITY } from '@hana/plugin-protocol';
+import { PLUGIN_UI_CAPABILITY } from '@agentry/plugin-protocol';
 
 function tmpPluginDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'hana-plugin-test-'));

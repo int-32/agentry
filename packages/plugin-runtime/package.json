@@ -1,5 +1,5 @@
 {
-  "name": "@hana/plugin-runtime",
+  "name": "@agentry/plugin-runtime",
   "version": "0.0.0",
   "private": true,
   "type": "module",

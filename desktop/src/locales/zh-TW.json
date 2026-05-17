@@ -874,6 +874,7 @@
       "empty": "還沒有註冊供應商",
       "fetchModels": "讀取模型",
       "delete": "刪除供應商",
+      "clearConfig": "清除設定",
       "modelCount": "{n} 個模型",
       "fetchSuccess": "{name} 取得了 {n} 個模型",
       "fetchFailed": "拉取失敗",
@@ -882,6 +883,7 @@
       "apiRequired": "請選擇 API 協定",
       "added": "已新增 {name}",
       "deleted": "已刪除 {name}",
+      "clearedConfig": "已清除 {name} 設定",
       "noModels": "暫無模型",
       "resetModels": "重設模型",
       "apiType": "API 類型",
@@ -896,7 +898,8 @@
       "addCustom": "新增自訂供應商",
       "noKey": "未設定",
       "remove": "移除",
-      "deleteConfirm": "確定刪除供應商 {name}？相關模型將一併清除。"
+      "deleteConfirm": "確定刪除供應商 {name}？相關模型將一併清除。",
+      "clearConfigConfirm": "確定清除 {name} 的 API Key、Base URL 和模型？供應商入口仍會保留，方便重新設定。"
     },
     "oauth": {
       "title": "快速登入",

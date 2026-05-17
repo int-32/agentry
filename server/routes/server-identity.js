@@ -3,12 +3,12 @@ import { loadServerIdentity } from "../../core/server-identity.js";
 
 const LOCAL_CAPABILITIES = ["chat", "resources", "tools"];
 
-export function createServerIdentityRoute({ hanakoHome, appVersion = "?" }) {
+export function createServerIdentityRoute({ agentryHome, appVersion = "?" }) {
   const route = new Hono();
 
   route.get("/server/identity", (c) => {
     try {
-      const identity = loadServerIdentity(hanakoHome);
+      const identity = loadServerIdentity(agentryHome);
       return c.json({
         serverId: identity.serverId,
         userId: identity.userId,

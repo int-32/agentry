@@ -36,8 +36,8 @@ describe("log redaction", () => {
       "/Users/alice/Desktop/private.txt",
       "file:///Users/alice/Desktop/private.txt",
       "/home/bob/.hanako/auth.json",
-      "C:\\Users\\carol\\AppData\\Roaming\\Hanako\\crash.log",
-      "C:/Users/dave/AppData/Roaming/Hanako/crash.log",
+      "C:\\Users\\carol\\AppData\\Roaming\\Agentry\\crash.log",
+      "C:/Users/dave/AppData/Roaming/Agentry/crash.log",
     ].join("\n");
 
     const cleaned = redactLogText(raw, { homeDir: "/Users/alice" });

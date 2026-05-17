@@ -3,7 +3,7 @@ import {
   definePlugin,
   HANA_BUS_SKIP,
   requestBus,
-} from "@hana/plugin-runtime";
+} from "@agentry/plugin-runtime";
 
 const previewHandler = defineBusHandler({
   type: "sdk-showcase:preview",

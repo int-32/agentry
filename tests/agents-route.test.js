@@ -34,7 +34,7 @@ describe("agents route", () => {
     const { createAgentsRoute } = await import("../server/routes/agents.js");
     const app = new Hono();
     const engine = {
-      createAgent: vi.fn().mockResolvedValue({ id: "hana", name: "Hana" }),
+      createAgent: vi.fn().mockResolvedValue({ id: "hana", name: "Agentry" }),
       emitEvent: vi.fn(),
     };
 
@@ -43,11 +43,11 @@ describe("agents route", () => {
     const res = await app.request("/api/agents", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Hana" }),
+      body: JSON.stringify({ name: "Agentry" }),
     });
 
     expect(res.status).toBe(200);
-    expectAppEvent(engine.emitEvent, "agent-created", { agentId: "hana", name: "Hana" });
+    expectAppEvent(engine.emitEvent, "agent-created", { agentId: "hana", name: "Agentry" });
   });
 
   it("does not emit agent-created when create validation fails", async () => {
@@ -131,7 +131,7 @@ describe("agents route", () => {
     const agentId = "hana";
     const agentDir = path.join(tempRoot, agentId);
     fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Hana\n", "utf-8");
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
 
     const { createAgentsRoute } = await import("../server/routes/agents.js");
     const app = new Hono();
@@ -176,7 +176,7 @@ describe("agents route", () => {
     const agentId = "hana";
     const agentDir = path.join(tempRoot, agentId);
     fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Hana\n", "utf-8");
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
 
     const { createAgentsRoute } = await import("../server/routes/agents.js");
     const app = new Hono();
@@ -205,7 +205,7 @@ describe("agents route", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         locale: "en-US",
-        agent: { name: "Hana Prime", yuan: "muse" },
+        agent: { name: "Agentry Prime", yuan: "muse" },
         desk: { home_folder: "/tmp/hana-work" },
         memory: { enabled: false },
         models: { chat: { id: "gpt-5", provider: "openai" } },
@@ -215,7 +215,7 @@ describe("agents route", () => {
 
     expect(res.status).toBe(200);
     expect(engine.updateConfig).toHaveBeenCalledWith(expect.objectContaining({
-      agent: { name: "Hana Prime", yuan: "muse" },
+      agent: { name: "Agentry Prime", yuan: "muse" },
       desk: { home_folder: "/tmp/hana-work" },
       memory: expect.objectContaining({ enabled: false }),
       models: { chat: { id: "gpt-5", provider: "openai" } },
@@ -225,7 +225,7 @@ describe("agents route", () => {
     expectAppEvent(engine.emitEvent, "models-changed", { agentId });
     expectAppEvent(engine.emitEvent, "agent-updated", {
       agentId,
-      agentName: "Hana Prime",
+      agentName: "Agentry Prime",
       yuan: "muse",
     });
     expectAppEvent(engine.emitEvent, "agent-workspace-changed", {
@@ -285,7 +285,7 @@ describe("agents route", () => {
     const agentId = "hana";
     const agentDir = path.join(tempRoot, agentId);
     fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Hana\n", "utf-8");
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
 
     const { createAgentsRoute } = await import("../server/routes/agents.js");
     const app = new Hono();
@@ -315,7 +315,7 @@ describe("agents route", () => {
     const agentId = "hana";
     const agentDir = path.join(tempRoot, agentId);
     fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Hana\nexperience:\n  enabled: true\n", "utf-8");
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agentry\nexperience:\n  enabled: true\n", "utf-8");
     fs.writeFileSync(path.join(agentDir, "identity.md"), "original identity\n", "utf-8");
 
     const { createAgentsRoute } = await import("../server/routes/agents.js");

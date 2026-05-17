@@ -1,5 +1,5 @@
 {
-  "name": "@hana/plugin-sdk",
+  "name": "@agentry/plugin-sdk",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -19,6 +19,6 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@hana/plugin-protocol": "0.0.0"
+    "@agentry/plugin-protocol": "0.0.0"
   }
 }

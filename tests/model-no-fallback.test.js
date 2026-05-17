@@ -247,7 +247,7 @@ describe("模型选择无 fallback", () => {
     });
 
     it("对象模型引用会先解析成 availableModels 里的完整模型对象", () => {
-      const mm = new ModelManager({ hanakoHome: tempDir });
+      const mm = new ModelManager({ agentryHome: tempDir });
       const fullModel = {
         id: "kimi-k2.6",
         provider: "kimi-coding",
@@ -277,7 +277,7 @@ describe("模型选择无 fallback", () => {
     });
 
     it("provider 声明无须 key 时，远程 baseUrl 也能解析执行凭证", () => {
-      const mm = new ModelManager({ hanakoHome: tempDir });
+      const mm = new ModelManager({ agentryHome: tempDir });
       const fullModel = {
         id: "llama3",
         provider: "ollama",
@@ -350,14 +350,14 @@ describe("模型选择无 fallback", () => {
     }
 
     it("utility 未配置时抛错", () => {
-      const mm = new ModelManager({ hanakoHome: tempDir });
+      const mm = new ModelManager({ agentryHome: tempDir });
       setupRouter(mm);
       expect(() => mm.resolveUtilityConfig({}, {}, {}))
         .toThrow(/noUtilityModel|utility 模型|utility model/);
     });
 
     it("utility_large 未配置时抛错", () => {
-      const mm = new ModelManager({ hanakoHome: tempDir });
+      const mm = new ModelManager({ agentryHome: tempDir });
       setupRouter(mm);
       mm._availableModels = [{ id: "some-model", provider: "x" }];
       expect(() => mm.resolveUtilityConfig({}, { utility: { id: "some-model", provider: "x" } }, {}))
@@ -365,7 +365,7 @@ describe("模型选择无 fallback", () => {
     });
 
     it("utility 和 utility_large 都配置时正常返回", () => {
-      const mm = new ModelManager({ hanakoHome: tempDir });
+      const mm = new ModelManager({ agentryHome: tempDir });
       mm._availableModels = [
         { id: "util-model", provider: "test-provider", _cred: { api: "openai-completions", apiKey: "sk-test", baseUrl: "https://test.example.com/v1" } },
         { id: "large-model", provider: "test-provider", _cred: { api: "openai-completions", apiKey: "sk-test", baseUrl: "https://test.example.com/v1" } },
@@ -386,7 +386,7 @@ describe("模型选择无 fallback", () => {
     });
 
     it("provider 声明无须 key 时，utility 远程 baseUrl 可不填 apiKey", () => {
-      const mm = new ModelManager({ hanakoHome: tempDir });
+      const mm = new ModelManager({ agentryHome: tempDir });
       mm._availableModels = [
         {
           id: "util-model",
@@ -427,7 +427,7 @@ describe("模型选择无 fallback", () => {
     });
 
     it("utility_api 与模型 provider 不一致时直接报错", () => {
-      const mm = new ModelManager({ hanakoHome: tempDir });
+      const mm = new ModelManager({ agentryHome: tempDir });
       mm._availableModels = [
         { id: "util-model", provider: "test-provider", _cred: { api: "openai-completions", apiKey: "sk-test", baseUrl: "https://test.example.com/v1" } },
         { id: "large-model", provider: "test-provider", _cred: { api: "openai-completions", apiKey: "sk-test", baseUrl: "https://test.example.com/v1" } },
@@ -444,7 +444,7 @@ describe("模型选择无 fallback", () => {
     });
 
     it("不再接受 hardcoded fallback 模型名", () => {
-      const mm = new ModelManager({ hanakoHome: tempDir });
+      const mm = new ModelManager({ agentryHome: tempDir });
       // 以前会 fallback 到 "doubao-seed-2-0-mini-260215"，现在应该抛错
       expect(() => mm.resolveUtilityConfig({}, {}, {}))
         .toThrow(/noUtilityModel|utility 模型|utility model/);

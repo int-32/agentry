@@ -1,6 +1,6 @@
-# @hana/plugin-components
+# @agentry/plugin-components
 
-React component primitives for Hana plugin iframes.
+React component primitives for Agentry plugin iframes.
 
 ```tsx
 import {
@@ -9,8 +9,8 @@ import {
   HanaThemeProvider,
   SettingRow,
   Switch,
-} from '@hana/plugin-components';
-import '@hana/plugin-components/styles.css';
+} from '@agentry/plugin-components';
+import '@agentry/plugin-components/styles.css';
 
 export function PluginPanel() {
   return (
@@ -18,7 +18,7 @@ export function PluginPanel() {
       <CardShell title="Sync">
         <SettingRow
           label="Enabled"
-          hint="Follows the current Hana theme."
+          hint="Follows the current Agentry theme."
           control={<Switch checked label="On" />}
         />
         <Button variant="primary">Run</Button>
@@ -30,8 +30,8 @@ export function PluginPanel() {
 
 `HanaThemeProvider` has three modes:
 
-- `inherit`: use host CSS variables when the iframe receives them, then fall back to Hana defaults from `styles.css`.
-- `hana`: set one of Hana's named theme token groups, such as `warm-paper` or `midnight`.
+- `inherit`: use host CSS variables when the iframe receives them, then fall back to Agentry defaults from `styles.css`.
+- `hana`: set one of Agentry's named theme token groups, such as `warm-paper` or `midnight`.
 - `custom`: set only the tokens you provide. Missing tokens still fall back through host variables and SDK defaults.
 
-Components intentionally expose stable `hana-plugin-*` classes so plugin authors can add small local refinements without depending on Hana renderer internals.
+Components intentionally expose stable `hana-plugin-*` classes so plugin authors can add small local refinements without depending on Agentry renderer internals.

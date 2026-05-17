@@ -607,7 +607,7 @@ describe("model sync related routes", () => {
         getAuthJsonKey: (id) => id,
         getDefaultModels: () => [],
       },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     });
 
     app.route("/api", createProvidersRoute(engine));
@@ -634,7 +634,7 @@ describe("model sync related routes", () => {
       onProviderChanged: vi.fn().mockResolvedValue(undefined),
       emitEvent: vi.fn(),
       providerRegistry: { removeModel },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     };
 
     app.route("/api", createProvidersRoute(engine));
@@ -660,7 +660,7 @@ describe("model sync related routes", () => {
       onProviderChanged: vi.fn().mockResolvedValue(undefined),
       emitEvent: vi.fn(),
       providerRegistry: { updateModelEntry },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     };
 
     app.route("/api", createProvidersRoute(engine));
@@ -710,7 +710,7 @@ describe("model sync related routes", () => {
       preferences: {
         getOAuthCustomModels: () => ({}),
       },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     };
 
     app.route("/api", createProvidersRoute(engine));
@@ -731,6 +731,48 @@ describe("model sync related routes", () => {
     );
   });
 
+  it("providers summary prefers user display_name for added providers", async () => {
+    const { createProvidersRoute } = await import("../server/routes/providers.js");
+    const app = new Hono();
+    const engine = {
+      providerRegistry: {
+        getAllProvidersRaw: vi.fn(() => ({
+          deepseek: {
+            display_name: "研发 DeepSeek",
+            base_url: "https://api.deepseek.com",
+            api: "openai-completions",
+            api_key: "sk-test",
+            models: ["deepseek-v4-pro"],
+          },
+        })),
+        get: vi.fn(() => ({
+          authType: "api-key",
+          baseUrl: "https://api.deepseek.com",
+          api: "openai-completions",
+          displayName: "DeepSeek",
+        })),
+        isOAuth: vi.fn(() => false),
+        getAuthType: vi.fn(() => "api-key"),
+        allowsMissingApiKey: vi.fn(() => false),
+        getAuthJsonKey: (id) => id,
+        getOAuthProviderIds: () => [],
+        getAll: () => new Map(),
+      },
+      preferences: {
+        getOAuthCustomModels: () => ({}),
+      },
+      agentryHome: "/tmp",
+    };
+
+    app.route("/api", createProvidersRoute(engine));
+
+    const res = await app.request("/api/providers/summary");
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.providers.deepseek.display_name).toBe("研发 DeepSeek");
+  });
+
   it("oauth provider with empty registry falls back to defaults", async () => {
     const { createProvidersRoute } = await import("../server/routes/providers.js");
     const app = new Hono();
@@ -741,7 +783,7 @@ describe("model sync related routes", () => {
         getAuthJsonKey: (id) => id,
         getDefaultModels: (id) => id === "openai-codex" ? ["gpt-5.4", "gpt-5.3-codex"] : [],
       },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     });
 
     app.route("/api", createProvidersRoute(engine));
@@ -779,7 +821,7 @@ describe("model sync related routes", () => {
         getAuthJsonKey: (id) => id,
         getDefaultModels: () => [],
       },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     });
 
     app.route("/api", createProvidersRoute(engine));
@@ -823,7 +865,7 @@ describe("model sync related routes", () => {
         getAuthJsonKey: (id) => id,
         getDefaultModels: () => [],
       },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     });
 
     app.route("/api", createProvidersRoute(engine));
@@ -868,7 +910,7 @@ describe("model sync related routes", () => {
         providerRegistry: {
           getCredentials: () => ({ apiKey: "sk-test", baseUrl: "https://api.deepseek.com/v1", api: "openai-completions" }),
         },
-        hanakoHome: tmpDir,
+        agentryHome: tmpDir,
       });
 
       app.route("/api", createProvidersRoute(engine));
@@ -906,7 +948,7 @@ describe("model sync related routes", () => {
         getAuthJsonKey: (id) => id,
         getDefaultModels: () => [],
       },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     });
 
     app.route("/api", createProvidersRoute(engine));
@@ -941,7 +983,7 @@ describe("model sync related routes", () => {
         getAuthJsonKey: () => "openai-codex",
         getDefaultModels: () => [],
       },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     });
 
     app.route("/api", createProvidersRoute(engine));
@@ -970,7 +1012,7 @@ describe("model sync related routes", () => {
         getAuthJsonKey: (id) => id,
         getDefaultModels: () => [],
       },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     });
 
     app.route("/api", createProvidersRoute(engine));
@@ -1002,7 +1044,7 @@ describe("model sync related routes", () => {
           return null;
         },
       },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     });
 
     app.route("/api", createProvidersRoute(engine));
@@ -1046,7 +1088,7 @@ describe("model sync related routes", () => {
         getAuthJsonKey: (id) => id,
         getDefaultModels: () => [],
       },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     });
 
     app.route("/api", createProvidersRoute(engine));
@@ -1101,7 +1143,7 @@ describe("model sync related routes", () => {
         getAuthJsonKey: (id) => id,
         getDefaultModels: () => [],
       },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     });
 
     app.route("/api", createProvidersRoute(engine));
@@ -1141,7 +1183,7 @@ describe("model sync related routes", () => {
         getAuthJsonKey: (id) => id,
         getDefaultModels: (id) => id === "kimi-coding" ? ["kimi-k2.6", "kimi-k2.5"] : [],
       },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     });
 
     app.route("/api", createProvidersRoute(engine));
@@ -1174,7 +1216,7 @@ describe("model sync related routes", () => {
         getAuthJsonKey: (id) => id,
         getDefaultModels: () => [],
       },
-      hanakoHome: "/tmp",
+      agentryHome: "/tmp",
     });
 
     app.route("/api", createProvidersRoute(engine));

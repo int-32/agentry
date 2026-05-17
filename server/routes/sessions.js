@@ -72,7 +72,7 @@ function getWritableSessionManager(engine, sessionPath) {
 }
 
 const TODO_COMPLETE_MESSAGE =
-  "[Hana Todo] The user marked the current todo list as completed and removed it from the session UI. Treat every item in that list as completed. Create a new todo list only if new work needs tracking.";
+  "[Agentry Todo] The user marked the current todo list as completed and removed it from the session UI. Treat every item in that list as completed. Create a new todo list only if new work needs tracking.";
 
 export function createSessionsRoute(engine) {
   const route = new Hono();
@@ -633,7 +633,7 @@ export function createSessionsRoute(engine) {
     } catch (err) {
       const errDetail = `${err.message}\n${err.stack || ""}`;
       console.error("[sessions/switch] error:", errDetail);
-      try { appendFileSync(path.join(engine.hanakoHome, "switch-error.log"), `${new Date().toISOString()}\n${errDetail}\n---\n`); } catch {}
+      try { appendFileSync(path.join(engine.agentryHome, "switch-error.log"), `${new Date().toISOString()}\n${errDetail}\n---\n`); } catch {}
       return c.json({ error: err.message }, 500);
     }
   });
@@ -872,9 +872,9 @@ function patchSessionFileLifecycleBlocks(blocks, engine, sessionPath) {
     if (!file && block.filePath && typeof engine?.getSessionFileByPath === "function") {
       file = engine.getSessionFileByPath(block.filePath, { sessionPath });
     }
-    if (!file && block.type === "screenshot" && block.base64 && engine?.hanakoHome && typeof engine?.getSessionFileByPath === "function") {
+    if (!file && block.type === "screenshot" && block.base64 && engine?.agentryHome && typeof engine?.getSessionFileByPath === "function") {
       try {
-        const filePath = browserScreenshotPath(engine.hanakoHome, sessionPath, {
+        const filePath = browserScreenshotPath(engine.agentryHome, sessionPath, {
           base64: block.base64,
           mimeType: block.mimeType,
         });

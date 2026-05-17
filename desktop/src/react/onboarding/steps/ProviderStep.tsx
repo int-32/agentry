@@ -7,7 +7,7 @@ import { PROVIDER_PRESETS } from '../constants';
 import type { ProviderPreset } from '../constants';
 import { getProviderPresetLabel } from '../../utils/provider-presets';
 import { testConnection, saveProvider as saveProviderAction } from '../onboarding-actions';
-import type { HanaFetch } from '../onboarding-actions';
+import type { AgentryFetch } from '../onboarding-actions';
 import { StepContainer, Multiline } from '../onboarding-ui';
 import { SelectWidget } from '@/ui';
 
@@ -29,7 +29,7 @@ const EyeOffIcon = () => (
 
 interface ProviderStepProps {
   preview: boolean;
-  hanaFetch: HanaFetch;
+  hanaFetch: AgentryFetch;
   goToStep: (index: number) => void;
   showError: (msg: string) => void;
   onProviderReady: (providerName: string, providerUrl: string, providerApi: string, apiKey: string) => void;

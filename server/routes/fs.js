@@ -56,11 +56,11 @@ function resolveAllowedPath(filePath, allowedRoots) {
 
 export function createFsRoute(engine) {
   const route = new Hono();
-  const hanakoHome = path.resolve(engine.hanakoHome);
+  const agentryHome = path.resolve(engine.agentryHome);
 
   // 收集允许的根目录
   function getAllowedRoots(c) {
-    const roots = [hanakoHome];
+    const roots = [agentryHome];
     // desk 工作空间目录（用户可能配在 ~/.hanako 外面）
     const agent = resolveAgent(engine, c);
     const deskHome = agent?.config?.desk?.home_folder || engine.getHomeCwd?.(agent?.id);

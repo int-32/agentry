@@ -1,5 +1,5 @@
 /**
- * HanaEngine — Hanako 的核心引擎（Thin Facade）
+ * AgentryEngine — Agentry 的核心引擎（Thin Facade）
  *
  * 持有所有 Manager，对外暴露统一 API。
  * 具体逻辑委托给：
@@ -21,7 +21,7 @@ import { migrateProviderMediaConfig } from "./provider-media-config.js";
 import { runMigrations } from "./migrations.js";
 import { findModel } from "../shared/model-ref.js";
 import { resolveWorkspaceSkillPaths } from "../shared/workspace-skill-paths.js";
-import { resolveHanaPiAgentDir, resolveHanaPiProjectDir } from "../shared/hana-runtime-paths.js";
+import { resolveHanaPiAgentDir, resolveHanaPiProjectDir } from "../shared/agentry-runtime-paths.js";
 import { PluginManager } from "./plugin-manager.js";
 import { PluginDevService } from "./plugin-dev-service.js";
 import { createPluginDevTools } from "./plugin-dev-tools.js";
@@ -127,29 +127,29 @@ import {
   translateSkillNamesWithCache,
 } from "../lib/skills/skill-name-translation-cache.js";
 
-export class HanaEngine {
+export class AgentryEngine {
   /**
    * @param {object} dirs
-   * @param {string} dirs.hanakoHome
+   * @param {string} dirs.agentryHome
    * @param {string} dirs.productDir
    * @param {string} [dirs.agentId]
    */
-  constructor({ hanakoHome, productDir, agentId }) {
-    this.hanakoHome = hanakoHome;
+  constructor({ agentryHome, productDir, agentId }) {
+    this.agentryHome = agentryHome;
     this.productDir = productDir;
     this.appVersion = "0.0.0";
-    this.agentsDir = path.join(hanakoHome, "agents");
-    this.userDir = path.join(hanakoHome, "user");
-    this.channelsDir = path.join(hanakoHome, "channels");
+    this.agentsDir = path.join(agentryHome, "agents");
+    this.userDir = path.join(agentryHome, "user");
+    this.channelsDir = path.join(agentryHome, "channels");
     fs.mkdirSync(this.channelsDir, { recursive: true });
     this._sessionFiles = new SessionFileRegistry({
-      managedCacheRoot: path.join(hanakoHome, "session-files"),
+      managedCacheRoot: path.join(agentryHome, "session-files"),
     });
-    this._pluginInstallRecords = new PluginInstallRecords({ hanakoHome });
+    this._pluginInstallRecords = new PluginInstallRecords({ agentryHome });
 
     // ── Core managers ──
     this._prefs = new PreferencesManager({ userDir: this.userDir, agentsDir: this.agentsDir });
-    this._models = new ModelManager({ hanakoHome });
+    this._models = new ModelManager({ agentryHome });
 
     // 确定启动时焦点 agent
     const startId = agentId || this._prefs.getPrimaryAgent() || this._prefs.findFirstAgent();
@@ -165,7 +165,7 @@ export class HanaEngine {
 
     // ── Agent Manager ──
     this._agentMgr = new AgentManager({
-      hanakoHome: this.hanakoHome,
+      agentryHome: this.agentryHome,
       agentsDir: this.agentsDir,
       productDir: this.productDir,
       userDir: this.userDir,
@@ -216,7 +216,7 @@ export class HanaEngine {
 
     // ── Config Coordinator ──
     this._configCoord = new ConfigCoordinator({
-      hanakoHome,
+      agentryHome,
       agentsDir: this.agentsDir,
       getAgent: () => this.agent,
       getAgentById: (id) => this._agentMgr.getAgent(id),
@@ -249,7 +249,7 @@ export class HanaEngine {
       getHomeCwd: (agentId) => this.getHomeCwd(agentId),
       getVisionBridge: () => this._visionBridge,
       isVisionAuxiliaryEnabled: () => this.isVisionAuxiliaryEnabled(),
-      getHanakoHome: () => this.hanakoHome,
+      getHanakoHome: () => this.agentryHome,
       registerSessionFile: (entry) => this.registerSessionFile(entry),
       getSessionFile: (fileId, options) => this.getSessionFile(fileId, options),
       getSessionFileByPath: (filePath, options) => this.getSessionFileByPath(filePath, options),
@@ -268,7 +268,7 @@ export class HanaEngine {
 
     // 任务注册表（外部 abort 用）；handler 是运行时函数，任务元数据持久化供插件重启恢复和诊断使用。
     this._taskRegistry = new TaskRegistry({
-      persistencePath: path.join(this.hanakoHome, ".ephemeral", "plugin-tasks.json"),
+      persistencePath: path.join(this.agentryHome, ".ephemeral", "plugin-tasks.json"),
     });
 
     // subagent AbortController 存储（engine 级别，跨 agent 共享）
@@ -281,13 +281,13 @@ export class HanaEngine {
     });
 
     this._terminalSessions = new TerminalSessionManager({
-      hanakoHome: this.hanakoHome,
+      agentryHome: this.agentryHome,
       emitEvent: (event, sessionPath) => this._emitEvent(event, sessionPath),
     });
 
     // Checkpoint 备份存储
     this._checkpointStore = new CheckpointStore(
-      path.join(this.hanakoHome, "checkpoints")
+      path.join(this.agentryHome, "checkpoints")
     );
 
     // Computer Use runtime is deliberately lazy. Constructing the provider
@@ -540,8 +540,8 @@ export class HanaEngine {
     return this._configCoord.getExplicitHomeFolder(agentId || this.currentAgentId) || null;
   }
   _createResourceLoaderOptions(skillsDir) {
-    const cwd = resolveHanaPiProjectDir(this.hanakoHome);
-    const agentDir = resolveHanaPiAgentDir(this.hanakoHome);
+    const cwd = resolveHanaPiProjectDir(this.agentryHome);
+    const agentDir = resolveHanaPiAgentDir(this.agentryHome);
     if (!cwd || typeof cwd !== "string") {
       throw new Error("ResourceLoader init: cwd is required");
     }
@@ -929,17 +929,17 @@ export class HanaEngine {
     });
 
     // 0b. Provider 迁移（旧数据 → added-models.yaml，只跑一次）
-    migrateToProvidersYaml(this.hanakoHome, this.agentsDir, log);
+    migrateToProvidersYaml(this.agentryHome, this.agentsDir, log);
 
     // 0b2. Provider media 迁移（旧 type:image 模型 → media.image_generation）
-    migrateProviderMediaConfig(this.hanakoHome, log);
+    migrateProviderMediaConfig(this.agentryHome, log);
 
     // 0c. Model overrides 迁移（config.models.overrides → added-models.yaml，只跑一次）
     this._models.providerRegistry.migrateOverridesToAddedModels(this.agentsDir, log);
 
     // 0d. 统一数据迁移（版本号驱动，新迁移统一加在 migrations.js）
     runMigrations({
-      hanakoHome: this.hanakoHome,
+      agentryHome: this.agentryHome,
       agentsDir: this.agentsDir,
       prefs: this._prefs,
       providerRegistry: this._models.providerRegistry,
@@ -974,7 +974,7 @@ export class HanaEngine {
     // 3. ResourceLoader + Skills
     log(`[init] 3/5 ResourceLoader 初始化...`);
     const t_rl = Date.now();
-    const skillsDir = path.join(this.hanakoHome, "skills");
+    const skillsDir = path.join(this.agentryHome, "skills");
     fs.mkdirSync(skillsDir, { recursive: true });
 
     // 解析外部兼容技能路径
@@ -1173,11 +1173,11 @@ export class HanaEngine {
    */
   async initPlugins(bus) {
     const builtinPluginsDir = path.join(this.productDir, "..", "plugins");
-    const userPluginsDir = path.join(this.hanakoHome, "plugins");
-    const devPluginsDir = path.join(this.hanakoHome, "plugins-dev");
-    const pluginDevRunsDir = path.join(this.hanakoHome, "plugin-dev-runs");
-    const pluginDevSourcesDir = path.join(this.hanakoHome, "plugin-dev-sources");
-    const pluginDataDir = path.join(this.hanakoHome, "plugin-data");
+    const userPluginsDir = path.join(this.agentryHome, "plugins");
+    const devPluginsDir = path.join(this.agentryHome, "plugins-dev");
+    const pluginDevRunsDir = path.join(this.agentryHome, "plugin-dev-runs");
+    const pluginDevSourcesDir = path.join(this.agentryHome, "plugin-dev-sources");
+    const pluginDataDir = path.join(this.agentryHome, "plugin-data");
     fs.mkdirSync(pluginDevSourcesDir, { recursive: true });
 
     // Read app version for plugin compatibility check
@@ -1347,7 +1347,7 @@ export class HanaEngine {
         : [];
       return externalReadPathsFromSessionFiles(files, {
         workspaceRoots: workspaceRootsForSandbox(effectiveWorkspace, workspaceFolders),
-        hanakoHome: this.hanakoHome,
+        agentryHome: this.agentryHome,
       });
     };
 
@@ -1355,7 +1355,7 @@ export class HanaEngine {
       agentDir: effectiveAgentDir,
       workspace: effectiveWorkspace,
       workspaceFolders,
-      hanakoHome: this.hanakoHome,
+      agentryHome: this.agentryHome,
       getSandboxEnabled: () => this._readPreferences().sandbox !== false,
       getSandboxNetworkEnabled: () => this._readPreferences().sandbox_network === true,
       getExternalReadPaths,
@@ -1534,7 +1534,7 @@ export class HanaEngine {
       ? opts.skills
       : (opts.agentId ? this.getAllSkills(opts.agentId) : []);
     return translateSkillNamesWithCache({
-      cachePath: getSkillNameTranslationCachePath(this.hanakoHome),
+      cachePath: getSkillNameTranslationCachePath(this.agentryHome),
       skills,
       names,
       lang,

@@ -9,7 +9,7 @@
  * 避免 import 时阻塞模块加载链。
  */
 import { readFileSync } from "fs";
-import { fromRoot } from "./hana-root.js";
+import { fromRoot } from "./agentry-root.js";
 
 let _raw = null;
 let _fallbacks = null;

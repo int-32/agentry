@@ -98,12 +98,12 @@ describe("auto-updater", () => {
     try {
       Object.defineProperty(process, "platform", { value: "win32" });
       vi.resetModules();
-      mockExePath = "/tmp/Hanako/Hanako.exe";
+      mockExePath = "/tmp/Agentry/Agentry.exe";
       mod = await import("../desktop/auto-updater.cjs");
 
       initWithMockWindow();
 
-      expect(mockAutoUpdater.installDirectory).toBe("/tmp/Hanako");
+      expect(mockAutoUpdater.installDirectory).toBe("/tmp/Agentry");
     } finally {
       Object.defineProperty(process, "platform", { value: originalPlatform });
     }
@@ -233,7 +233,7 @@ describe("auto-updater", () => {
     try {
       Object.defineProperty(process, "platform", { value: "win32" });
       vi.resetModules();
-      mockExePath = "/tmp/Hanako/Hanako.exe";
+      mockExePath = "/tmp/Agentry/Agentry.exe";
       mod = await import("../desktop/auto-updater.cjs");
 
       initWithMockWindow();

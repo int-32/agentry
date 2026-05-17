@@ -41,7 +41,7 @@ describe("modelSupportsVideo", () => {
   it("input 含 video → true", () => {
     expect(modelSupportsVideo({ input: ["text", "video"] })).toBe(true);
   });
-  it("Hana compat 标记视频能力 → true", () => {
+  it("Agentry compat 标记视频能力 → true", () => {
     expect(modelSupportsVideo({ input: ["text", "image"], compat: { hanaVideoInput: true } })).toBe(true);
   });
   it("input 缺失或只有 image → false", () => {

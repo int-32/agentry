@@ -28,7 +28,7 @@ describe('screenshot utils', () => {
       chatSessions: {},
       selectedIdsBySession: {},
       currentAgentId: null,
-      agentName: 'Hana',
+      agentName: 'Agentry',
       userName: '我',
       beginScreenshotTask: vi.fn(),
       updateScreenshotProgress: vi.fn(),

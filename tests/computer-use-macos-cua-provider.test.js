@@ -38,7 +38,7 @@ describe("macos Cua provider", () => {
     expect(command).toBe("/opt/cua-driver");
   });
 
-  it("prefers a Hana-bundled Computer Use helper over an external Cua Driver install", () => {
+  it("prefers a Agentry-bundled Computer Use helper over an external Cua Driver install", () => {
     const command = resolveCuaDriverCommand({
       env: {
         HANA_ROOT: "/Applications/Agentry.app/Contents/Resources/server",
@@ -191,7 +191,7 @@ describe("macos Cua provider", () => {
     });
   });
 
-  it("configures Hana's native cursor before controlling an app", async () => {
+  it("configures Agentry's native cursor before controlling an app", async () => {
     const { runner, calls } = makeRunner((_command, args) => {
       if (args[0] === "set_agent_cursor_style") {
         expect(JSON.parse(args[1])).toEqual({
@@ -391,7 +391,7 @@ describe("macos Cua provider", () => {
     });
   });
 
-  it("normalizes a Cua window state response into a Hana snapshot", async () => {
+  it("normalizes a Cua window state response into a Agentry snapshot", async () => {
     const { runner } = makeRunner((_command, args) => {
       expect(args[0]).toBe("get_window_state");
       return rawResult(
@@ -509,7 +509,7 @@ describe("macos Cua provider", () => {
     expect(provider.capabilities.requiresForegroundForInput).toBe(false);
   });
 
-  it("passes Hana cursor runtime config to each bundled helper process", async () => {
+  it("passes Agentry cursor runtime config to each bundled helper process", async () => {
     const { runner, calls } = makeRunner((_command, args) => {
       return rawResult({ ok: true });
     });

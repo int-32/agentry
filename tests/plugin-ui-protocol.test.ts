@@ -5,7 +5,7 @@ import {
   PLUGIN_UI_PROTOCOL,
   PLUGIN_UI_PROTOCOL_VERSION,
   parsePluginUiMessage,
-} from '@hana/plugin-protocol';
+} from '@agentry/plugin-protocol';
 
 describe('plugin UI protocol', () => {
   it('accepts a versioned event envelope', () => {

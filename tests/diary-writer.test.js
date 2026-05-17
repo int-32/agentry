@@ -59,7 +59,7 @@ function baseOpts(overrides = {}) {
       api_key: "test-key",
       base_url: "http://localhost:1234",
     },
-    agentPersonality: "你是 Hana。",
+    agentPersonality: "你是 Agentry。",
     memory: "",
     userName: "测试用户",
     agentName: "小花",

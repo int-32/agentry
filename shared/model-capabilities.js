@@ -136,7 +136,7 @@ export function getThinkingFormat(model, context = {}) {
     return "anthropic";
   }
 
-  // Built-in Anthropic models may arrive without Hana's projected compat object.
+  // Built-in Anthropic models may arrive without Agentry's projected compat object.
   if (provider === "anthropic" && model.reasoning !== false) {
     return "anthropic";
   }

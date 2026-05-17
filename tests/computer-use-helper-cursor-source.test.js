@@ -7,7 +7,7 @@ const helperSourceDir = path.join(
   "desktop/native/HanaComputerUseHelper/Sources/HanaComputerUseHelper",
 );
 
-describe("Hana computer-use helper cursor integration", () => {
+describe("Agentry computer-use helper cursor integration", () => {
   it("leaves native cursor visibility under provider control", () => {
     const main = fs.readFileSync(path.join(helperSourceDir, "main.swift"), "utf8");
 
@@ -24,7 +24,7 @@ describe("Hana computer-use helper cursor integration", () => {
     expect(main).toContain("AgentCursor.shared.apply(config: config.agentCursor)");
   });
 
-  it("applies Hana runtime cursor overrides inside the helper process", () => {
+  it("applies Agentry runtime cursor overrides inside the helper process", () => {
     const main = fs.readFileSync(path.join(helperSourceDir, "main.swift"), "utf8");
 
     expect(main).toContain("HANA_AGENT_CURSOR_CONFIG_JSON");

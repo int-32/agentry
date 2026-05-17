@@ -51,7 +51,7 @@ export class ChannelRouter {
     this._agentOrderCache = null; // { list: string[], ts: number }
   }
 
-  /** @returns {import('../core/engine.js').HanaEngine} */
+  /** @returns {import('../core/engine.js').AgentryEngine} */
   get _engine() { return this._hub.engine; }
 
   _getAgentInstance(agentId) {

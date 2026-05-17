@@ -21,7 +21,7 @@ describe("getPlatformPromptNote", () => {
       "Shell: bash\n" +
       "OS Version: TestOS 1.2.3\n" +
       "Host OS is Windows, but the bash tool accepts POSIX shell-style commands.\n" +
-      "Hanako may internally route simple git commands through bundled git.exe and explicit cmd.exe/powershell.exe commands through Windows-native runners.\n" +
+      "Agentry may internally route simple git commands through bundled git.exe and explicit cmd.exe/powershell.exe commands through Windows-native runners.\n" +
       "Prefer POSIX syntax for pipes, paths, environment variables, and redirection when writing shell-style commands.\n" +
       "Use cmd.exe /c or powershell.exe -NoProfile -Command only when you explicitly need a Windows-native shell.\n" +
       "Discard POSIX command output with /dev/null; use CMD's nul device only inside an explicit cmd.exe command."

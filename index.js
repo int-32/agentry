@@ -1,12 +1,17 @@
 import fs from "fs";
 import readline from "readline";
-import { HanaEngine } from "./core/engine.js";
+import { AgentryEngine } from "./core/engine.js";
 import { ensureFirstRun } from "./core/first-run.js";
 import { MoodParser } from "./core/events.js";
-import { configureProcessPiSdkEnv, ensureHanaPiSdkDirs, resolveHanakoHome } from "./shared/hana-runtime-paths.js";
+import {
+  configureProcessPiSdkEnv,
+  ensureHanaPiSdkDirs,
+  migrateLegacyHomeIfNeeded,
+  resolveAgentryHome,
+} from "./shared/agentry-runtime-paths.js";
 
 // ═══════════════════════════════════════
-// Project Hana — CLI Agent with Memory
+// Project Agentry — CLI Agent with Memory
 // ═══════════════════════════════════════
 
 import path from "path";
@@ -14,24 +19,26 @@ import path from "path";
 const projectRoot = import.meta.dirname;
 const productDir = projectRoot + "/lib";
 
-// 用户数据目录：优先 HANA_HOME，默认 ~/.hanako
-const hanakoHome = resolveHanakoHome(process.env.HANA_HOME);
-process.env.HANA_HOME = hanakoHome;
-ensureHanaPiSdkDirs(hanakoHome);
-configureProcessPiSdkEnv(hanakoHome);
+// 用户数据目录：优先 AGENTRY_HOME（兼容旧 HANA_HOME），默认 ~/.agentry
+const agentryHome = resolveAgentryHome();
+migrateLegacyHomeIfNeeded(agentryHome);
+process.env.AGENTRY_HOME = agentryHome;
+process.env.HANA_HOME = agentryHome; // 兼容期保留
+ensureHanaPiSdkDirs(agentryHome);
+configureProcessPiSdkEnv(agentryHome);
 
 // ── 首次运行播种 ──
-ensureFirstRun(hanakoHome, productDir);
+ensureFirstRun(agentryHome, productDir);
 
 // ── 初始化引擎 ──
-const engine = new HanaEngine({ hanakoHome, productDir });
+const engine = new AgentryEngine({ agentryHome, productDir });
 
 try {
   await engine.init((msg) => console.log(msg));
 } catch (err) {
   console.error("启动失败:", err.message);
   console.error("\n可能的原因：");
-  console.error(`  1. ${path.join(hanakoHome, "models.json")} 格式不对`);
+  console.error(`  1. ${path.join(agentryHome, "models.json")} 格式不对`);
   console.error("  2. API key 不对");
   console.error("  3. 网络连不上模型服务");
   console.error("  4. 缺少依赖：npm install js-yaml");
@@ -43,7 +50,7 @@ const available = engine.availableModels;
 const memoryMdPath = engine.memoryMdPath;
 
 // ── CLI 渲染器 ──
-// Hana 文字色 #7D1C4A = RGB(125, 28, 74)
+// Agentry 文字色 #7D1C4A = RGB(125, 28, 74)
 const hanaColor = `\x1b[38;2;125;28;74m`;
 const resetColor = `\x1b[0m`;
 

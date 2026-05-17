@@ -1,18 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import path from "path";
-import { HanaEngine } from "../core/engine.js";
+import { AgentryEngine } from "../core/engine.js";
 import { SettingsManager } from "../lib/pi-sdk/index.js";
 
-describe("HanaEngine resource loader options", () => {
+describe("AgentryEngine resource loader options", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("uses explicit Hana-owned Pi SDK cwd, agentDir, and in-memory Pi settings", () => {
+  it("uses explicit Agentry-owned Pi SDK cwd, agentDir, and in-memory Pi settings", () => {
     const settings = { kind: "in-memory-settings" };
     const inMemory = vi.spyOn(SettingsManager, "inMemory").mockReturnValue(settings);
-    const engine = Object.create(HanaEngine.prototype);
-    engine.hanakoHome = "/hanako-home";
+    const engine = Object.create(AgentryEngine.prototype);
+    engine.agentryHome = "/hanako-home";
     engine._agentMgr = {
       activeAgentId: "agent-a",
       agent: {

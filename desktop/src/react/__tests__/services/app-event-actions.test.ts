@@ -85,7 +85,7 @@ describe('handleAppEvent', () => {
     };
     (globalThis as Record<string, unknown>).i18n = {
       locale: 'zh-CN',
-      defaultName: 'Hanako',
+      defaultName: 'Agentry',
       load: vi.fn(async (locale: string) => {
         (globalThis as any).i18n.locale = locale;
       }),
@@ -105,7 +105,7 @@ describe('handleAppEvent', () => {
 
     const { handleAppEvent } = await import('../../services/app-event-actions');
     handleAppEvent('agent-switched', {
-      agentName: 'Hana',
+      agentName: 'Agentry',
       agentId: 'agent-a',
       sessionPath: '/sessions/agent-a.jsonl',
       cwd: '/agent-cwd',
@@ -117,7 +117,7 @@ describe('handleAppEvent', () => {
     await flushPromises();
 
     expect(mockApplyAgentIdentity).toHaveBeenCalledWith({
-      agentName: 'Hana',
+      agentName: 'Agentry',
       agentId: 'agent-a',
     });
     expect(mockLoadSessions).toHaveBeenCalledTimes(1);
@@ -161,7 +161,7 @@ describe('handleAppEvent', () => {
   });
 
   it('agent-updated for a non-current agent refreshes the agent list without applying identity', async () => {
-    Object.assign(mockState, { currentAgentId: 'agent-a', agentName: 'Hana' });
+    Object.assign(mockState, { currentAgentId: 'agent-a', agentName: 'Agentry' });
     const { handleAppEvent } = await import('../../services/app-event-actions');
 
     handleAppEvent('agent-updated', {
@@ -175,17 +175,17 @@ describe('handleAppEvent', () => {
   });
 
   it('agent-updated for the current agent keeps refreshing identity and avatar state', async () => {
-    Object.assign(mockState, { currentAgentId: 'agent-a', agentName: 'Hana' });
+    Object.assign(mockState, { currentAgentId: 'agent-a', agentName: 'Agentry' });
     const { handleAppEvent } = await import('../../services/app-event-actions');
 
     handleAppEvent('agent-updated', {
       agentId: 'agent-a',
-      agentName: 'Hana Prime',
+      agentName: 'Agentry Prime',
       yuan: 'muse',
     });
 
     expect(mockApplyAgentIdentity).toHaveBeenCalledWith({
-      agentName: 'Hana Prime',
+      agentName: 'Agentry Prime',
       agentId: 'agent-a',
       yuan: 'muse',
       ui: { settings: false },
@@ -198,7 +198,7 @@ describe('handleAppEvent', () => {
       currentAgentId: 'agent-a',
       memoryMasterEnabled: true,
       agents: [
-        { id: 'agent-a', name: 'Hana', memoryMasterEnabled: true },
+        { id: 'agent-a', name: 'Agentry', memoryMasterEnabled: true },
         { id: 'agent-b', name: 'Other', memoryMasterEnabled: true },
       ],
     });

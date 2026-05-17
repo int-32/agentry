@@ -3,10 +3,10 @@
  *
  * 历史上这个脚本会在 postinstall 阶段修改
  * node_modules/@mariozechner/pi-coding-agent/dist/core/sdk.js，
- * 为 Hana 的 session-scoped sandbox tools 打通 baseToolsOverride。
+ * 为 Agentry 的 session-scoped sandbox tools 打通 baseToolsOverride。
  *
  * Pi SDK 0.68+ 已把 createAgentSession({ tools }) 改成工具名 allowlist，
- * Hana 现在通过 lib/pi-sdk 适配层把本地 Tool[] 转为 customTools + names。
+ * Agentry 现在通过 lib/pi-sdk 适配层把本地 Tool[] 转为 customTools + names。
  * 因此这个脚本只验证版本、SDK 结构和生产 import 边界，不再写 node_modules。
  *
  * 文件名（patch-pi-sdk）保留是为了不动 package.json 的 postinstall 钩子，

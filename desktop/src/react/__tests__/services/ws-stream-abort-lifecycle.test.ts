@@ -79,7 +79,7 @@ describe('ws stream lifecycle after abort', () => {
         modified: '2026-05-08T00:00:00.000Z',
         messageCount: 0,
         agentId: 'hana',
-        agentName: 'Hana',
+        agentName: 'Agentry',
         cwd: null,
       }],
       streamingSessions: [PATH],

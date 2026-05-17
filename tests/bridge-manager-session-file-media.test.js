@@ -31,7 +31,7 @@ describe("BridgeManager session_file media delivery", () => {
   function makeManager(sessionFile) {
     if (!tmpDir) tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-bridge-media-"));
     const engine = {
-      hanakoHome: tmpDir,
+      agentryHome: tmpDir,
       agent: null,
       getSessionFile: vi.fn((id) => id === sessionFile?.id ? sessionFile : null),
     };

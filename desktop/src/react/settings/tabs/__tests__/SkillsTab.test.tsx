@@ -164,7 +164,7 @@ function seedStore(partial: Partial<SettingsState> = {}) {
     agents: [],
     currentAgentId: null,
     settingsAgentId: null,
-    agentName: 'Hanako',
+    agentName: 'Agentry',
     userName: 'User',
     agentYuan: 'hanako',
     agentAvatarUrl: null,

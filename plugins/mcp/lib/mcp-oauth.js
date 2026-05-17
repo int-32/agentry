@@ -160,7 +160,7 @@ async function fetchAuthChallenge(connectorUrl, fetchImpl) {
       params: {
         protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: {},
-        clientInfo: { name: "hana", title: "Hana", version: "0.1.0" },
+        clientInfo: { name: "hana", title: "Agentry", version: "0.1.0" },
       },
     }),
   });

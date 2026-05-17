@@ -104,9 +104,9 @@ export function apply(payload, model, options) { ... }
 
 ## 输出预算策略
 
-`maxOutput` / `model.maxTokens` 在 Hana 数据层表示模型能力上限，不表示每次请求的默认输出长度。
+`maxOutput` / `model.maxTokens` 在 Agentry 数据层表示模型能力上限，不表示每次请求的默认输出长度。
 Pi SDK 的 `streamSimple` 会在调用方未传 `maxTokens` 时，把 `min(model.maxTokens, 32000)` 注入请求体。
-对 OpenAI-compatible / Gemini / Mistral 这类 output cap 可省略的 provider，这会把 Hana 的模型能力 metadata
+对 OpenAI-compatible / Gemini / Mistral 这类 output cap 可省略的 provider，这会把 Agentry 的模型能力 metadata
 误变成本次请求策略，改变供应商默认行为，也可能与 thinking budget 冲突。
 
 通用层通过 `provider-compat/output-budget.js` 处理这件事。该文件内部维护

@@ -101,7 +101,7 @@ export function createLocalServerConnection({
   return {
     serverId: 'local',
     spaceId: 'local',
-    label: 'Local Hana',
+    label: 'Local Agentry',
     baseUrl: `http://127.0.0.1:${port}`,
     wsUrl: `ws://127.0.0.1:${port}`,
     token: normalizeToken(serverToken),

@@ -36,7 +36,7 @@ describe("channel-ticker membership source", () => {
       name: "Crew",
       members: ["hana", "yui"],
     });
-    await appendMessage(path.join(channelsDir, `${channelId}.md`), "user", "@Hana hello");
+    await appendMessage(path.join(channelsDir, `${channelId}.md`), "user", "@Agentry hello");
 
     const executeCheck = vi.fn(async () => ({ replied: false }));
     const onMemorySummarize = vi.fn();
@@ -62,7 +62,7 @@ describe("channel-ticker membership source", () => {
       "hana",
       channelId,
       expect.objectContaining({
-        messages: [expect.objectContaining({ sender: "user", body: "@Hana hello" })],
+        messages: [expect.objectContaining({ sender: "user", body: "@Agentry hello" })],
       }),
     );
   });

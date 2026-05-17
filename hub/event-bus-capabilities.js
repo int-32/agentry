@@ -13,7 +13,7 @@ export const BUILTIN_EVENT_BUS_CAPABILITIES = Object.freeze([
   {
     type: "session:send",
     title: "Send session message",
-    description: "Send text into a Hana session on behalf of a plugin.",
+    description: "Send text into a Agentry session on behalf of a plugin.",
     inputSchema: {
       type: "object",
       properties: {
@@ -102,7 +102,7 @@ export const BUILTIN_EVENT_BUS_CAPABILITIES = Object.freeze([
   {
     type: "agent:list",
     title: "List agents",
-    description: "List configured Hana agents.",
+    description: "List configured Agentry agents.",
     inputSchema: { type: "object", additionalProperties: false },
     outputSchema: OBJECT_SCHEMA,
     permission: "agent.read",

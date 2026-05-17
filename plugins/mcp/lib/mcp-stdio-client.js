@@ -58,7 +58,7 @@ export class McpStdioClient {
       capabilities: {},
       clientInfo: {
         name: "hana",
-        title: "Hana",
+        title: "Agentry",
         version: "0.1.0",
       },
     }, { timeout: requestTimeoutMs(this.server) });

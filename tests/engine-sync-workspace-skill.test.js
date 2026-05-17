@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { HanaEngine } from "../core/engine.js";
+import { AgentryEngine } from "../core/engine.js";
 
 /**
- * 针对 HanaEngine.syncWorkspaceSkillPaths 的最小单测。
+ * 针对 AgentryEngine.syncWorkspaceSkillPaths 的最小单测。
  *
  * syncWorkspaceSkillPaths 在"externalPaths 列表没变"时默认短路 return false，不 reload
  * 也不 emit。上传/删除 workspace skill 的场景（dirPath 不变，内容变）必须用 force: true
  * 绕过这个短路，否则会和 chokidar watcher 的 dot-ignore bug 叠加成用户看不到变化的 bug。
  */
-describe("HanaEngine.syncWorkspaceSkillPaths", () => {
+describe("AgentryEngine.syncWorkspaceSkillPaths", () => {
   function makeFakeEngine(initialPaths) {
-    const engine = Object.create(HanaEngine.prototype);
+    const engine = Object.create(AgentryEngine.prototype);
     const skills = {
       _externalPaths: initialPaths,
       setExternalPaths: vi.fn((paths) => { skills._externalPaths = paths; }),

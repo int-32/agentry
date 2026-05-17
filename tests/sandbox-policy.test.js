@@ -18,17 +18,17 @@ describe("sandbox workspace roots", () => {
 
   it("grants full access to explicit extra workspace folders but not siblings", () => {
     const agentDir = path.join(tempRoot, "agents", "hana");
-    const hanakoHome = path.join(tempRoot, "home");
+    const agentryHome = path.join(tempRoot, "home");
     const primary = path.join(tempRoot, "project");
     const extra = path.join(tempRoot, "reference");
     const sibling = path.join(tempRoot, "private");
-    for (const dir of [agentDir, hanakoHome, primary, extra, sibling]) {
+    for (const dir of [agentDir, agentryHome, primary, extra, sibling]) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
     const policy = deriveSandboxPolicy({
       agentDir,
-      hanakoHome,
+      agentryHome,
       workspace: primary,
       workspaceFolders: [extra],
       mode: "standard",
@@ -45,11 +45,11 @@ describe("sandbox workspace roots", () => {
 
   it("lets agents read skill snapshots and session files but blocks writing runtime copies", () => {
     const agentDir = path.join(tempRoot, "agents", "hana");
-    const hanakoHome = path.join(tempRoot, "home");
+    const agentryHome = path.join(tempRoot, "home");
     const workspace = path.join(tempRoot, "project");
     const snapshotRoot = path.join(agentDir, "sessions", ".skill-snapshots");
     const snapshotSkill = path.join(snapshotRoot, "main", "001-demo", "SKILL.md");
-    const sessionFile = path.join(hanakoHome, "session-files", "abc123", "SKILL.md");
+    const sessionFile = path.join(agentryHome, "session-files", "abc123", "SKILL.md");
     for (const filePath of [snapshotSkill, sessionFile]) {
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
       fs.writeFileSync(filePath, "---\nname: demo\n---\n", "utf-8");
@@ -58,14 +58,14 @@ describe("sandbox workspace roots", () => {
 
     const policy = deriveSandboxPolicy({
       agentDir,
-      hanakoHome,
+      agentryHome,
       workspace,
       workspaceFolders: [],
       mode: "standard",
     });
     const guard = new PathGuard(policy);
 
-    expect(policy.writablePaths).not.toContain(path.join(hanakoHome, "session-files"));
+    expect(policy.writablePaths).not.toContain(path.join(agentryHome, "session-files"));
     expect(policy.protectedPaths).toContain(snapshotRoot);
     expect(guard.getAccessLevel(snapshotSkill)).toBe(AccessLevel.READ_ONLY);
     expect(guard.getAccessLevel(sessionFile)).toBe(AccessLevel.READ_ONLY);

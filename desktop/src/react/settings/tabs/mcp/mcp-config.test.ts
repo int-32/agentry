@@ -17,7 +17,7 @@ describe('mcp connector config helpers', () => {
     })).toBe('API_KEY=********\nBASE_URL=https://example.com');
   });
 
-  it('converts Cherry and Claude style MCP JSON into Hana connector inputs', () => {
+  it('converts Cherry and Claude style MCP JSON into Agentry connector inputs', () => {
     const connectors = connectorsFromMcpJson(JSON.stringify({
       mcpServers: {
         remote: {

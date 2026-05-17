@@ -6,10 +6,10 @@ const SERVER_NODE_FILE = "server-node.json";
 const USERS_FILE = "users.json";
 const SPACES_FILE = "spaces.json";
 
-export function loadServerIdentity(hanakoHome) {
-  const serverNode = readRequiredIdentityJson(path.join(hanakoHome, SERVER_NODE_FILE), SERVER_NODE_FILE);
-  const users = readRequiredIdentityJson(path.join(hanakoHome, USERS_FILE), USERS_FILE);
-  const spaces = readRequiredIdentityJson(path.join(hanakoHome, SPACES_FILE), SPACES_FILE);
+export function loadServerIdentity(agentryHome) {
+  const serverNode = readRequiredIdentityJson(path.join(agentryHome, SERVER_NODE_FILE), SERVER_NODE_FILE);
+  const users = readRequiredIdentityJson(path.join(agentryHome, USERS_FILE), USERS_FILE);
+  const spaces = readRequiredIdentityJson(path.join(agentryHome, SPACES_FILE), SPACES_FILE);
 
   validateServerNodeIdentity(serverNode, SERVER_NODE_FILE);
   validateUsersIdentity(users, USERS_FILE);
@@ -33,10 +33,10 @@ export function loadServerIdentity(hanakoHome) {
   };
 }
 
-export function ensureLocalIdentityRegistries(hanakoHome) {
-  const serverNodePath = path.join(hanakoHome, SERVER_NODE_FILE);
-  const usersPath = path.join(hanakoHome, USERS_FILE);
-  const spacesPath = path.join(hanakoHome, SPACES_FILE);
+export function ensureLocalIdentityRegistries(agentryHome) {
+  const serverNodePath = path.join(agentryHome, SERVER_NODE_FILE);
+  const usersPath = path.join(agentryHome, USERS_FILE);
+  const spacesPath = path.join(agentryHome, SPACES_FILE);
 
   const existingServerNode = readIdentityJsonIfPresent(serverNodePath, SERVER_NODE_FILE);
   const existingUsers = readIdentityJsonIfPresent(usersPath, USERS_FILE);
@@ -104,7 +104,7 @@ function createLocalServerNodeIdentity({ now }) {
   return {
     schemaVersion: 1,
     serverId: `server_${crypto.randomUUID()}`,
-    label: "Local Hana",
+    label: "Local Agentry",
     createdAt: now,
     updatedAt: now,
   };

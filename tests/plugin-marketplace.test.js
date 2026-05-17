@@ -23,7 +23,7 @@ describe("PluginMarketplace", () => {
           schemaVersion: 1,
           id: "demo",
           name: "Demo",
-          publisher: "Hana",
+          publisher: "Agentry",
           version: "1.0.0",
           description: "Demo plugin",
           repository: "https://example.com/demo",
@@ -64,7 +64,7 @@ describe("PluginMarketplace", () => {
     });
   });
 
-  it("uses the official OH-Plugins marketplace URL by default", async () => {
+  it("uses the official agentry-plugins marketplace URL by default", async () => {
     const marketplace = createDefaultPluginMarketplace({
       env: {},
       fetchImpl: async (url) => {
@@ -85,7 +85,7 @@ describe("PluginMarketplace", () => {
 
   it("resolves readmePath relative to URL marketplaces", async () => {
     const marketplace = new PluginMarketplace({
-      indexUrl: "https://raw.githubusercontent.com/liliMozi/OH-Plugins/main/marketplace.json",
+      indexUrl: "https://raw.githubusercontent.com/int-32/agentry-plugins/main/marketplace.json",
       fetchImpl: async (url) => {
         if (url.endsWith("/marketplace.json")) {
           return Response.json({
@@ -94,7 +94,7 @@ describe("PluginMarketplace", () => {
               schemaVersion: 1,
               id: "demo",
               name: "Demo",
-              publisher: "Hana",
+              publisher: "Agentry",
               version: "1.0.0",
               description: "Demo plugin",
               repository: "https://example.com/demo",
@@ -107,14 +107,14 @@ describe("PluginMarketplace", () => {
             }],
           });
         }
-        expect(url).toBe("https://raw.githubusercontent.com/liliMozi/OH-Plugins/main/plugins/demo/README.md");
+        expect(url).toBe("https://raw.githubusercontent.com/int-32/agentry-plugins/main/plugins/demo/README.md");
         return new Response("# Demo from URL");
       },
     });
 
     const data = await marketplace.load();
     expect(data.plugins[0].readmePath).toBeNull();
-    expect(data.plugins[0].readmeUrl).toBe("https://raw.githubusercontent.com/liliMozi/OH-Plugins/main/plugins/demo/README.md");
+    expect(data.plugins[0].readmeUrl).toBe("https://raw.githubusercontent.com/int-32/agentry-plugins/main/plugins/demo/README.md");
     await expect(marketplace.getReadme("demo")).resolves.toBe("# Demo from URL");
   });
 
@@ -126,7 +126,7 @@ describe("PluginMarketplace", () => {
         plugins: [{
           id: "demo",
           name: "Demo",
-          publisher: "Hana",
+          publisher: "Agentry",
           version: "2.0.0",
           description: "Demo plugin",
           trust: "restricted",

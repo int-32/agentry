@@ -51,7 +51,7 @@ function resolveAgentPhoneModel(engine, ctx, agentConfig, modelOverride) {
  * @param {string} agentId
  * @param {Array<{text: string, capture?: boolean}>} rounds  按序执行的 prompts
  * @param {object} opts
- * @param {import('../core/engine.js').HanaEngine} opts.engine
+ * @param {import('../core/engine.js').AgentryEngine} opts.engine
  * @param {AbortSignal} [opts.signal]
  * @param {string} [opts.sessionSuffix="temp"]
  * @param {string} [opts.systemAppend] - 追加到 system prompt 末尾

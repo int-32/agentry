@@ -588,7 +588,7 @@ export class PluginManager {
     // Middleware: inject ctx + agentId (from proxy header)
     app.use("*", async (c, next) => {
       c.set("pluginCtx", ctx);
-      const agentId = c.req.header("X-Hana-Agent-Id") || null;
+      const agentId = c.req.header("X-Agentry-Agent-Id") || null;
       c.set("agentId", agentId);
       await next();
     });
@@ -604,7 +604,7 @@ export class PluginManager {
             // Static Hono app — inject ctx + agentId middleware onto sub-app too
             sub.use("*", async (c, next) => {
               c.set("pluginCtx", ctx);
-              const agentId = c.req.header("X-Hana-Agent-Id") || null;
+              const agentId = c.req.header("X-Agentry-Agent-Id") || null;
               c.set("agentId", agentId);
               await next();
             });

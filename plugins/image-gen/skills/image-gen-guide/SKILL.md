@@ -24,7 +24,7 @@ description: 使用图片/视频生成工具时必读。包含工具参数、非
 - `ratio`：长宽比（1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3, 21:9）
 - `resolution`：分辨率（2k, 4k）
 - `quality`：画质（low, medium, high）
-- `provider`：指定生图 provider（可选，默认自动选择）。可用 provider 来自 Hana Provider Registry 的 `media.imageGeneration` capability，不从聊天模型列表推断
+- `provider`：指定生图 provider（可选，默认自动选择）。可用 provider 来自 Agentry Provider Registry 的 `media.imageGeneration` capability，不从聊天模型列表推断
 
 ### image-gen_generate-video
 

@@ -4,12 +4,12 @@
 
 import { useState, useCallback } from 'react';
 import { saveUserName } from '../onboarding-actions';
-import type { HanaFetch } from '../onboarding-actions';
+import type { AgentryFetch } from '../onboarding-actions';
 import { StepContainer } from '../onboarding-ui';
 
 interface NameStepProps {
   preview: boolean;
-  hanaFetch: HanaFetch;
+  hanaFetch: AgentryFetch;
   goToStep: (index: number) => void;
   showError: (msg: string) => void;
 }

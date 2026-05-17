@@ -14,7 +14,7 @@ describe("generateDescription", () => {
   it("returns a description within 100 chars", async () => {
     const result = await generateDescription(
       { utility: "test-model", api_key: "key", base_url: "http://test", api: "openai" },
-      "你是 Hanako，一个温柔的助手...",
+      "你是 Agentry，一个温柔的助手...",
       "zh",
     );
     expect(result).toBeTruthy();
@@ -35,7 +35,7 @@ describe("generateDescription", () => {
 
     const result = await generateDescription(
       { utility: "test-model", api_key: "key", base_url: "http://test", api: "openai" },
-      "你是 Hanako，一个温柔的助手...",
+      "你是 Agentry，一个温柔的助手...",
       "zh",
     );
 

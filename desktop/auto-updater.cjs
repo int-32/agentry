@@ -249,8 +249,8 @@ function setupAutoUpdater() {
   // 显式设置 feed URL，不依赖 app-update.yml（electron-builder --dir 不生成该文件）
   autoUpdater.setFeedURL({
     provider: "github",
-    owner: "liliMozi",
-    repo: "openhanako",
+    owner: "int-32",
+    repo: "agentry",
   });
 
   autoUpdater.autoDownload = false;          // 由我们控制（磁盘空间检查后手动触发）
@@ -376,11 +376,11 @@ function startPolling() {
 // ── 公共 API ──
 
 function initAutoUpdater(mainWindow, {
-  setIsUpdating, hanakoHome,
+  setIsUpdating, agentryHome,
 } = {}) {
   _mainWindow = mainWindow;
   _setIsUpdating = setIsUpdating;
-  _hanakoHome = hanakoHome;
+  _hanakoHome = agentryHome;
 
   registerIpcHandlers(); // IPC handlers 是进程级单例，重复 init 时直接复用
 

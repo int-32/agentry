@@ -71,7 +71,7 @@ function mockEngine(overrides = {}) {
       ...overrides.pm,
     },
     fetch: overrides.fetch,
-    hanakoHome: overrides.hanakoHome,
+    agentryHome: overrides.agentryHome,
     getEventBus: overrides.getEventBus || (() => overrides.eventBus || null),
     pluginDevService: overrides.pluginDevService,
     getPluginDevToolsEnabled: overrides.getPluginDevToolsEnabled || (() => overrides.pluginDevToolsEnabled === true),
@@ -463,7 +463,7 @@ describe("plugin management API", () => {
       const plugin = {
         id: "demo",
         name: "Demo",
-        publisher: "Hana",
+        publisher: "Agentry",
         version: "1.0.0",
         description: "Demo plugin",
         trust: "restricted",
@@ -518,7 +518,7 @@ describe("plugin management API", () => {
         const plugin = {
           id: "demo",
           name: "Demo",
-          publisher: "Hana",
+          publisher: "Agentry",
           version: "1.0.0",
           description: "Demo plugin",
           trust: "restricted",
@@ -538,7 +538,7 @@ describe("plugin management API", () => {
           installedManifestExists: fs.existsSync(path.join(dir, "manifest.json")),
         }));
         const engine = mockEngine({
-          hanakoHome: tmp,
+          agentryHome: tmp,
           fetch: vi.fn(async () => new Response(zip)),
           plugins: [],
           pm: {
@@ -591,7 +591,7 @@ describe("plugin management API", () => {
         const plugin = {
           id: "demo",
           name: "Demo",
-          publisher: "Hana",
+          publisher: "Agentry",
           version: "2.0.0",
           description: "Demo plugin",
           trust: "restricted",
@@ -628,7 +628,7 @@ describe("plugin management API", () => {
         const recordPluginInstall = vi.fn();
         const engine = mockEngine({
           appVersion: "0.190.2",
-          hanakoHome: tmp,
+          agentryHome: tmp,
           fetch: vi.fn(async () => new Response(zip)),
           plugins: [{ id: "demo", name: "Demo", version: "1.5.0", status: "loaded" }],
           recordPluginInstall,
@@ -714,7 +714,7 @@ describe("plugin management API", () => {
           .mockRejectedValueOnce(new Error("load exploded"))
           .mockResolvedValueOnce({ id: "demo", name: "Demo", version: "1.0.0", status: "loaded" });
         const engine = mockEngine({
-          hanakoHome: tmp,
+          agentryHome: tmp,
           pm: {
             getUserPluginsDir: () => userPluginsDir,
             listPlugins: () => [{ id: "demo", name: "Demo", version: "1.0.0", status: "loaded", pluginDir: existingDir }],
@@ -756,7 +756,7 @@ describe("plugin management API", () => {
         const plugin = {
           id: "demo",
           name: "Demo",
-          publisher: "Hana",
+          publisher: "Agentry",
           version: "1.0.0",
           description: "Demo plugin",
           trust: "restricted",
@@ -771,7 +771,7 @@ describe("plugin management API", () => {
         };
         const installPlugin = vi.fn();
         const engine = mockEngine({
-          hanakoHome: tmp,
+          agentryHome: tmp,
           fetch: vi.fn(async () => new Response(zip)),
           plugins: [],
           pm: {

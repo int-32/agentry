@@ -14,11 +14,11 @@ describe("workspace history", () => {
   it("builds picker items from current workspace, home folder, and persisted history", () => {
     expect(buildWorkspacePickerItems({
       selectedFolder: "/workspace/Desktop",
-      homeFolder: "/workspace/Hana",
+      homeFolder: "/workspace/Agentry",
       cwdHistory: ["/workspace/Desktop", "/workspace/Novel"],
     })).toEqual([
       "/workspace/Desktop",
-      "/workspace/Hana",
+      "/workspace/Agentry",
       "/workspace/Novel",
     ]);
   });

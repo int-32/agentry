@@ -102,7 +102,7 @@ function throwIfAborted(signal) {
  * Normalize image payloads before they reach Pi SDK's AgentSession.prompt().
  *
  * Pi SDK does not currently resize images supplied via prompt options. Its CLI
- * file processor and read tool do resize, so Hana applies the same policy at
+ * file processor and read tool do resize, so Agentry applies the same policy at
  * the model-input boundary and keeps UI/session-file ownership untouched.
  *
  * @param {object} params

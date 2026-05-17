@@ -33,7 +33,7 @@ export class Scheduler {
     });
   }
 
-  /** @returns {import('../core/engine.js').HanaEngine} */
+  /** @returns {import('../core/engine.js').AgentryEngine} */
   get _engine() { return this._hub.engine; }
 
   /** 获取某个 agent 的 heartbeat 实例 */

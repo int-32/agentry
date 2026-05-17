@@ -13,10 +13,10 @@ describe("fs route", () => {
     fs.mkdirSync(tempRoot, { recursive: true });
   });
 
-  function buildApp({ hanakoHome, workspace }) {
+  function buildApp({ agentryHome, workspace }) {
     const app = new Hono();
     const engine = {
-      hanakoHome,
+      agentryHome,
       currentAgentId: "hana",
       getHomeCwd: vi.fn((agentId) => agentId === "hana" ? workspace : null),
       getAgent(id) {
@@ -33,10 +33,10 @@ describe("fs route", () => {
   }
 
   it("rejects symlink escapes from an allowed workspace", async () => {
-    const hanakoHome = path.join(tempRoot, "hanako");
+    const agentryHome = path.join(tempRoot, "hanako");
     const workspace = path.join(tempRoot, "workspace");
     const outsideDir = path.join(tempRoot, "outside");
-    fs.mkdirSync(path.join(hanakoHome, "user"), { recursive: true });
+    fs.mkdirSync(path.join(agentryHome, "user"), { recursive: true });
     fs.mkdirSync(workspace, { recursive: true });
     fs.mkdirSync(outsideDir, { recursive: true });
 
@@ -45,7 +45,7 @@ describe("fs route", () => {
     fs.writeFileSync(outsideFile, "top secret", "utf-8");
     fs.symlinkSync(outsideFile, linkedFile);
 
-    const app = buildApp({ hanakoHome, workspace });
+    const app = buildApp({ agentryHome, workspace });
     const res = await app.request(`/api/fs/read?path=${encodeURIComponent(linkedFile)}`);
 
     expect(res.status).toBe(403);
@@ -53,13 +53,13 @@ describe("fs route", () => {
   });
 
   it("keeps missing files inside the workspace as 404 instead of 403", async () => {
-    const hanakoHome = path.join(tempRoot, "hanako");
+    const agentryHome = path.join(tempRoot, "hanako");
     const workspace = path.join(tempRoot, "workspace");
-    fs.mkdirSync(path.join(hanakoHome, "user"), { recursive: true });
+    fs.mkdirSync(path.join(agentryHome, "user"), { recursive: true });
     fs.mkdirSync(workspace, { recursive: true });
 
     const missingFile = path.join(workspace, "missing.txt");
-    const app = buildApp({ hanakoHome, workspace });
+    const app = buildApp({ agentryHome, workspace });
     const res = await app.request(`/api/fs/read?path=${encodeURIComponent(missingFile)}`);
 
     expect(res.status).toBe(404);

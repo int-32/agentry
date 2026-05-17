@@ -669,7 +669,7 @@ export function createDeskRoute(engine, hub) {
               results.push({ src: srcPath, error: "invalid path" });
               continue;
             }
-            if (isSensitivePath(srcPath, engine.hanakoHome)) {
+            if (isSensitivePath(srcPath, engine.agentryHome)) {
               results.push({ src: srcPath, error: "sensitive path blocked" });
               continue;
             }

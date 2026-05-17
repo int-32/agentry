@@ -4,7 +4,7 @@ import {
   PLUGIN_UI_ERROR_CODE,
   PLUGIN_UI_PROTOCOL,
   PLUGIN_UI_PROTOCOL_VERSION,
-} from '@hana/plugin-protocol';
+} from '@agentry/plugin-protocol';
 import {
   handlePluginUiRequest,
   type PluginUiCapability,

@@ -874,6 +874,7 @@
       "empty": "아직 등록된 Provider가 없어요",
       "fetchModels": "모델 가져오기",
       "delete": "Provider 삭제",
+      "clearConfig": "설정 지우기",
       "modelCount": "{n}개 모델",
       "fetchSuccess": "{name}에서 {n}개 모델을 가져왔어요",
       "fetchFailed": "가져오기 실패",
@@ -882,6 +883,7 @@
       "apiRequired": "API 프로토콜을 선택해 주세요",
       "added": "{name} 추가됨",
       "deleted": "{name} 삭제됨",
+      "clearedConfig": "{name} 설정을 지웠어요",
       "noModels": "아직 모델이 없어요",
       "resetModels": "모델 초기화",
       "apiType": "API 유형",
@@ -896,7 +898,8 @@
       "addCustom": "커스텀 Provider 추가",
       "noKey": "미설정",
       "remove": "제거",
-      "deleteConfirm": "Provider {name}을(를) 삭제할까요? 연결된 모델도 함께 제거돼요."
+      "deleteConfirm": "Provider {name}을(를) 삭제할까요? 연결된 모델도 함께 제거돼요.",
+      "clearConfigConfirm": "{name}의 API Key, Base URL, 모델을 지울까요? 내장 Provider 항목은 다시 설정할 수 있도록 남아 있어요."
     },
     "oauth": {
       "title": "간편 로그인",

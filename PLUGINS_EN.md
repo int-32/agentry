@@ -40,7 +40,7 @@ Read `.docs/PLUGIN-DEVELOPMENT.md` for the end-to-end workflow. Pick the plugin 
 | Tool-only | No UI, adds Agent-callable tools | `restricted` |
 | Runtime | Lifecycle, EventBus, background tasks, dynamic tools | `full-access` |
 | UI | Page / widget / iframe card | `full-access` |
-| Marketplace entry | Makes the plugin discoverable in the marketplace | `OH-Plugins/plugins/<id>.yaml` |
+| Marketplace entry | Makes the plugin discoverable in the marketplace | `agentry-plugins/plugins/<id>.yaml` |
 
 Start with the `hana-plugin-creator` scaffold, then delete what you do not need:
 
@@ -48,7 +48,7 @@ Start with the `hana-plugin-creator` scaffold, then delete what you do not need:
 python3 skills2set/hana-plugin-creator/scripts/create_hana_plugin.py "My Plugin" --path examples/plugins --kind full
 ```
 
-Debug order: install the local folder, inspect Settings diagnostics, finish README/manifest, then add an `OH-Plugins` marketplace entry when the plugin is ready to publish.
+Debug order: install the local folder, inspect Settings diagnostics, finish README/manifest, then add an `agentry-plugins` marketplace entry when the plugin is ready to publish.
 
 ## Installation & Management
 
@@ -56,7 +56,7 @@ Debug order: install the local folder, inspect Settings diagnostics, finish READ
 
 - **Drag-and-drop**: Drag a plugin folder or .zip into Settings → Plugins install area
 - **File picker**: Click the install area and select a plugin folder or .zip via the file picker
-- **Manual**: Place the plugin directory in `${HANA_HOME}/plugins/`. The actual path is shown in Settings → Plugins or via `/api/plugins/settings` as `plugins_dir`
+- **Manual**: Place the plugin directory in `${AGENTRY_HOME}/plugins/`. The actual path is shown in Settings → Plugins or via `/api/plugins/settings` as `plugins_dir`
 
 ### Management
 
@@ -68,7 +68,7 @@ All operations take effect immediately, no restart required:
 
 ### Plugin Data
 
-Plugin private data is stored in `${HANA_HOME}/plugin-data/{pluginId}/`. This directory is preserved when the plugin is deleted, so config persists across reinstalls.
+Plugin private data is stored in `${AGENTRY_HOME}/plugin-data/{pluginId}/`. This directory is preserved when the plugin is deleted, so config persists across reinstalls.
 
 ## Directory Structure
 
@@ -168,10 +168,10 @@ export async function execute(input, toolCtx) {  // required
 
 - Automatically namespaced: `pluginId_name` (e.g. `my-plugin_search`)
 - Restricted plugins' `toolCtx.bus` only has `emit/subscribe/request`, not `handle`
-- New plugins can use `defineTool()` from `@hana/plugin-runtime` for types and default parameters. The current static `tools/*.js` loader still reads named exports.
+- New plugins can use `defineTool()` from `@agentry/plugin-runtime` for types and default parameters. The current static `tools/*.js` loader still reads named exports.
 
 ```js
-import { defineTool } from '@hana/plugin-runtime';
+import { defineTool } from '@agentry/plugin-runtime';
 
 const tool = defineTool({
   name: "search",
@@ -195,7 +195,7 @@ export const { name, description, parameters, execute } = tool;
 When a tool needs to deliver files, first stage the local file as a `SessionFile` for the current session, then return the staged media item through `details.media.items`:
 
 ```js
-import { createMediaDetails } from "@hana/plugin-runtime";
+import { createMediaDetails } from "@agentry/plugin-runtime";
 
 const staged = toolCtx.stageFile({
   sessionPath: toolCtx.sessionPath,
@@ -211,7 +211,7 @@ return {
 
 The framework automatically extracts `details.media` and delivers files according to context: desktop renders file cards, Bridge sends through the target platform, and future mobile surfaces can consume the same `SessionFile` identity. The new protocol prefers structured `session_file` entries in `details.media.items`; `mediaUrls` remains only as a compatibility field for old tools and remote URLs, and is planned for removal no earlier than v0.133. Local files must not bypass StageFile through `MEDIA:/path`, `file://`, or `mediaUrls`; register them as `session_file` entries first. Do not create private plugin file cards as a substitute for `SessionFile`.
 
-When a plugin produces local files directly, call `toolCtx.stageFile({ sessionPath, filePath, label })` to attach them to the current session and obtain a ready-to-return media item. `registerSessionFile` remains available as a lower-level compatibility API, but new plugins should use `stageFile` so file ownership and media delivery stay coupled. `sessionPath` is explicit and `filePath` must be absolute. Hana records these files as `storageKind: "plugin_data"`, so they are treated as plugin data or generated output and are not removed by the session temporary-cache cleaner. Plugins should not assign temporary-cache lifecycle to arbitrary local paths; that lifecycle belongs to the framework.
+When a plugin produces local files directly, call `toolCtx.stageFile({ sessionPath, filePath, label })` to attach them to the current session and obtain a ready-to-return media item. `registerSessionFile` remains available as a lower-level compatibility API, but new plugins should use `stageFile` so file ownership and media delivery stay coupled. `sessionPath` is explicit and `filePath` must be absolute. Agentry records these files as `storageKind: "plugin_data"`, so they are treated as plugin data or generated output and are not removed by the session temporary-cache cleaner. Plugins should not assign temporary-cache lifecycle to arbitrary local paths; that lifecycle belongs to the framework.
 
 Boundaries:
 
@@ -415,7 +415,7 @@ export const capabilities = {
 };
 ```
 
-CLI providers must use structured argument bindings. Do not build shell command strings; Hana runs commands through non-shell `execFile` / `spawn` paths and collects outputs into the media task directory.
+CLI providers must use structured argument bindings. Do not build shell command strings; Agentry runs commands through non-shell `execFile` / `spawn` paths and collects outputs into the media task directory.
 
 ### Configuration (Config Schema)
 
@@ -461,10 +461,10 @@ Declare in `manifest.json` under `contributes`:
 - Hovering over the tab shows the plugin's full name (tooltip)
 - When there are more than 5 tabs, extras are collapsed into an overflow dropdown menu; users can drag to reorder
 
-Plugin pages are rendered via iframe. New plugins should use `@hana/plugin-sdk` for handshake and host requests:
+Plugin pages are rendered via iframe. New plugins should use `@agentry/plugin-sdk` for handshake and host requests:
 
 ```js
-import { hana } from '@hana/plugin-sdk';
+import { hana } from '@agentry/plugin-sdk';
 
 hana.ready();
 hana.ui.resize({ height: 320 });
@@ -502,11 +502,11 @@ The host appends `hana-theme` and `hana-css` query parameters to the iframe URL.
 <link rel="stylesheet" href="${new URLSearchParams(location.search).get('hana-css')}">
 ```
 
-React plugin UIs should use `@hana/plugin-components`. It provides Button, IconButton, TextInput, Textarea, Select, Switch, SettingRow, CardShell, List, EmptyState, and related primitives that match Hana's current controls:
+React plugin UIs should use `@agentry/plugin-components`. It provides Button, IconButton, TextInput, Textarea, Select, Switch, SettingRow, CardShell, List, EmptyState, and related primitives that match Agentry's current controls:
 
 ```tsx
-import { Button, CardShell, HanaThemeProvider, SettingRow, Switch } from "@hana/plugin-components";
-import "@hana/plugin-components/styles.css";
+import { Button, CardShell, HanaThemeProvider, SettingRow, Switch } from "@agentry/plugin-components";
+import "@agentry/plugin-components/styles.css";
 
 export function PluginPanel() {
   return (
@@ -520,7 +520,7 @@ export function PluginPanel() {
 }
 ```
 
-`HanaThemeProvider` supports three modes: `inherit` reads host CSS variables and then uses SDK fallback tokens; `hana` pins the UI to a named Hana theme token set; `custom` only overrides explicitly provided tokens and lets missing fields continue through the fallback chain. Components depend only on `hana-plugin-*` classes and CSS variables, not renderer internals.
+`HanaThemeProvider` supports three modes: `inherit` reads host CSS variables and then uses SDK fallback tokens; `hana` pins the UI to a named Agentry theme token set; `custom` only overrides explicitly provided tokens and lets missing fields continue through the fallback chain. Components depend only on `hana-plugin-*` classes and CSS variables, not renderer internals.
 
 ### Widget (Sidebar Component) ⚡ full-access
 
@@ -601,10 +601,10 @@ Without a manifest, `id` is derived from the directory name, other fields defaul
 
 If a plugin needs persistent connections, scheduled tasks, or bus handlers, create `index.js`:
 
-New plugins should use `definePlugin()` from `@hana/plugin-runtime`. It returns a class-compatible value for the current PluginManager:
+New plugins should use `definePlugin()` from `@agentry/plugin-runtime`. It returns a class-compatible value for the current PluginManager:
 
 ```js
-import { definePlugin } from '@hana/plugin-runtime';
+import { definePlugin } from '@agentry/plugin-runtime';
 
 export default definePlugin({
   async onload(ctx, { register }) {
@@ -618,7 +618,7 @@ export default definePlugin({
 The traditional class form is still supported:
 
 ```js
-import { HANA_BUS_SKIP } from "@hana/plugin-runtime";
+import { HANA_BUS_SKIP } from "@agentry/plugin-runtime";
 
 export default class MyPlugin {
   async onload() {
@@ -653,10 +653,10 @@ export default class MyPlugin {
 
 ## Bus Communication (bus.request / bus.handle)
 
-Inter-plugin communication uses EventBus request-response. `bus.handle` requires full-access permission; `bus.request` is available to all plugins. New plugins should use `defineBusHandler()`, `requestBus()`, and `HANA_BUS_SKIP` from `@hana/plugin-runtime` so handler types, request arguments, and chained skip semantics come from the SDK instead of hand-written conventions.
+Inter-plugin communication uses EventBus request-response. `bus.handle` requires full-access permission; `bus.request` is available to all plugins. New plugins should use `defineBusHandler()`, `requestBus()`, and `HANA_BUS_SKIP` from `@agentry/plugin-runtime` so handler types, request arguments, and chained skip semantics come from the SDK instead of hand-written conventions.
 
 ```js
-import { defineBusHandler, HANA_BUS_SKIP, requestBus } from "@hana/plugin-runtime";
+import { defineBusHandler, HANA_BUS_SKIP, requestBus } from "@agentry/plugin-runtime";
 
 // Plugin A (full-access): register a capability
 const bridgeSend = defineBusHandler({
@@ -758,20 +758,20 @@ await this.ctx.bus.request("task:remove", { taskId: "my-task-123" });
 
 ### Official Plugin Marketplace
 
-The "Open plugin marketplace" button in Settings -> Plugins opens a full marketplace subpage that reads `/api/plugins/marketplace`. Hana follows the Obsidian-style official community catalog model: third-party authors submit plugins to `OH-Plugins`, while users browse, install, enable, and disable plugins without managing marketplace sources.
+The "Open plugin marketplace" button in Settings -> Plugins opens a full marketplace subpage that reads `/api/plugins/marketplace`. Agentry follows the Obsidian-style official community catalog model: third-party authors submit plugins to `agentry-plugins`, while users browse, install, enable, and disable plugins without managing marketplace sources.
 
 Default official catalog:
 
 ```text
-https://raw.githubusercontent.com/liliMozi/OH-Plugins/main/marketplace.json
+https://raw.githubusercontent.com/int-32/agentry-plugins/main/marketplace.json
 ```
 
 Developer overrides remain available:
 
-- `HANA_PLUGIN_MARKETPLACE_FILE=/path/to/marketplace.json`
-- `HANA_PLUGIN_MARKETPLACE_URL=https://.../marketplace.json`
+- `AGENTRY_PLUGIN_MARKETPLACE_FILE=/path/to/marketplace.json`
+- `AGENTRY_PLUGIN_MARKETPLACE_URL=https://.../marketplace.json`
 
-Without either environment variable, Hana first tries `${HANA_HOME}/plugin-marketplace/marketplace.json` for local development. If it does not exist, Hana reads the official `OH-Plugins` URL. The marketplace index shape matches the `OH-Plugins` repository:
+Without either environment variable, Agentry first tries `${AGENTRY_HOME}/plugin-marketplace/marketplace.json` for local development. If it does not exist, Agentry reads the official `agentry-plugins` URL. The marketplace index shape matches the `agentry-plugins` repository:
 
 ```json
 {
@@ -780,7 +780,7 @@ Without either environment variable, Hana first tries `${HANA_HOME}/plugin-marke
     "schemaVersion": 1,
     "id": "demo",
     "name": "Demo",
-    "publisher": "Hana",
+    "publisher": "Agentry",
     "version": "1.0.0",
     "description": "Demo plugin",
     "repository": "https://example.com/demo",
@@ -790,7 +790,7 @@ Without either environment variable, Hana first tries `${HANA_HOME}/plugin-marke
     "contributions": ["tools"],
     "distribution": {
       "kind": "release",
-      "packageUrl": "https://github.com/liliMozi/OH-Plugins/releases/download/demo-v1.0.0/demo.zip",
+      "packageUrl": "https://github.com/int-32/agentry-plugins/releases/download/demo-v1.0.0/demo.zip",
       "sha256": "..."
     },
     "versions": [
@@ -799,7 +799,7 @@ Without either environment variable, Hana first tries `${HANA_HOME}/plugin-marke
         "compatibility": { "minAppVersion": "0.170.0" },
         "distribution": {
           "kind": "release",
-          "packageUrl": "https://github.com/liliMozi/OH-Plugins/releases/download/demo-v1.0.0/demo.zip",
+          "packageUrl": "https://github.com/int-32/agentry-plugins/releases/download/demo-v1.0.0/demo.zip",
           "sha256": "..."
         }
       }
@@ -811,9 +811,9 @@ Without either environment variable, Hana first tries `${HANA_HOME}/plugin-marke
 
 The marketplace UI shows the plugin list and README in a wider settings subpage. Selecting a plugin reads `/api/plugins/marketplace/:id/readme`. `distribution.kind: "release"` downloads the zip package, verifies `sha256`, then installs it into the user's plugin directory. `distribution.kind: "source"` is only for local file marketplace development because the source path must resolve to a directory on the user's machine.
 
-Marketplace version management uses `versions[]` as the long-term contract: each item declares `version`, that version's `compatibility.minAppVersion`, and its own `distribution`. If `versions[]` is absent, Hana treats the root-level `version` / `compatibility` / `distribution` as a single version entry. The client chooses the highest SemVer version compatible with the current app, while exposing `latestVersion`, `selectedVersion`, `installedVersion`, `updateAvailable`, `downgrade`, `reinstall`, `compatible`, `installAction`, and `canInstall` for UI state.
+Marketplace version management uses `versions[]` as the long-term contract: each item declares `version`, that version's `compatibility.minAppVersion`, and its own `distribution`. If `versions[]` is absent, Agentry treats the root-level `version` / `compatibility` / `distribution` as a single version entry. The client chooses the highest SemVer version compatible with the current app, while exposing `latestVersion`, `selectedVersion`, `installedVersion`, `updateAvailable`, `downgrade`, `reinstall`, `compatible`, `installAction`, and `canInstall` for UI state.
 
-If the installed version is newer than the highest compatible marketplace version, the action is marked as `downgrade` and install requires explicit `allowDowngrade: true`. Drag-and-drop / local path installs also reject implicit downgrades. Updates back up the previous plugin directory under `${HANA_HOME}/plugin-backups/<pluginId>/`; if the new version fails to load, Hana restores and reloads the old directory. Successful installs are recorded in `${HANA_HOME}/plugin-installs.json` with source, version, release URL, and sha256 so later marketplace state is explicit.
+If the installed version is newer than the highest compatible marketplace version, the action is marked as `downgrade` and install requires explicit `allowDowngrade: true`. Drag-and-drop / local path installs also reject implicit downgrades. Updates back up the previous plugin directory under `${AGENTRY_HOME}/plugin-backups/<pluginId>/`; if the new version fails to load, Agentry restores and reloads the old directory. Successful installs are recorded in `${AGENTRY_HOME}/plugin-installs.json` with source, version, release URL, and sha256 so later marketplace state is explicit.
 
 ## Forward Compatibility
 
@@ -827,7 +827,7 @@ The system ignores unrecognized directories and manifest fields. Old plugins alw
 
 ## Concurrency
 
-Hana supports multiple sessions and multiple agents running in parallel. Keep the following in mind when developing plugins:
+Agentry supports multiple sessions and multiple agents running in parallel. Keep the following in mind when developing plugins:
 
 - All session-related EventBus events (`session:send`, `session:abort`, etc.) must include a `sessionPath` parameter to identify the target session
 - Tools can obtain the current session path via `ctx.sessionManager.getSessionFile()`

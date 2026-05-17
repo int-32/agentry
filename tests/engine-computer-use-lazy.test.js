@@ -2,9 +2,9 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, describe, expect, it } from "vitest";
-import { HanaEngine } from "../core/engine.js";
+import { AgentryEngine } from "../core/engine.js";
 
-describe("HanaEngine Computer Use lazy runtime", () => {
+describe("AgentryEngine Computer Use lazy runtime", () => {
   let tmpDir = null;
 
   afterEach(() => {
@@ -14,8 +14,8 @@ describe("HanaEngine Computer Use lazy runtime", () => {
 
   function createEngine() {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-engine-computer-use-"));
-    return new HanaEngine({
-      hanakoHome: tmpDir,
+    return new AgentryEngine({
+      agentryHome: tmpDir,
       productDir: tmpDir,
       agentId: "hana",
     });

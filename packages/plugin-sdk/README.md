@@ -1,9 +1,9 @@
-# @hana/plugin-sdk
+# @agentry/plugin-sdk
 
-Browser-side SDK for Hana iframe plugins.
+Browser-side SDK for Agentry iframe plugins.
 
 ```ts
-import { hana } from '@hana/plugin-sdk';
+import { hana } from '@agentry/plugin-sdk';
 
 hana.ready();
 hana.ui.resize({ height: 320 });

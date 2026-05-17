@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { HanaEngine } from "../core/engine.js";
+import { AgentryEngine } from "../core/engine.js";
 
-describe("HanaEngine session API", () => {
+describe("AgentryEngine session API", () => {
   it("exposes session model switch state without leaking coordinator internals", () => {
-    const engine = Object.create(HanaEngine.prototype);
+    const engine = Object.create(AgentryEngine.prototype);
     engine._sessionCoord = {
       isSessionSwitching: vi.fn(() => true),
     };

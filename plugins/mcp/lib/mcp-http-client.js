@@ -136,7 +136,7 @@ export class McpStreamableHttpClient {
       capabilities: {},
       clientInfo: {
         name: "hana",
-        title: "Hana",
+        title: "Agentry",
         version: "0.1.0",
       },
     }, { initializing: true, retryOnSessionExpired: false });
@@ -297,7 +297,7 @@ export class McpLegacySseClient {
       capabilities: {},
       clientInfo: {
         name: "hana",
-        title: "Hana",
+        title: "Agentry",
         version: "0.1.0",
       },
     });

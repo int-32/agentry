@@ -17,7 +17,7 @@ import {
   sessionFileToMediaItem,
   unscheduleTask,
   updateTask,
-} from '@hana/plugin-runtime';
+} from '@agentry/plugin-runtime';
 
 describe('plugin runtime SDK', () => {
   it('defines tools with stable fields and default parameters', async () => {

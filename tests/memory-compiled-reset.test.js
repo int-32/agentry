@@ -76,7 +76,7 @@ describe("compiled memory reset state", () => {
   it("normalizes section body content by removing headings and JSON string arrays", () => {
     expect(normalizeCompiledSectionBody("# 本周主题概要\n\n- 用户关注记忆系统")).toBe("- 用户关注记忆系统");
     expect(normalizeCompiledSectionBody("## 长期背景记录\n\n### 偏好\n\n用户喜欢沉静的 UI")).toBe("用户喜欢沉静的 UI");
-    expect(normalizeCompiledSectionBody("[\"用户关注 Project Hana\", \"用户喜欢清晰边界\"]")).toBe("- 用户关注 Project Hana\n- 用户喜欢清晰边界");
+    expect(normalizeCompiledSectionBody("[\"用户关注 Project Agentry\", \"用户喜欢清晰边界\"]")).toBe("- 用户关注 Project Agentry\n- 用户喜欢清晰边界");
   });
 });
 

@@ -1,5 +1,5 @@
 /**
- * Hana Desktop — Preload 桥接
+ * Agentry Desktop — Preload 桥接
  *
  * 业务通信走 HTTP/WS 到 server。
  * IPC 仅用于：窗口管理、系统对话框、跨窗口消息转发。

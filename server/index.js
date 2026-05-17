@@ -1,5 +1,5 @@
 /**
- * Hanako Server — HTTP + WebSocket API
+ * Agentry Server — HTTP + WebSocket API
  *
  * 启动方式：
  *   node server/index.js              （独立运行）
@@ -17,7 +17,7 @@ import { createNodeWebSocket } from "@hono/node-ws";
 import { WebSocketServer } from "ws";
 import { AppError } from "../shared/errors.js";
 import { errorBus } from "../shared/error-bus.js";
-import { HanaEngine } from "../core/engine.js";
+import { AgentryEngine } from "../core/engine.js";
 import { ensureFirstRun } from "../core/first-run.js";
 import { initDebugLog } from "../lib/debug-log.js";
 import { redactLogLabel, redactLogText } from "../lib/log-redactor.js";
@@ -52,7 +52,12 @@ import { createPluginsRoute } from "./routes/plugins.js";
 import { createCheckpointsRoute } from "./routes/checkpoints.js";
 import { createCommandsRoute } from "./routes/commands.js";
 import { createServerIdentityRoute } from "./routes/server-identity.js";
-import { configureProcessPiSdkEnv, ensureHanaPiSdkDirs, resolveHanakoHome } from "../shared/hana-runtime-paths.js";
+import {
+  configureProcessPiSdkEnv,
+  ensureHanaPiSdkDirs,
+  migrateLegacyHomeIfNeeded,
+  resolveAgentryHome,
+} from "../shared/agentry-runtime-paths.js";
 // internal-browser WS is handled directly via raw ws.WebSocketServer in the
 // upgrade handler below (WsTransport needs raw ws .on()/.off() methods)
 import { ConfirmStore } from "../lib/confirm-store.js";
@@ -62,23 +67,26 @@ import { createDeferredResultExtension } from "../lib/extensions/deferred-result
 import { createCompactionGuardExtension } from "../lib/extensions/compaction-guard-ext.js";
 import { Hub } from "../hub/index.js";
 import { startCLI } from "./cli.js";
-import { fromRoot } from "../shared/hana-root.js";
+import { fromRoot } from "../shared/agentry-root.js";
 
 const productDir = fromRoot("lib");
 
-// 用户数据存放在 ~/.hanako/（打包后与产品代码分离）
-// 开发时可通过 HANA_HOME 环境变量隔离数据目录，如：HANA_HOME=~/.hanako-dev node server/index.js
-const hanakoHome = resolveHanakoHome(process.env.HANA_HOME);
-process.env.HANA_HOME = hanakoHome;
-ensureHanaPiSdkDirs(hanakoHome);
-configureProcessPiSdkEnv(hanakoHome);
+// 用户数据存放在 ~/.agentry/（打包后与产品代码分离）
+// 开发时可通过 AGENTRY_HOME 环境变量隔离数据目录，如：AGENTRY_HOME=~/.agentry-dev node server/index.js
+// 兼容期：旧 HANA_HOME 环境变量仍生效，~/.hanako 数据会自动迁移到 ~/.agentry
+const agentryHome = resolveAgentryHome();
+migrateLegacyHomeIfNeeded(agentryHome);
+process.env.AGENTRY_HOME = agentryHome;
+process.env.HANA_HOME = agentryHome;
+ensureHanaPiSdkDirs(agentryHome);
+configureProcessPiSdkEnv(agentryHome);
 // ── 首次运行播种 ──
 console.log("[server] ① ensureFirstRun...");
-ensureFirstRun(hanakoHome, productDir);
+ensureFirstRun(agentryHome, productDir);
 console.log("[server] ① ensureFirstRun 完成");
 
 // ── 初始化 Debug 日志 ──
-const dlog = initDebugLog(path.join(hanakoHome, "logs"));
+const dlog = initDebugLog(path.join(agentryHome, "logs"));
 
 // 读取版本号
 let appVersion = "?";
@@ -88,9 +96,9 @@ try {
 } catch {}
 
 // ── 初始化引擎 ──
-console.log("[server] ② 创建 HanaEngine...");
-const engine = new HanaEngine({ hanakoHome, productDir });
-console.log("[server] ② HanaEngine 构造完成，开始 init...");
+console.log("[server] ② 创建 AgentryEngine...");
+const engine = new AgentryEngine({ agentryHome, productDir });
+console.log("[server] ② AgentryEngine 构造完成，开始 init...");
 await engine.init((msg) => console.log(`[server] ${msg}`));
 console.log("[server] ② engine.init 完成");
 dlog.log("server", "engine initialized");
@@ -103,7 +111,7 @@ outboundProxyRuntime.apply(engine.getNetworkProxy());
 
 // 注入依赖给 BrowserManager（避免循环依赖）
 import { BrowserManager } from "../lib/browser/browser-manager.js";
-BrowserManager.setHanakoHome(engine.hanakoHome);
+BrowserManager.setHanakoHome(engine.agentryHome);
 
 // 注：createSession 必须在所有 Pi SDK extension factory 都注册完之后
 // (framework extension via registerExtensionFactory + plugin extension via
@@ -194,7 +202,7 @@ engine.setConfirmStore(confirmStore);
 // --- Deferred Result Store ---
 const deferredResultStore = new DeferredResultStore(
   hub.eventBus,
-  path.join(hanakoHome, ".ephemeral", "deferred-tasks.json"),
+  path.join(agentryHome, ".ephemeral", "deferred-tasks.json"),
 );
 engine.setDeferredResultStore(deferredResultStore);
 
@@ -388,14 +396,14 @@ app.route("/api", createDmRoute(engine));
 app.route("/api", createFsRoute(engine));
 app.route("/api", createPreferencesRoute(engine));
 app.route("/api", createBridgeRoute(engine, bridgeManagerRef));
-app.route("/api", createLocalCliRoute());
+app.route("/api", createLocalCliRoute({ agentryHome: engine.agentryHome }));
 app.route("/api", createAuthRoute(engine));
 app.route("/api", createDiaryRoute(engine));
 app.route("/api", createConfirmRoute(confirmStore, engine));
 app.route("/api", createPluginsRoute(engine));
 app.route("/api", createCheckpointsRoute(engine));
 app.route("/api", createCommandsRoute(engine));
-app.route("/api", createServerIdentityRoute({ hanakoHome: engine.hanakoHome, appVersion }));
+app.route("/api", createServerIdentityRoute({ agentryHome: engine.agentryHome, appVersion }));
 // internal-browser WS — see unified upgrade handler in server startup below
 
 // 健康检查 + 身份信息
@@ -562,7 +570,7 @@ try {
     const _bwsEnabled = process.env.HANA_DEBUG === "1";
     let _bwsBuf = "";
     let _bwsFlushTimer = null;
-    const _bwsLogPath = path.join(hanakoHome, "browser-ws.log");
+    const _bwsLogPath = path.join(agentryHome, "browser-ws.log");
     let _bwsFlushChain = Promise.resolve();
     const _bwsFlush = () => {
       if (!_bwsBuf) return;
@@ -618,11 +626,11 @@ try {
   const address = server.address();
   const actualPort = address.port;
 
-  console.log(`[server] Hanako Server 运行在 http://${host}:${actualPort}`);
+  console.log(`[server] Agentry Server 运行在 http://${host}:${actualPort}`);
   dlog.log("server", `listening on :${actualPort}`);
 
   // 写 server-info 文件，供 Electron 检测复用或外部工具查询
-  const serverInfoPath = path.join(hanakoHome, "server-info.json");
+  const serverInfoPath = path.join(agentryHome, "server-info.json");
   try {
     fs.writeFileSync(serverInfoPath, JSON.stringify({ pid: process.pid, port: actualPort, token: SERVER_TOKEN, version: appVersion }));
   } catch (e) {
@@ -702,7 +710,7 @@ async function gracefulShutdown() {
   }
 
   clearTimeout(forceTimer);
-  try { fs.unlinkSync(path.join(hanakoHome, "server-info.json")); } catch {}
+  try { fs.unlinkSync(path.join(agentryHome, "server-info.json")); } catch {}
   process.exit(0);
 }
 

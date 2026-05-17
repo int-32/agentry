@@ -3,7 +3,7 @@
  */
 import fs from "fs";
 import path from "path";
-import { fromRoot } from "../shared/hana-root.js";
+import { fromRoot } from "../shared/agentry-root.js";
 
 const localesDir = fromRoot("desktop", "src", "locales");
 

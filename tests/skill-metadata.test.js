@@ -159,7 +159,7 @@ describe("SkillManager metadata scanning", () => {
     fs.writeFileSync(skillFile, [
       "---",
       "name: hana-plugin-creator",
-      "description: Create Hana plugins.",
+      "description: Create Agentry plugins.",
       "metadata:",
       "  default-enabled: false",
       "---",

@@ -50,7 +50,7 @@ describe("ChannelRouter reply tool boundary", () => {
     const result = await router._executeReply(
       "hanako",
       "ch_crew",
-      "user: @Hanako please reply OK",
+      "user: @Agentry please reply OK",
     );
 
     expect(result).toMatchObject({ replied: false, missingDecision: true });
@@ -130,7 +130,7 @@ describe("ChannelRouter reply tool boundary", () => {
           marker: "engine",
           channelsDir,
           agentsDir,
-          getAgent: (id) => ({ id, agentName: id === "yui" ? "Yui" : "Hana", config: { agent: { yuan: "hanako" } } }),
+          getAgent: (id) => ({ id, agentName: id === "yui" ? "Yui" : "Agentry", config: { agent: { yuan: "hanako" } } }),
         },
         eventBus: { emit: vi.fn() },
       },
@@ -213,7 +213,7 @@ describe("ChannelRouter reply tool boundary", () => {
     await router._executeReply(
       "hanako",
       "ch_crew",
-      "user: @Hanako please reply OK",
+      "user: @Agentry please reply OK",
     );
 
     expect(runAgentPhoneSessionMock.mock.calls[0][2]).toMatchObject({
@@ -243,7 +243,7 @@ describe("ChannelRouter reply tool boundary", () => {
     fs.mkdirSync(channelsDir, { recursive: true });
     fs.mkdirSync(userDir, { recursive: true });
     fs.mkdirSync(path.join(productDir, "yuan"), { recursive: true });
-    fs.writeFileSync(path.join(agentsDir, "hanako", "config.yaml"), "agent:\n  name: Hanako\n", "utf-8");
+    fs.writeFileSync(path.join(agentsDir, "hanako", "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
     fs.writeFileSync(path.join(channelsDir, "ch_crew.md"), "---\nid: ch_crew\nmembers: [hanako]\n---\n", "utf-8");
 
     const emit = vi.fn();
@@ -263,7 +263,7 @@ describe("ChannelRouter reply tool boundary", () => {
     const result = await router._executeCheck(
       "hanako",
       "ch_crew",
-      [{ sender: "user", timestamp: "2026-05-07 17:00:00", body: "@Hanako ping" }],
+      [{ sender: "user", timestamp: "2026-05-07 17:00:00", body: "@Agentry ping" }],
       [],
     );
 
@@ -304,7 +304,7 @@ describe("ChannelRouter reply tool boundary", () => {
     fs.mkdirSync(channelsDir, { recursive: true });
     fs.mkdirSync(userDir, { recursive: true });
     fs.mkdirSync(path.join(productDir, "yuan"), { recursive: true });
-    fs.writeFileSync(path.join(agentsDir, "hanako", "config.yaml"), "agent:\n  name: Hanako\n", "utf-8");
+    fs.writeFileSync(path.join(agentsDir, "hanako", "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
     fs.writeFileSync(path.join(channelsDir, "ch_crew.md"), "---\nid: ch_crew\nmembers: [hanako]\n---\n", "utf-8");
 
     const emit = vi.fn();
@@ -357,7 +357,7 @@ describe("ChannelRouter reply tool boundary", () => {
     fs.mkdirSync(channelsDir, { recursive: true });
     fs.mkdirSync(userDir, { recursive: true });
     fs.mkdirSync(path.join(productDir, "yuan"), { recursive: true });
-    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Hanako\n", "utf-8");
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
     fs.writeFileSync(path.join(channelsDir, "ch_crew.md"), "---\nid: ch_crew\nmembers: [hanako, yui]\n---\n", "utf-8");
 
     const activityRecord = vi.fn();
@@ -369,7 +369,7 @@ describe("ChannelRouter reply tool boundary", () => {
           userDir,
           productDir,
           isChannelsEnabled: () => true,
-          getAgent: () => ({ agentDir, config: { agent: { name: "Hanako" } }, personality: "I am Hanako" }),
+          getAgent: () => ({ agentDir, config: { agent: { name: "Agentry" } }, personality: "I am Agentry" }),
         },
         eventBus: { emit: vi.fn() },
         agentPhoneActivities: { record: activityRecord },
@@ -379,7 +379,7 @@ describe("ChannelRouter reply tool boundary", () => {
     await router._executeCheck(
       "hanako",
       "ch_crew",
-      [{ sender: "user", timestamp: "2026-05-07 17:00:00", body: "@Hanako ping" }],
+      [{ sender: "user", timestamp: "2026-05-07 17:00:00", body: "@Agentry ping" }],
       [],
     );
 

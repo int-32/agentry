@@ -179,7 +179,7 @@ describe("ChannelManager", () => {
     it("adds missing agent cursor entries from channel membership without changing channel data", async () => {
       writeChannelMd(channelsDir, "ch_team", ["hana", "yui", "ghost"]);
       fs.mkdirSync(path.join(agentsDir, "hana"), { recursive: true });
-      fs.writeFileSync(path.join(agentsDir, "hana", "config.yaml"), "agent:\n  name: Hana\n", "utf-8");
+      fs.writeFileSync(path.join(agentsDir, "hana", "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
       fs.writeFileSync(path.join(agentsDir, "hana", "channels.md"), "# 频道\n\n", "utf-8");
       fs.mkdirSync(path.join(agentsDir, "yui"), { recursive: true });
       fs.writeFileSync(path.join(agentsDir, "yui", "config.yaml"), "agent:\n  name: Yui\n", "utf-8");

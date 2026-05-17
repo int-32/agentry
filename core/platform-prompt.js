@@ -19,7 +19,7 @@ export function getPlatformPromptNote({
   if (platform === "win32") {
     lines.push(
       "Host OS is Windows, but the bash tool accepts POSIX shell-style commands.",
-      "Hanako may internally route simple git commands through bundled git.exe and explicit cmd.exe/powershell.exe commands through Windows-native runners.",
+      "Agentry may internally route simple git commands through bundled git.exe and explicit cmd.exe/powershell.exe commands through Windows-native runners.",
       "Prefer POSIX syntax for pipes, paths, environment variables, and redirection when writing shell-style commands.",
       "Use cmd.exe /c or powershell.exe -NoProfile -Command only when you explicitly need a Windows-native shell.",
       "Discard POSIX command output with /dev/null; use CMD's nul device only inside an explicit cmd.exe command.",

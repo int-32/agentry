@@ -40,6 +40,26 @@ describe('getApiKeySavePlan', () => {
     });
   });
 
+  it('saves and verifies an edited base url even when the api key was not changed', () => {
+    expect(getApiKeySavePlan({
+      keyEdited: false,
+      keyVal: 'sk-test',
+      urlEdited: true,
+      urlVal: 'https://api.changed.example.com/v1',
+      derivedBaseUrl: 'https://api.example.com/v1',
+      isPresetSetup: false,
+      isLocalPreset: false,
+      api: 'openai-completions',
+    })).toEqual({
+      shouldSave: true,
+      shouldVerify: true,
+      payload: { base_url: 'https://api.changed.example.com/v1' },
+      effectiveUrl: 'https://api.changed.example.com/v1',
+      api: 'openai-completions',
+      key: 'sk-test',
+    });
+  });
+
   it('can repair an existing preset provider with no saved models', () => {
     expect(getApiKeySavePlan({
       keyEdited: true,

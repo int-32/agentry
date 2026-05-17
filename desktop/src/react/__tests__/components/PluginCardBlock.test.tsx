@@ -9,7 +9,7 @@ import {
   PLUGIN_UI_CAPABILITY,
   PLUGIN_UI_PROTOCOL,
   PLUGIN_UI_PROTOCOL_VERSION,
-} from '@hana/plugin-protocol';
+} from '@agentry/plugin-protocol';
 
 vi.mock('../../hooks/use-hana-fetch', () => ({
   hanaUrl: (path: string) => `http://127.0.0.1:3210${path}`,

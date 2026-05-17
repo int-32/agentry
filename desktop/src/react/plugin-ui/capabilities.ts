@@ -1,4 +1,4 @@
-import { PLUGIN_UI_CAPABILITY } from '@hana/plugin-protocol';
+import { PLUGIN_UI_CAPABILITY } from '@agentry/plugin-protocol';
 import { useStore } from '../stores';
 import type { Toast } from '../stores/toast-slice';
 import type {

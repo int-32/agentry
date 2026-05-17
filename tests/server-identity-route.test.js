@@ -66,7 +66,7 @@ describe("server identity route", () => {
     writeValidIdentity(tmpDir);
     const { createServerIdentityRoute } = await import("../server/routes/server-identity.js");
     const app = new Hono();
-    app.route("/api", createServerIdentityRoute({ hanakoHome: tmpDir, appVersion: "1.2.3" }));
+    app.route("/api", createServerIdentityRoute({ agentryHome: tmpDir, appVersion: "1.2.3" }));
 
     const res = await app.request("/api/server/identity");
 
@@ -91,7 +91,7 @@ describe("server identity route", () => {
     fs.writeFileSync(path.join(tmpDir, "spaces.json"), "{ bad json", "utf-8");
     const { createServerIdentityRoute } = await import("../server/routes/server-identity.js");
     const app = new Hono();
-    app.route("/api", createServerIdentityRoute({ hanakoHome: tmpDir, appVersion: "1.2.3" }));
+    app.route("/api", createServerIdentityRoute({ agentryHome: tmpDir, appVersion: "1.2.3" }));
 
     const res = await app.request("/api/server/identity");
 

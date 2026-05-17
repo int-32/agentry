@@ -9,7 +9,7 @@ import {
   Button,
   CardShell,
   EmptyState,
-  HanaThemeProvider,
+  AgentryThemeProvider,
   IconButton,
   List,
   Select,
@@ -17,18 +17,18 @@ import {
   Switch,
   Textarea,
   TextInput,
-} from '@hana/plugin-components';
+} from '@agentry/plugin-components';
 
 describe('plugin component SDK', () => {
   afterEach(() => {
     cleanup();
   });
 
-  it('renders plugin surfaces that inherit Hana theme variables by default', () => {
+  it('renders plugin surfaces that inherit Agentry theme variables by default', () => {
     render(
-      <HanaThemeProvider>
+      <AgentryThemeProvider>
         <CardShell title="工具结果">正文</CardShell>
-      </HanaThemeProvider>,
+      </AgentryThemeProvider>,
     );
 
     const root = screen.getByTestId('hana-plugin-theme');
@@ -41,9 +41,9 @@ describe('plugin component SDK', () => {
 
   it('applies named and custom theme tokens while leaving unspecified tokens to CSS fallback', () => {
     const { rerender } = render(
-      <HanaThemeProvider mode="hana" theme="midnight">
+      <AgentryThemeProvider mode="hana" theme="midnight">
         <span>named</span>
-      </HanaThemeProvider>,
+      </AgentryThemeProvider>,
     );
 
     let root = screen.getByTestId('hana-plugin-theme');
@@ -55,9 +55,9 @@ describe('plugin component SDK', () => {
     });
 
     rerender(
-      <HanaThemeProvider mode="custom" theme={{ bg: '#111111', accent: '#88AAFF' }}>
+      <AgentryThemeProvider mode="custom" theme={{ bg: '#111111', accent: '#88AAFF' }}>
         <span>custom</span>
-      </HanaThemeProvider>,
+      </AgentryThemeProvider>,
     );
 
     root = screen.getByTestId('hana-plugin-theme');
@@ -69,7 +69,7 @@ describe('plugin component SDK', () => {
     expect(root.style.getPropertyValue('--hana-plugin-text')).toBe('');
   });
 
-  it('renders controlled controls with stable Hana component classes', () => {
+  it('renders controlled controls with stable Agentry component classes', () => {
     const onButtonClick = vi.fn();
     const onTextChange = vi.fn();
     const onSwitchChange = vi.fn();

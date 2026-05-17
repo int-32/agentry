@@ -2,7 +2,7 @@
 
 const NETWORK_PROXY_MODES = ["system", "manual", "direct"];
 const DEFAULT_NO_PROXY = "localhost, 127.0.0.1, ::1";
-// Only loopback endpoints are forced direct. Future remote Hana servers need a
+// Only loopback endpoints are forced direct. Future remote Agentry servers need a
 // separate frontend-to-server connection policy, not this backend outbound list.
 const FORCED_LOCAL_PROXY_BYPASS = Object.freeze(["localhost", "127.0.0.1", "::1"]);
 

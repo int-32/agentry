@@ -13,7 +13,7 @@ describe("chat route model switch guard", () => {
       send: vi.fn(async () => {}),
     };
     const engine = {
-      agentName: "Hana",
+      agentName: "Agentry",
       abortAllStreaming: vi.fn(async () => {}),
       getSessionByPath: vi.fn(() => null),
       isSessionStreaming: vi.fn(() => false),

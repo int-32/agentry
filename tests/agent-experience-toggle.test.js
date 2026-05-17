@@ -29,10 +29,10 @@ function makeAgent({ experienceEnabled }) {
   });
   agent._config = {
     locale: "en",
-    agent: { name: "Hana", yuan: "hanako" },
+    agent: { name: "Agentry", yuan: "hanako" },
     experience: { enabled: experienceEnabled },
   };
-  agent.agentName = "Hana";
+  agent.agentName = "Agentry";
   agent.userName = "User";
   agent._memoryMasterEnabled = true;
   agent._memorySessionEnabled = true;

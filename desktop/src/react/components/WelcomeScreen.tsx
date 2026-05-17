@@ -7,11 +7,12 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { MutableRefObject } from 'react';
 import { useStore } from '../stores';
 import { hanaFetch } from '../hooks/use-hana-fetch';
 import { useI18n } from '../hooks/use-i18n';
 import { loadModels } from '../utils/ui-helpers';
-import { addWorkspaceFolder, applyFolder, removeWorkspaceFolder } from '../stores/desk-actions';
+import { activateWorkspaceDesk, addWorkspaceFolder, applyFolder, removeWorkspaceFolder } from '../stores/desk-actions';
 import { openSettingsModal } from '../stores/settings-modal-actions';
 import type { Agent } from '../types';
 import { AgentAvatar, refreshAgentAvatarVersion, resolveAgentDisplayInfo, type AgentDisplayInfo } from '../utils/agent-display';
@@ -40,6 +41,20 @@ function randomWelcome(agentName: string, yuan: string): string {
   return raw.replaceAll('{name}', agentName);
 }
 
+function normalizeWorkspacePath(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function readConfigChatModel(config: any): { id: string; provider: string } | null {
+  const chat = config?.models?.chat;
+  if (!chat || typeof chat !== 'object') return null;
+  const id = typeof chat.id === 'string' ? chat.id.trim() : '';
+  const provider = typeof chat.provider === 'string' ? chat.provider.trim() : '';
+  return id && provider ? { id, provider } : null;
+}
+
 // ── 内部组件 ──
 
 function WelcomeInner() {
@@ -57,6 +72,7 @@ function WelcomeInner() {
   const homeFolder = useStore(s => s.homeFolder);
   const workspaceFolders = useStore(s => s.workspaceFolders);
   const cwdHistory = useStore(s => s.cwdHistory);
+  const agentSelectVersionRef = useRef(0);
 
   // Determine the displayed agent
   const displayAgent = useMemo(() => {
@@ -105,6 +121,7 @@ function WelcomeInner() {
         <AgentChips
           agents={agents}
           selectedId={selectedAgentId || currentAgentId}
+          selectionVersionRef={agentSelectVersionRef}
         />
       )}
       <FolderPicker
@@ -139,22 +156,52 @@ function WelcomeAvatar({ info }: {
 
 // ── Agent Chips ──
 
-function AgentChips({ agents, selectedId }: {
+function AgentChips({ agents, selectedId, selectionVersionRef }: {
   agents: Agent[];
   selectedId: string | null;
+  selectionVersionRef: MutableRefObject<number>;
 }) {
   const handleClick = useCallback((agentId: string) => {
+    const version = ++selectionVersionRef.current;
     useStore.setState({ selectedAgentId: agentId });
-    // 切换到该 agent 的 chat model
     const agent = agents.find(a => a.id === agentId) as any;
-    if (agent?.chatModel?.id) {
-      hanaFetch('/api/models/set', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelId: agent.chatModel.id, provider: agent.chatModel.provider }),
-      }).then(() => loadModels()).catch(() => {});
-    }
-  }, [agents]);
+
+    hanaFetch(`/api/agents/${encodeURIComponent(agentId)}/config`)
+      .then(r => r.json())
+      .then(async (config: any) => {
+        if (version !== selectionVersionRef.current) return;
+        if (config?.error) throw new Error(String(config.error));
+
+        const homeFolder = normalizeWorkspacePath(config?.desk?.home_folder);
+        useStore.setState({
+          homeFolder,
+          selectedFolder: homeFolder,
+          workspaceFolders: [],
+        });
+        await activateWorkspaceDesk(homeFolder);
+        if (version !== selectionVersionRef.current) return;
+
+        const chatModel = readConfigChatModel(config) || (agent?.chatModel?.id && agent?.chatModel?.provider
+          ? { id: agent.chatModel.id, provider: agent.chatModel.provider }
+          : null);
+        if (!chatModel) return;
+        await hanaFetch('/api/models/set', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modelId: chatModel.id, provider: chatModel.provider }),
+        });
+        if (version === selectionVersionRef.current) loadModels();
+      })
+      .catch(() => {
+        if (version !== selectionVersionRef.current) return;
+        if (!agent?.chatModel?.id || !agent?.chatModel?.provider) return;
+        hanaFetch('/api/models/set', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modelId: agent.chatModel.id, provider: agent.chatModel.provider }),
+        }).then(() => loadModels()).catch(() => {});
+      });
+  }, [agents, selectionVersionRef]);
 
   return (
     <div className={styles.welcomeAgentSelector}>

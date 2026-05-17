@@ -9,9 +9,9 @@ vi.mock("../lib/sandbox/index.js", () => ({
   createSandboxedTools,
 }));
 
-const { HanaEngine } = await import("../core/engine.js");
+const { AgentryEngine } = await import("../core/engine.js");
 
-describe("HanaEngine.buildTools session external sandbox grants", () => {
+describe("AgentryEngine.buildTools session external sandbox grants", () => {
   let tempRoot;
 
   afterEach(() => {
@@ -22,12 +22,12 @@ describe("HanaEngine.buildTools session external sandbox grants", () => {
 
   it("passes active session external files as read-only sandbox inputs", () => {
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hana-engine-sandbox-files-"));
-    const hanakoHome = path.join(tempRoot, "hana-home");
-    const agentDir = path.join(hanakoHome, "agents", "hana");
+    const agentryHome = path.join(tempRoot, "hana-home");
+    const agentDir = path.join(agentryHome, "agents", "hana");
     const workspace = path.join(tempRoot, "workspace");
     const externalFile = path.join(tempRoot, "outside", "brief.md");
     const workspaceFile = path.join(workspace, "owned.md");
-    const managedFile = path.join(hanakoHome, "session-files", "cache", "shot.png");
+    const managedFile = path.join(agentryHome, "session-files", "cache", "shot.png");
     for (const file of [externalFile, workspaceFile, managedFile]) {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, "x");
@@ -35,8 +35,8 @@ describe("HanaEngine.buildTools session external sandbox grants", () => {
     fs.mkdirSync(agentDir, { recursive: true });
     const sessionPath = path.join(agentDir, "sessions", "one.jsonl");
 
-    const engine = Object.create(HanaEngine.prototype);
-    engine.hanakoHome = hanakoHome;
+    const engine = Object.create(AgentryEngine.prototype);
+    engine.agentryHome = agentryHome;
     engine.getAgent = vi.fn(() => ({ id: "hana", agentDir, tools: [] }));
     engine._pluginManager = null;
     engine._prefs = { getFileBackup: () => ({ enabled: false }) };
@@ -63,14 +63,14 @@ describe("HanaEngine.buildTools session external sandbox grants", () => {
 
   it("passes the sandbox network preference as a dynamic sandbox option", () => {
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hana-engine-sandbox-network-"));
-    const hanakoHome = path.join(tempRoot, "hana-home");
-    const agentDir = path.join(hanakoHome, "agents", "hana");
+    const agentryHome = path.join(tempRoot, "hana-home");
+    const agentDir = path.join(agentryHome, "agents", "hana");
     const workspace = path.join(tempRoot, "workspace");
     fs.mkdirSync(agentDir, { recursive: true });
     fs.mkdirSync(workspace, { recursive: true });
 
-    const engine = Object.create(HanaEngine.prototype);
-    engine.hanakoHome = hanakoHome;
+    const engine = Object.create(AgentryEngine.prototype);
+    engine.agentryHome = agentryHome;
     engine.getAgent = vi.fn(() => ({ id: "hana", agentDir, tools: [] }));
     engine._pluginManager = null;
     engine._prefs = { getFileBackup: () => ({ enabled: false }) };
@@ -96,8 +96,8 @@ describe("HanaEngine.buildTools session external sandbox grants", () => {
 
   it("includes inherited parent session files in read-only sandbox inputs", () => {
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hana-engine-sandbox-parent-files-"));
-    const hanakoHome = path.join(tempRoot, "hana-home");
-    const agentDir = path.join(hanakoHome, "agents", "hana");
+    const agentryHome = path.join(tempRoot, "hana-home");
+    const agentDir = path.join(agentryHome, "agents", "hana");
     const workspace = path.join(tempRoot, "workspace");
     const childExternal = path.join(tempRoot, "outside", "child.md");
     const parentExternal = path.join(tempRoot, "outside", "parent.md");
@@ -110,8 +110,8 @@ describe("HanaEngine.buildTools session external sandbox grants", () => {
     const childSessionPath = path.join(agentDir, "subagent-sessions", "child.jsonl");
     const parentSessionPath = path.join(agentDir, "sessions", "parent.jsonl");
 
-    const engine = Object.create(HanaEngine.prototype);
-    engine.hanakoHome = hanakoHome;
+    const engine = Object.create(AgentryEngine.prototype);
+    engine.agentryHome = agentryHome;
     engine.getAgent = vi.fn(() => ({ id: "hana", agentDir, tools: [] }));
     engine._pluginManager = null;
     engine._prefs = { getFileBackup: () => ({ enabled: false }) };

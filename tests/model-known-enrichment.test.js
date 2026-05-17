@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { enrichModelFromKnownMetadata } from "../core/model-known-enrichment.js";
 
 describe("enrichModelFromKnownMetadata", () => {
-  it("adds Hana metadata to Pi built-in Kimi models without dropping request headers", () => {
+  it("adds Agentry metadata to Pi built-in Kimi models without dropping request headers", () => {
     const model = {
       id: "kimi-for-coding",
       name: "Kimi For Coding",

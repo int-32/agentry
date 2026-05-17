@@ -26,7 +26,7 @@ function InstallIcon() {
   );
 }
 
-export function AutoUpdateStatus({ state, agentName = 'Hanako', onInstall }: AutoUpdateStatusProps) {
+export function AutoUpdateStatus({ state, agentName = 'Agentry', onInstall }: AutoUpdateStatusProps) {
   if (!state || state.status === 'idle') {
     return null;
   }

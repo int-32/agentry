@@ -35,7 +35,7 @@ function makeEngine(tmpDir) {
       const rel = path.relative(path.join(tmpDir, "agents"), p);
       return rel.split(path.sep)[0] || null;
     },
-    getAgent: () => ({ agentName: "Hana" }),
+    getAgent: () => ({ agentName: "Agentry" }),
     clearSessionTitle: vi.fn(async () => {}),
     listArchivedSessions: vi.fn(async () => []),
     emitEvent: vi.fn(),

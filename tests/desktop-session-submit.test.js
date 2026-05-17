@@ -217,7 +217,7 @@ describe("submitDesktopSessionMessage", () => {
         createdAt: 1,
       }));
       const engine = {
-        hanakoHome: tmpDir,
+        agentryHome: tmpDir,
         registerSessionFile,
         ensureSessionLoaded: vi.fn(async () => session),
         promptSession: vi.fn(async (sessionPath, text, opts) => session.prompt(text, opts)),
@@ -300,7 +300,7 @@ describe("submitDesktopSessionMessage", () => {
         createdAt: 1,
       }));
       const engine = {
-        hanakoHome: tmpDir,
+        agentryHome: tmpDir,
         registerSessionFile,
         ensureSessionLoaded: vi.fn(async () => session),
         promptSession: vi.fn(async (sessionPath, text, opts) => session.prompt(text, opts)),

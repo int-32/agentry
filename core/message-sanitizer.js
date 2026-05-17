@@ -26,7 +26,7 @@ export function modelSupportsImage(model) {
 }
 
 /**
- * 模型是否支持 video 输入（Hana 扩展能力，兼容读取旧 input 数组）。
+ * 模型是否支持 video 输入（Agentry 扩展能力，兼容读取旧 input 数组）。
  * @param {{ input?: readonly string[] } | null | undefined} model
  */
 export function modelSupportsVideo(model) {

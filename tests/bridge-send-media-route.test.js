@@ -16,9 +16,9 @@ describe("bridge send-media route", () => {
 
   function makeApp({ agentOverrides = {}, engineOverrides = {}, bridgeManagerOverrides = {} } = {}) {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-bridge-route-"));
-    const hanakoHome = path.join(tmpDir, "hana-home");
+    const agentryHome = path.join(tmpDir, "hana-home");
     const sessionDir = path.join(tmpDir, "sessions");
-    fs.mkdirSync(hanakoHome, { recursive: true });
+    fs.mkdirSync(agentryHome, { recursive: true });
     fs.mkdirSync(sessionDir, { recursive: true });
 
     const agent = {
@@ -29,7 +29,7 @@ describe("bridge send-media route", () => {
       ...agentOverrides,
     };
     const engine = {
-      hanakoHome,
+      agentryHome,
       currentAgentId: "hana",
       getAgent: vi.fn((id) => id === "hana" ? agent : null),
       getHomeCwd: vi.fn((agentId) => agentId === "hana" ? agent.config?.desk?.home_folder || null : null),
@@ -60,7 +60,7 @@ describe("bridge send-media route", () => {
     };
     const app = new Hono();
     app.route("/api", createBridgeRoute(engine, bridgeManager));
-    return { app, engine, bridgeManager, hanakoHome, agent };
+    return { app, engine, bridgeManager, agentryHome, agent };
   }
 
   it("treats a unique known WeChat DM user as owner even without configured owner", async () => {
@@ -91,8 +91,8 @@ describe("bridge send-media route", () => {
   });
 
   it("registers the local file as a session_file before bridge delivery", async () => {
-    const { app, engine, bridgeManager, hanakoHome } = makeApp();
-    const filePath = path.join(hanakoHome, "out.txt");
+    const { app, engine, bridgeManager, agentryHome } = makeApp();
+    const filePath = path.join(agentryHome, "out.txt");
     fs.writeFileSync(filePath, "ok");
 
     const res = await app.request("/api/bridge/send-media?agentId=hana", {
@@ -164,14 +164,14 @@ describe("bridge send-media route", () => {
 
   it("returns explicit JSON errors from unsupported platform delivery", async () => {
     const deliveryError = new Error("QQ 当前 adapter 不能直接消费这个本地 staged file，只能走 public_url fallback");
-    const { app, hanakoHome } = makeApp({
+    const { app, agentryHome } = makeApp({
       bridgeManagerOverrides: {
         sendMediaItem: vi.fn(async () => {
           throw deliveryError;
         }),
       },
     });
-    const filePath = path.join(hanakoHome, "out.txt");
+    const filePath = path.join(agentryHome, "out.txt");
     fs.writeFileSync(filePath, "ok");
 
     const res = await app.request("/api/bridge/send-media?agentId=hana", {
@@ -192,11 +192,11 @@ describe("bridge send-media route", () => {
   });
 
   it("serves tokenized bridge media files from the media publisher", async () => {
-    const { app, hanakoHome } = makeApp({
+    const { app, agentryHome } = makeApp({
       bridgeManagerOverrides: {
         mediaPublisher: {
           resolve: vi.fn((token) => token === "token_123" ? {
-            realPath: path.join(hanakoHome, "published.txt"),
+            realPath: path.join(agentryHome, "published.txt"),
             filename: "published.txt",
             mime: "text/plain",
             size: 5,
@@ -205,7 +205,7 @@ describe("bridge send-media route", () => {
         },
       },
     });
-    const filePath = path.join(hanakoHome, "published.txt");
+    const filePath = path.join(agentryHome, "published.txt");
     fs.writeFileSync(filePath, "hello");
 
     const res = await app.request("/api/bridge/media/token_123");
@@ -220,11 +220,11 @@ describe("bridge send-media route", () => {
   });
 
   it("serves images inline for platform media fetches", async () => {
-    const { app, hanakoHome } = makeApp({
+    const { app, agentryHome } = makeApp({
       bridgeManagerOverrides: {
         mediaPublisher: {
           resolve: vi.fn((token) => token === "token_123" ? {
-            realPath: path.join(hanakoHome, "published.png"),
+            realPath: path.join(agentryHome, "published.png"),
             filename: "published.png",
             mime: "image/png",
             size: 4,
@@ -233,7 +233,7 @@ describe("bridge send-media route", () => {
         },
       },
     });
-    const filePath = path.join(hanakoHome, "published.png");
+    const filePath = path.join(agentryHome, "published.png");
     fs.writeFileSync(filePath, Buffer.from([0x89, 0x50, 0x4E, 0x47]));
 
     const res = await app.request("/api/bridge/media/token_123");

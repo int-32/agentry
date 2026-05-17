@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 
-const DEFAULT_NAME = 'Hanako';
+const DEFAULT_NAME = 'Agentry';
 const YUAN_AVATARS: Record<string, string> = {
   hanako: 'Hanako.png',
   butter: 'Butter.png',

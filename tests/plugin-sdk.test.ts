@@ -7,8 +7,8 @@ import {
   PLUGIN_UI_CAPABILITY,
   PLUGIN_UI_PROTOCOL,
   PLUGIN_UI_PROTOCOL_VERSION,
-} from '@hana/plugin-protocol';
-import { createHanaPluginSdk, HanaPluginError } from '@hana/plugin-sdk';
+} from '@agentry/plugin-protocol';
+import { createHanaPluginSdk, AgentryPluginError } from '@agentry/plugin-sdk';
 
 function makeParentWindow() {
   return { postMessage: vi.fn() } as unknown as Window & { postMessage: ReturnType<typeof vi.fn> };
@@ -102,7 +102,7 @@ describe('plugin SDK', () => {
     await expect(pending).resolves.toEqual({ ok: true });
   });
 
-  it('rejects host request errors with a typed HanaPluginError', async () => {
+  it('rejects host request errors with a typed AgentryPluginError', async () => {
     const parentWindow = makeParentWindow();
     const sdk = createHanaPluginSdk({
       parentWindow,
@@ -131,11 +131,11 @@ describe('plugin SDK', () => {
     }));
 
     await expect(pending).rejects.toMatchObject({
-      name: 'HanaPluginError',
+      name: 'AgentryPluginError',
       code: 'CAPABILITY_DENIED',
       message: 'Capability denied.',
       details: { capability: 'external.open' },
-    } satisfies Partial<HanaPluginError>);
+    } satisfies Partial<AgentryPluginError>);
   });
 
   it('wraps toast.show as a typed host request helper', async () => {

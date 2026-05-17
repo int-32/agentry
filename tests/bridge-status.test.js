@@ -33,7 +33,7 @@ describe("BridgeManager platform status", () => {
     createWechatAdapter.mockReturnValue({ stop: vi.fn() });
 
     const engine = {
-      hanakoHome: os.tmpdir(),
+      agentryHome: os.tmpdir(),
       agent: null,
       getAgent: vi.fn(() => null),
     };

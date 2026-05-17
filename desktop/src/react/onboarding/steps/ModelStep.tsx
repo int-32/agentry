@@ -8,12 +8,12 @@ import type { SelectOption } from '@/ui';
 import { Toggle } from '../../settings/widgets/Toggle';
 import { lookupReferenceModelMeta } from '../../utils/model-metadata';
 import { loadModels as loadModelsAction, saveModel as saveModelAction } from '../onboarding-actions';
-import type { AddedModelEntry, AddedModelObject, DiscoveredModel, HanaFetch } from '../onboarding-actions';
+import type { AddedModelEntry, AddedModelObject, DiscoveredModel, AgentryFetch } from '../onboarding-actions';
 import { StepContainer } from '../onboarding-ui';
 
 interface ModelStepProps {
   preview: boolean;
-  hanaFetch: HanaFetch;
+  hanaFetch: AgentryFetch;
   providerName: string;
   providerUrl: string;
   providerApi: string;

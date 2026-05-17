@@ -8,15 +8,111 @@
  */
 
 import { Hono } from "hono";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { scanAllAgentCliS, getModelsForCli, KNOWN_AGENT_CLIS } from "../../lib/local-cli/detector.js";
 
-export function createLocalCliRoute() {
+export const LOCAL_CLI_SCAN_CACHE_FILE = "local-cli-scan-cache.json";
+export const DEFAULT_LOCAL_CLI_SCAN_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
+
+function boolQuery(value) {
+  return value === "1" || value === "true" || value === "yes";
+}
+
+function localCliScanCachePath(agentryHome) {
+  if (!agentryHome || typeof agentryHome !== "string") return null;
+  return path.join(agentryHome, "user", LOCAL_CLI_SCAN_CACHE_FILE);
+}
+
+function readLocalCliScanCache(agentryHome) {
+  const cachePath = localCliScanCachePath(agentryHome);
+  if (!cachePath) return null;
+  try {
+    const raw = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
+    if (!Array.isArray(raw?.clis)) return null;
+    return {
+      scannedAt: typeof raw.scannedAt === "string" ? raw.scannedAt : null,
+      clis: raw.clis,
+    };
+  } catch (err) {
+    if (err?.code !== "ENOENT") {
+      console.warn(`[local-cli] failed to read scan cache: ${err.message}`);
+    }
+    return null;
+  }
+}
+
+function writeLocalCliScanCache(agentryHome, clis, scannedAt) {
+  const cachePath = localCliScanCachePath(agentryHome);
+  if (!cachePath) return;
+  try {
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    const tmp = `${cachePath}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify({
+      schemaVersion: 1,
+      scannedAt,
+      clis,
+    }, null, 2) + os.EOL, "utf-8");
+    fs.renameSync(tmp, cachePath);
+  } catch (err) {
+    console.warn(`[local-cli] failed to write scan cache: ${err.message}`);
+  }
+}
+
+function isCacheStale(entry, maxAgeMs = DEFAULT_LOCAL_CLI_SCAN_CACHE_MAX_AGE_MS, now = Date.now()) {
+  if (!entry?.scannedAt) return true;
+  const scannedAtMs = Date.parse(entry.scannedAt);
+  if (!Number.isFinite(scannedAtMs)) return true;
+  return now - scannedAtMs > maxAgeMs;
+}
+
+export function createLocalCliRoute({ agentryHome } = {}) {
   const route = new Hono();
 
   route.get("/local-cli/scan", async (c) => {
     try {
+      const forceRefresh = boolQuery(c.req.query("refresh")) || boolQuery(c.req.query("force"));
+      const cacheOnly = boolQuery(c.req.query("cached")) || c.req.query("mode") === "cached";
+      const maxAgeParam = Number(c.req.query("maxAgeMs"));
+      const maxAgeMs = Number.isFinite(maxAgeParam) && maxAgeParam >= 0
+        ? maxAgeParam
+        : DEFAULT_LOCAL_CLI_SCAN_CACHE_MAX_AGE_MS;
+      const cache = readLocalCliScanCache(agentryHome);
+
+      if (!forceRefresh && cache) {
+        const stale = isCacheStale(cache, maxAgeMs);
+        if (cacheOnly || !stale) {
+          return c.json({
+            ok: true,
+            clis: cache.clis,
+            cached: true,
+            stale,
+            scannedAt: cache.scannedAt,
+          });
+        }
+      }
+
+      if (cacheOnly) {
+        return c.json({
+          ok: true,
+          clis: [],
+          cached: false,
+          stale: true,
+          scannedAt: null,
+        });
+      }
+
       const cliS = await scanAllAgentCliS();
-      return c.json({ ok: true, clis: cliS });
+      const scannedAt = new Date().toISOString();
+      writeLocalCliScanCache(agentryHome, cliS, scannedAt);
+      return c.json({
+        ok: true,
+        clis: cliS,
+        cached: false,
+        stale: false,
+        scannedAt,
+      });
     } catch (err) {
       return c.json({ ok: false, error: String(err?.message || err) }, 500);
     }

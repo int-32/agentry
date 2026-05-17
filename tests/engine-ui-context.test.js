@@ -1,19 +1,19 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { HanaEngine } from "../core/engine.js";
+import { AgentryEngine } from "../core/engine.js";
 
 /**
  * 轻量测试：只校验 setUiContext / getUiContext 的 Map 行为。
- * 不实例化 HanaEngine（依赖过多），用原型方法 + 手工 fake this 测试。
+ * 不实例化 AgentryEngine（依赖过多），用原型方法 + 手工 fake this 测试。
  */
 
 function makeFakeEngine() {
   const fake = { _uiContextBySession: new Map() };
-  fake.setUiContext = HanaEngine.prototype.setUiContext;
-  fake.getUiContext = HanaEngine.prototype.getUiContext;
+  fake.setUiContext = AgentryEngine.prototype.setUiContext;
+  fake.getUiContext = AgentryEngine.prototype.getUiContext;
   return fake;
 }
 
-describe("HanaEngine uiContext", () => {
+describe("AgentryEngine uiContext", () => {
   let engine;
 
   beforeEach(() => {

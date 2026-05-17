@@ -48,7 +48,7 @@ function writeAgentFixture(memoryEnabled) {
     path.join(agentDir, "config.yaml"),
     [
       "agent:",
-      "  name: Hana",
+      "  name: Agentry",
       "  yuan: hanako",
       "memory:",
       `  enabled: ${memoryEnabled ? "true" : "false"}`,
@@ -154,7 +154,7 @@ describe("ChannelRouter memory master fallback", () => {
     writeAgentConfig(paths.agentsDir, "butter", "Butter");
     writeAgentConfig(paths.agentsDir, "ming", "Ming");
     const router = makeRouter(paths);
-    callTextMock.mockResolvedValue("Butter 提出先清洗摘要；Ming 补充了校验点；Hana 负责整理。");
+    callTextMock.mockResolvedValue("Butter 提出先清洗摘要；Ming 补充了校验点；Agentry 负责整理。");
 
     await router._memorySummarize("hana", "crew", {
       messages: [
@@ -171,7 +171,7 @@ describe("ChannelRouter memory master fallback", () => {
     expect(request.messages[0].content).toContain("黎: 请把摘要洗干净。");
     expect(request.messages[0].content).toContain("Butter: 先把摘要洗干净。");
     expect(request.messages[0].content).toContain("Ming: 还要补一个测试。");
-    expect(request.messages[0].content).toContain("[我的回复] Hana: 我来整理这条链路。");
+    expect(request.messages[0].content).toContain("[我的回复] Agentry: 我来整理这条链路。");
     expect(request.messages[0].content).not.toContain("user:");
     expect(request.messages[0].content).not.toContain("butter:");
     expect(request.messages[0].content).not.toContain("ming:");
@@ -184,7 +184,7 @@ describe("ChannelRouter memory master fallback", () => {
       { id: 3, fact: "[#general] butter: 旧摘要里还残留 sender id。" },
       { id: 5, fact: "[#general] 有人说要改摘要，但主语很乱。" },
     ]);
-    callTextMock.mockResolvedValue("Hana 确认频道摘要需要按角色行动记录。");
+    callTextMock.mockResolvedValue("Agentry 确认频道摘要需要按角色行动记录。");
 
     await router._memorySummarize("hana", "general", {
       messages: [{ sender: "user", timestamp: "2026-05-14 10:00:00", body: "摘要要写角色做了什么。" }],
@@ -197,7 +197,7 @@ describe("ChannelRouter memory master fallback", () => {
     expect(factDeleteMock).toHaveBeenCalledWith(3);
     expect(factDeleteMock).toHaveBeenCalledWith(5);
     expect(factAddMock).toHaveBeenCalledWith(expect.objectContaining({
-      fact: "[#general] Hana 确认频道摘要需要按角色行动记录。",
+      fact: "[#general] Agentry 确认频道摘要需要按角色行动记录。",
       session_id: "channel-general",
     }));
   });

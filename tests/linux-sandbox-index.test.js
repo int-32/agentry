@@ -38,7 +38,7 @@ describe("createSandboxedTools on Linux", () => {
       agentDir: "/hana/agents/hana",
       workspace: "/work",
       workspaceFolders: [],
-      hanakoHome: "/hana",
+      agentryHome: "/hana",
       getSandboxEnabled: () => true,
     });
 
@@ -55,7 +55,7 @@ describe("createSandboxedTools on Linux", () => {
       agentDir: "/hana/agents/hana",
       workspace: "/work",
       workspaceFolders: [],
-      hanakoHome: "/hana",
+      agentryHome: "/hana",
       getSandboxEnabled: () => false,
     });
 

@@ -6,7 +6,7 @@ describe("channel mention extraction", () => {
     const agents = [
       { id: "yui", name: "Yui" },
       { id: "yui-ray", name: "Yui Ray" },
-      { id: "hana", name: "Hana" },
+      { id: "hana", name: "Agentry" },
     ];
 
     expect(extractMentionedAgentIds("@Yui Ray 你看看", {
@@ -17,11 +17,11 @@ describe("channel mention extraction", () => {
 
   it("does not resolve ambiguous display-name mentions by list order", () => {
     const agents = [
-      { id: "hana-a", name: "Hana" },
-      { id: "hana-b", name: "Hana" },
+      { id: "hana-a", name: "Agentry" },
+      { id: "hana-b", name: "Agentry" },
     ];
 
-    expect(extractMentionedAgentIds("@Hana 看看", {
+    expect(extractMentionedAgentIds("@Agentry 看看", {
       channelMembers: ["hana-a", "hana-b"],
       agents,
     })).toEqual([]);

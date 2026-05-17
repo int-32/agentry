@@ -1,19 +1,21 @@
 <p align="center">
-  <img src=".github/assets/banner.jpg" width="100%" alt="OpenHanako Banner">
+  <img src=".github/assets/banner.jpg" width="100%" alt="Agentry Banner">
 </p>
 
 <p align="center">
-  <img src=".github/assets/Hanako-280.png" width="80" alt="Hanako">
+  <img src=".github/assets/Hanako-280.png" width="80" alt="Agentry">
 </p>
 
-<h1 align="center">OpenHanako</h1>
+<h1 align="center">Agentry</h1>
 
 <p align="center">A personal AI agent with memory and soul</p>
+
+<p align="center"><sub>Forked from <a href="https://github.com/liliMozi/openhanako">OpenHanako</a> (by liliMozi), maintained by int-32</sub></p>
 
 <p align="center"><a href="README.md">中文版</a></p>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/liliMozi/openhanako/releases)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/int-32/agentry/releases)
 
 ---
 
@@ -62,15 +64,15 @@ As a tool, it is powerful: it remembers everything you've said, operates your co
 
 ### Download
 
-**macOS (Apple Silicon / Intel):** download the latest `.dmg` from [Releases](https://github.com/liliMozi/openhanako/releases).
+**macOS (Apple Silicon / Intel):** download the latest `.dmg` from [Releases](https://github.com/int-32/agentry/releases).
 
 The app is signed and notarized with an Apple Developer ID. macOS should allow it to launch directly.
 
-**Windows:** download the latest `.exe` installer from [Releases](https://github.com/liliMozi/openhanako/releases).
+**Windows:** download the latest `.exe` installer from [Releases](https://github.com/int-32/agentry/releases).
 
 > **Windows SmartScreen notice:** The installer is not yet code-signed. Windows Defender SmartScreen may show a warning on first run. Click **More info** → **Run anyway**. This is expected for unsigned builds.
 
-**Linux:** download the latest `.AppImage` or `.deb` from [Releases](https://github.com/liliMozi/openhanako/releases).
+**Linux:** download the latest `.AppImage` or `.deb` from [Releases](https://github.com/int-32/agentry/releases).
 
 ### First Run
 
@@ -94,7 +96,7 @@ tests/          Vitest test suite
 The engine layer coordinates multiple managers (Agent, Session, Model, Preferences, Skill, Channel, BridgeSession, Plugin, etc.) and exposes them through a unified facade. The Hub handles background tasks (heartbeat, cron, channel routing, agent messaging, DM routing) independently of the active chat session.
 
 The server runs as a standalone Node.js process (spawned by Electron or independently), bundled via Vite with @vercel/nft for dependency tracing. It communicates with the Electron renderer through WebSocket.
-User data is rooted at `HANA_HOME` (`~/.hanako` in production, `~/.hanako-dev` in development). The Pi SDK's own data is isolated under `${HANA_HOME}/.pi/`.
+User data is rooted at `AGENTRY_HOME` (`~/.agentry` in production, `~/.agentry-dev` in development). Legacy `HANA_HOME` still works as fallback, and old `~/.hanako/` data is auto-migrated to the new location on first run. The Pi SDK's own data is isolated under `${AGENTRY_HOME}/.pi/`.
 
 ## Tech Stack
 
@@ -144,9 +146,8 @@ npm run typecheck
 
 ## Links
 
-- [Homepage](https://openhanako.com)
-- [Report an Issue](https://github.com/liliMozi/openhanako/issues)
-- [Security](https://github.com/liliMozi/openhanako/security)
+- [Report an Issue](https://github.com/int-32/agentry/issues)
+- [Security](https://github.com/int-32/agentry/security)
 - [Security Policy](SECURITY.md)
 - [Plugin Development](PLUGINS.md)
 - [Contributing](CONTRIBUTING.md)

@@ -28,7 +28,7 @@ describe("current_status tool", () => {
     const tool = createCurrentStatusTool({
       now: () => new Date("2026-05-03T19:30:00.000Z"),
       getTimezone: () => "Asia/Shanghai",
-      getAgent: () => ({ id: "hana", agentName: "Hana" }),
+      getAgent: () => ({ id: "hana", agentName: "Agentry" }),
       getSessionModel: () => ({ id: "claude-sonnet-4-5", provider: "anthropic", name: "Claude Sonnet 4.5" }),
     });
 
@@ -45,7 +45,7 @@ describe("current_status tool", () => {
     ]);
     expect(payload.usage).toContain("list");
     expect(payload.usage).toContain("get");
-    expect(JSON.stringify(payload)).not.toContain("Hana");
+    expect(JSON.stringify(payload)).not.toContain("Agentry");
     expect(JSON.stringify(payload)).not.toContain("claude-sonnet-4-5");
     expect(JSON.stringify(payload)).not.toContain("2026-05-03T19:30:00.000Z");
   });
@@ -54,7 +54,7 @@ describe("current_status tool", () => {
     const tool = createCurrentStatusTool({
       now: () => new Date("2026-05-03T19:30:00.000Z"),
       getTimezone: () => "Asia/Shanghai",
-      getAgent: () => ({ id: "hana", agentName: "Hana" }),
+      getAgent: () => ({ id: "hana", agentName: "Agentry" }),
       getSessionModel: () => ({ id: "claude-sonnet-4-5", provider: "anthropic", name: "Claude Sonnet 4.5" }),
     });
 
@@ -68,7 +68,7 @@ describe("current_status tool", () => {
         utcOffset: "+08:00",
       },
     });
-    expect(JSON.stringify(payload)).not.toContain("Hana");
+    expect(JSON.stringify(payload)).not.toContain("Agentry");
     expect(JSON.stringify(payload)).not.toContain("claude-sonnet-4-5");
   });
 
@@ -91,7 +91,7 @@ describe("current_status tool", () => {
 
   it("returns only agent fields for get agent", async () => {
     const tool = createCurrentStatusTool({
-      getAgent: () => ({ id: "hana", agentName: "Hana" }),
+      getAgent: () => ({ id: "hana", agentName: "Agentry" }),
       now: () => new Date("2026-05-03T19:30:00.000Z"),
     });
 
@@ -100,7 +100,7 @@ describe("current_status tool", () => {
     expect(payload).toEqual({
       agent: {
         id: "hana",
-        name: "Hana",
+        name: "Agentry",
       },
     });
   });

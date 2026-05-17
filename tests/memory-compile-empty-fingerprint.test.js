@@ -304,7 +304,7 @@ describe("compiled section formatting", () => {
     const memoryPath = path.join(tmpDir, "memory.md");
     fs.writeFileSync(factsPath, "[\"用户喜欢清晰边界\"]", "utf-8");
     fs.writeFileSync(todayPath, "# 今天概要\n\n用户关注记忆系统。", "utf-8");
-    fs.writeFileSync(weekPath, "# 本周主题概要\n\n用户持续关注 Project Hana。", "utf-8");
+    fs.writeFileSync(weekPath, "# 本周主题概要\n\n用户持续关注 Project Agentry。", "utf-8");
     fs.writeFileSync(longtermPath, "# 长期背景记录\n\n## 偏好\n\n用户偏好沉静 UI。", "utf-8");
 
     assemble(factsPath, todayPath, weekPath, longtermPath, memoryPath);
@@ -312,7 +312,7 @@ describe("compiled section formatting", () => {
     const output = fs.readFileSync(memoryPath, "utf-8");
     expect(output).toContain("## 重要事实\n\n- 用户喜欢清晰边界");
     expect(output).toContain("## 今天\n\n用户关注记忆系统。");
-    expect(output).toContain("## 本周早些时候\n\n用户持续关注 Project Hana。");
+    expect(output).toContain("## 本周早些时候\n\n用户持续关注 Project Agentry。");
     expect(output).toContain("## 长期情况\n\n用户偏好沉静 UI。");
     expect(output).not.toContain("# 本周主题概要");
     expect(output).not.toContain("# 长期背景记录");

@@ -5,7 +5,7 @@ import { emitSessionShutdown } from "../lib/pi-sdk/index.js";
  *
  * 顺序契约：
  *   1. emit session_shutdown
- *   2. 调用 Hanako 层 unsub
+ *   2. 调用 Agentry 层 unsub
  *   3. 调用 session.dispose()
  *
  * 任一步失败都只 warn，不阻断后续清理。

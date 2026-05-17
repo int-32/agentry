@@ -60,7 +60,7 @@ describe('ArchivedSessionsModal', () => {
         archivedAt: new Date(Date.now() - 2 * 86400_000).toISOString(),
         sizeBytes: 1024 * 1024,
         agentId: 'a',
-        agentName: 'Hana',
+        agentName: 'Agentry',
       },
       {
         path: '/x/b.jsonl',
@@ -93,7 +93,7 @@ describe('ArchivedSessionsModal', () => {
         archivedAt: new Date().toISOString(),
         sizeBytes: 100,
         agentId: 'a',
-        agentName: 'Hana',
+        agentName: 'Agentry',
       },
     ]);
     restoreMock.mockResolvedValue('ok');
@@ -113,7 +113,7 @@ describe('ArchivedSessionsModal', () => {
         archivedAt: new Date().toISOString(),
         sizeBytes: 100,
         agentId: 'a',
-        agentName: 'Hana',
+        agentName: 'Agentry',
       },
     ]);
     window.confirm = vi.fn(() => false);
@@ -131,7 +131,7 @@ describe('ArchivedSessionsModal', () => {
         archivedAt: new Date().toISOString(),
         sizeBytes: 100,
         agentId: 'a',
-        agentName: 'Hana',
+        agentName: 'Agentry',
       },
     ]);
     restoreMock.mockResolvedValue('conflict');
@@ -152,7 +152,7 @@ describe('ArchivedSessionsModal', () => {
         archivedAt: new Date(Date.now() - 40 * 86400_000).toISOString(),
         sizeBytes: 100,
         agentId: 'a',
-        agentName: 'Hana',
+        agentName: 'Agentry',
       },
     ]);
     cleanupMock.mockResolvedValue({ deleted: 1 });
@@ -171,7 +171,7 @@ describe('ArchivedSessionsModal', () => {
         archivedAt: new Date().toISOString(),
         sizeBytes: 100,
         agentId: 'a',
-        agentName: 'Hana',
+        agentName: 'Agentry',
       },
     ]);
     window.confirm = vi.fn(() => true);
@@ -190,7 +190,7 @@ describe('ArchivedSessionsModal', () => {
         archivedAt: new Date().toISOString(),
         sizeBytes: 100,
         agentId: 'a',
-        agentName: 'Hana',
+        agentName: 'Agentry',
       },
     ]);
     deleteMock.mockResolvedValue(true);

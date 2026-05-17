@@ -5,12 +5,12 @@
 import { AGENT_ID } from './constants';
 import { DEFAULT_HEARTBEAT_INTERVAL_MINUTES } from '../../../../shared/default-workspace-constants.js';
 
-export type HanaFetch = (path: string, opts?: RequestInit) => Promise<Response>;
+export type AgentryFetch = (path: string, opts?: RequestInit) => Promise<Response>;
 
 // ── Test connection ──
 
 interface TestConnectionParams {
-  hanaFetch: HanaFetch;
+  hanaFetch: AgentryFetch;
   providerUrl: string;
   providerApi: string;
   apiKey: string;
@@ -41,7 +41,7 @@ export async function testConnection({ hanaFetch, providerUrl, providerApi, apiK
 // ── Save provider ──
 
 interface SaveProviderParams {
-  hanaFetch: HanaFetch;
+  hanaFetch: AgentryFetch;
   providerName: string;
   providerUrl: string;
   apiKey: string;
@@ -68,7 +68,7 @@ export async function saveProvider({ hanaFetch, providerName, providerUrl, apiKe
 // ── Load models ──
 
 interface LoadModelsParams {
-  hanaFetch: HanaFetch;
+  hanaFetch: AgentryFetch;
   providerName: string;
   providerUrl: string;
   providerApi: string;
@@ -119,7 +119,7 @@ export interface AddedModelObject {
 export type AddedModelEntry = string | AddedModelObject;
 
 interface SaveModelParams {
-  hanaFetch: HanaFetch;
+  hanaFetch: AgentryFetch;
   selectedModel: string;
   providerName: string;
   addedModels: AddedModelEntry[];
@@ -172,7 +172,7 @@ export async function saveModel({ hanaFetch, selectedModel, providerName, addedM
 
 // ── Save locale ──
 
-export async function saveLocale(hanaFetch: HanaFetch, locale: string): Promise<void> {
+export async function saveLocale(hanaFetch: AgentryFetch, locale: string): Promise<void> {
   await hanaFetch(`/api/agents/${AGENT_ID}/config`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -182,7 +182,7 @@ export async function saveLocale(hanaFetch: HanaFetch, locale: string): Promise<
 
 // ── Save user name ──
 
-export async function saveUserName(hanaFetch: HanaFetch, name: string): Promise<void> {
+export async function saveUserName(hanaFetch: AgentryFetch, name: string): Promise<void> {
   await hanaFetch(`/api/agents/${AGENT_ID}/config`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -192,14 +192,14 @@ export async function saveUserName(hanaFetch: HanaFetch, name: string): Promise<
 
 // ── Workspace ──
 
-export async function loadDefaultWorkspace(hanaFetch: HanaFetch): Promise<string> {
+export async function loadDefaultWorkspace(hanaFetch: AgentryFetch): Promise<string> {
   const res = await hanaFetch('/api/config/default-workspace');
   const data = await res.json();
   if (data.error) throw new Error(data.error);
   return data.path || '';
 }
 
-async function ensureDefaultWorkspace(hanaFetch: HanaFetch): Promise<string> {
+async function ensureDefaultWorkspace(hanaFetch: AgentryFetch): Promise<string> {
   const res = await hanaFetch('/api/config/default-workspace', { method: 'POST' });
   const data = await res.json();
   if (data.error) throw new Error(data.error);
@@ -207,7 +207,7 @@ async function ensureDefaultWorkspace(hanaFetch: HanaFetch): Promise<string> {
 }
 
 interface SaveWorkspaceParams {
-  hanaFetch: HanaFetch;
+  hanaFetch: AgentryFetch;
   workspacePath: string;
   defaultPath: string;
 }

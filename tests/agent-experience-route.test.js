@@ -15,7 +15,7 @@ describe("agents route: experience toggle", () => {
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hana-experience-route-"));
     agentDir = path.join(tempRoot, agentId);
     fs.mkdirSync(path.join(agentDir, "experience"), { recursive: true });
-    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Hana\n", "utf-8");
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
     fs.writeFileSync(
       path.join(agentDir, "experience", "workflow.md"),
       "<!-- experience-title: d29ya2Zsb3c -->\n1. Keep context boundaries explicit.\n",

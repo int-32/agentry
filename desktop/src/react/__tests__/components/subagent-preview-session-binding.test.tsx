@@ -52,7 +52,7 @@ describe('SubagentSessionPreview session binding', () => {
       currentSessionPath: '/session/current',
       userName: 'USER SELF',
       userAvatarUrl: '/mock-user-avatar.png',
-      agentName: 'Hanako',
+      agentName: 'Agentry',
       agentYuan: 'hanako',
       agents: [
         { id: 'butter', name: 'butter', yuan: 'neko', hasAvatar: false },
@@ -174,7 +174,7 @@ describe('SubagentSessionPreview session binding', () => {
     );
 
     expect(screen.getByText('butter')).toBeTruthy();
-    expect(screen.queryByText('Hanako')).toBeNull();
+    expect(screen.queryByText('Agentry')).toBeNull();
   });
 
   it('运行中的空壳 session 会持续重试，直到首条会话内容出现', async () => {

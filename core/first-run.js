@@ -18,16 +18,16 @@ import {
 
 /**
  * 确保 ~/.hanako/ 数据目录就绪
- * @param {string} hanakoHome - ~/.hanako 绝对路径
+ * @param {string} agentryHome - ~/.hanako 绝对路径
  * @param {string} productDir - 产品模板目录（lib/）
  */
-export function ensureFirstRun(hanakoHome, productDir) {
+export function ensureFirstRun(agentryHome, productDir) {
   // 1. 确保目录结构存在
-  fs.mkdirSync(path.join(hanakoHome, "agents"), { recursive: true });
-  fs.mkdirSync(path.join(hanakoHome, "user"), { recursive: true });
+  fs.mkdirSync(path.join(agentryHome, "agents"), { recursive: true });
+  fs.mkdirSync(path.join(agentryHome, "user"), { recursive: true });
 
   // 2. 如果 agents/ 没有任何 agent → 播种默认 agent
-  const agentsDir = path.join(hanakoHome, "agents");
+  const agentsDir = path.join(agentryHome, "agents");
   const hasAgent = fs.readdirSync(agentsDir, { withFileTypes: true }).some(entry => {
     return entry.isDirectory() && !entry.name.startsWith('.');
   });
@@ -39,7 +39,7 @@ export function ensureFirstRun(hanakoHome, productDir) {
 
   // 3. 同步 skills：从 skills2set/ 复制到 ~/.hanako/skills/
   const skillsSrc = path.join(productDir, "..", "skills2set");
-  const skillsDst = path.join(hanakoHome, "skills");
+  const skillsDst = path.join(agentryHome, "skills");
   fs.mkdirSync(skillsDst, { recursive: true });
   if (fs.existsSync(skillsSrc)) {
     syncSkills(skillsSrc, skillsDst);
@@ -47,7 +47,7 @@ export function ensureFirstRun(hanakoHome, productDir) {
 
   // 4. 确保可选文件存在（老用户升级 + 新 agent 都覆盖）
   const touchIfMissing = (p) => { if (!fs.existsSync(p)) fs.writeFileSync(p, '', 'utf-8'); };
-  touchIfMissing(path.join(hanakoHome, 'user', 'user.md'));
+  touchIfMissing(path.join(agentryHome, 'user', 'user.md'));
   const agents = fs.readdirSync(agentsDir, { withFileTypes: true });
   for (const entry of agents) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
@@ -55,7 +55,7 @@ export function ensureFirstRun(hanakoHome, productDir) {
   }
 
   // 5. 确保 user/preferences.json 存在
-  const prefsPath = path.join(hanakoHome, "user", "preferences.json");
+  const prefsPath = path.join(agentryHome, "user", "preferences.json");
   if (!fs.existsSync(prefsPath)) {
     fs.writeFileSync(
       prefsPath,

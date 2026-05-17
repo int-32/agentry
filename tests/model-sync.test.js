@@ -529,7 +529,7 @@ describe("syncModels", () => {
     expect(model.input).toEqual(["text"]);
   });
 
-  it("projects explicit video capability into Hana compat and keeps Pi input schema-compatible", async () => {
+  it("projects explicit video capability into Agentry compat and keeps Pi input schema-compatible", async () => {
     const syncModels = await loadSync();
 
     const providers = {
@@ -555,7 +555,7 @@ describe("syncModels", () => {
     ]);
   });
 
-  it("projects known video-capable models into Hana compat without invalid Pi input", async () => {
+  it("projects known video-capable models into Agentry compat without invalid Pi input", async () => {
     const syncModels = await loadSync();
 
     const providers = {
@@ -574,7 +574,7 @@ describe("syncModels", () => {
     expect(result.providers.dashscope.models[0].compat.hanaVideoInput).toBe(true);
   });
 
-  it("projects Moonshot Kimi official video capability into Hana compat", async () => {
+  it("projects Moonshot Kimi official video capability into Agentry compat", async () => {
     const syncModels = await loadSync();
 
     const providers = {
@@ -663,7 +663,7 @@ describe("syncModels", () => {
     });
   });
 
-  it("writes Pi-loadable models when Hana video capability is enabled", async () => {
+  it("writes Pi-loadable models when Agentry video capability is enabled", async () => {
     const syncModels = await loadSync();
     const { AuthStorage, createModelRegistry } = await import("../lib/pi-sdk/index.js");
 
@@ -884,7 +884,7 @@ describe("syncModels", () => {
       "",
     ].join("\n"), "utf-8");
 
-    const mm = new ModelManager({ hanakoHome: tmpDir });
+    const mm = new ModelManager({ agentryHome: tmpDir });
     mm._modelRegistry = {
       refresh: vi.fn(),
       getAvailable: vi.fn().mockResolvedValue([{ id: "llama3", provider: "ollama" }]),
@@ -915,7 +915,7 @@ describe("syncModels", () => {
       "",
     ].join("\n"), "utf-8");
 
-    const mm = new ModelManager({ hanakoHome: tmpDir });
+    const mm = new ModelManager({ agentryHome: tmpDir });
     mm._modelRegistry = {
       refresh: vi.fn(),
       getAvailable: vi.fn().mockResolvedValue([

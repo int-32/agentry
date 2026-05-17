@@ -55,12 +55,12 @@ describe("createWin32Exec", () => {
 
   it("routes simple Git commands through bundled git.exe without bash", async () => {
     classifyWin32Command.mockReturnValue({ runner: "git", reason: "git-command" });
-    const gitExe = "C:\\Hanako\\resources\\git\\cmd\\git.exe";
+    const gitExe = "C:\\Agentry\\resources\\git\\cmd\\git.exe";
     existsSync.mockImplementation((p) => p === gitExe);
 
     const originalResourcesPath = process.resourcesPath;
     Object.defineProperty(process, "resourcesPath", {
-      value: "C:\\Hanako\\resources",
+      value: "C:\\Agentry\\resources",
       configurable: true,
     });
 
@@ -90,13 +90,13 @@ describe("createWin32Exec", () => {
 
   it("routes sandboxed simple Git commands through bundled git.exe via the helper", async () => {
     classifyWin32Command.mockReturnValue({ runner: "git", reason: "git-command" });
-    const gitExe = "C:\\Hanako\\resources\\git\\cmd\\git.exe";
-    const helper = "C:\\Hanako\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
+    const gitExe = "C:\\Agentry\\resources\\git\\cmd\\git.exe";
+    const helper = "C:\\Agentry\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
     existsSync.mockImplementation((p) => p === gitExe || p === helper);
 
     const originalResourcesPath = process.resourcesPath;
     Object.defineProperty(process, "resourcesPath", {
-      value: "C:\\Hanako\\resources",
+      value: "C:\\Agentry\\resources",
       configurable: true,
     });
 
@@ -129,7 +129,7 @@ describe("createWin32Exec", () => {
       helper,
       expect.arrayContaining([
         "--grant-read-optional",
-        "C:\\Hanako\\resources\\git",
+        "C:\\Agentry\\resources\\git",
         "--",
         gitExe,
         "status",
@@ -143,7 +143,7 @@ describe("createWin32Exec", () => {
     classifyWin32Command.mockReturnValue({ runner: "python", reason: "python-command" });
     const pythonExe = "C:\\Users\\Me\\AppData\\Local\\Programs\\Python\\Python311\\python.exe";
     const pythonRoot = "C:\\Users\\Me\\AppData\\Local\\Programs\\Python\\Python311";
-    const helper = "C:\\Hanako\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
+    const helper = "C:\\Agentry\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
     existsSync.mockImplementation((p) => p === pythonExe || p === pythonRoot || p === helper);
     spawnSync.mockImplementation((cmd, args) => {
       if (cmd === "where" && args?.[0] === "python") {
@@ -193,9 +193,9 @@ describe("createWin32Exec", () => {
 
   it("routes sandboxed simple Node commands through the current Node runtime via the helper", async () => {
     classifyWin32Command.mockReturnValue({ runner: "node", reason: "node-command" });
-    const nodeExe = "C:\\Hanako\\resources\\server\\hana-server.exe";
-    const nodeRoot = "C:\\Hanako\\resources\\server";
-    const helper = "C:\\Hanako\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
+    const nodeExe = "C:\\Agentry\\resources\\server\\hana-server.exe";
+    const nodeRoot = "C:\\Agentry\\resources\\server";
+    const helper = "C:\\Agentry\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
     existsSync.mockImplementation((p) => p === nodeExe || p === nodeRoot || p === helper);
 
     const originalExecPath = process.execPath;
@@ -253,7 +253,7 @@ describe("createWin32Exec", () => {
   it("rejects explicit Python executables outside the workspace when they are not on PATH", async () => {
     classifyWin32Command.mockReturnValue({ runner: "python", reason: "python-command" });
     const privatePython = "D:\\Secrets\\python.exe";
-    const helper = "C:\\Hanako\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
+    const helper = "C:\\Agentry\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
     existsSync.mockImplementation((p) => p === privatePython || p === helper);
     spawnSync.mockImplementation((cmd, args) => {
       if (cmd === "where" && args?.[0] === "python.exe") {
@@ -315,7 +315,7 @@ describe("createWin32Exec", () => {
 
   it("prefers bundled POSIX runtime over system Git Bash when sandbox is disabled", async () => {
     classifyWin32Command.mockReturnValue({ runner: "bash", reason: "complex-shell" });
-    const bundledShell = "C:\\Hanako\\resources\\git\\bin\\bash.exe";
+    const bundledShell = "C:\\Agentry\\resources\\git\\bin\\bash.exe";
     const systemBash = "C:\\Program Files\\Git\\bin\\bash.exe";
     existsSync.mockImplementation((p) => p === bundledShell || p === systemBash);
     spawnSync.mockImplementation((cmd, args) => {
@@ -330,7 +330,7 @@ describe("createWin32Exec", () => {
 
     const originalResourcesPath = process.resourcesPath;
     Object.defineProperty(process, "resourcesPath", {
-      value: "C:\\Hanako\\resources",
+      value: "C:\\Agentry\\resources",
       configurable: true,
     });
 
@@ -360,7 +360,7 @@ describe("createWin32Exec", () => {
       expect.objectContaining({
         cwd: "C:\\work",
         env: expect.objectContaining({
-          PATH: expect.stringMatching(/^C:\\Hanako\\resources\\git\\bin;C:\\Hanako\\resources\\git\\usr\\bin;C:\\Hanako\\resources\\git\\mingw64\\bin;C:\\Hanako\\resources\\git\\cmd;/),
+          PATH: expect.stringMatching(/^C:\\Agentry\\resources\\git\\bin;C:\\Agentry\\resources\\git\\usr\\bin;C:\\Agentry\\resources\\git\\mingw64\\bin;C:\\Agentry\\resources\\git\\cmd;/),
         }),
       })
     );
@@ -394,8 +394,8 @@ describe("createWin32Exec", () => {
 
   it("routes sandbox-enabled bash commands through the AppContainer helper with policy grants", async () => {
     classifyWin32Command.mockReturnValue({ runner: "bash", reason: "complex-shell" });
-    const bundledShell = "C:\\Hanako\\resources\\git\\bin\\bash.exe";
-    const helper = "C:\\Hanako\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
+    const bundledShell = "C:\\Agentry\\resources\\git\\bin\\bash.exe";
+    const helper = "C:\\Agentry\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
     existsSync.mockImplementation((p) => p === bundledShell || p === helper);
     spawnSync.mockImplementation((cmd, args) => {
       if (cmd === bundledShell && args?.[0] === "-lc") {
@@ -406,7 +406,7 @@ describe("createWin32Exec", () => {
 
     const originalResourcesPath = process.resourcesPath;
     Object.defineProperty(process, "resourcesPath", {
-      value: "C:\\Hanako\\resources",
+      value: "C:\\Agentry\\resources",
       configurable: true,
     });
 
@@ -416,9 +416,9 @@ describe("createWin32Exec", () => {
         helperPath: helper,
         grants: {
           readPaths: ["C:\\outside\\reference.md"],
-          optionalReadPaths: ["C:\\Users\\Hana\\.hanako\\agents\\hanako\\config.yaml"],
+          optionalReadPaths: ["C:\\Users\\Agentry\\.hanako\\agents\\hanako\\config.yaml"],
           writePaths: ["C:\\work"],
-          optionalWritePaths: ["C:\\Users\\Hana\\.hanako\\agents\\hanako\\memory"],
+          optionalWritePaths: ["C:\\Users\\Agentry\\.hanako\\agents\\hanako\\memory"],
         },
       },
     });
@@ -445,13 +445,13 @@ describe("createWin32Exec", () => {
         "--grant-read",
         "C:\\outside\\reference.md",
         "--grant-read-optional",
-        "C:\\Users\\Hana\\.hanako\\agents\\hanako\\config.yaml",
+        "C:\\Users\\Agentry\\.hanako\\agents\\hanako\\config.yaml",
         "--grant-write",
         "C:\\work",
         "--grant-write-optional",
-        "C:\\Users\\Hana\\.hanako\\agents\\hanako\\memory",
+        "C:\\Users\\Agentry\\.hanako\\agents\\hanako\\memory",
         "--grant-read-optional",
-        "C:\\Hanako\\resources\\git",
+        "C:\\Agentry\\resources\\git",
         "--",
         bundledShell,
         "-lc",
@@ -463,8 +463,8 @@ describe("createWin32Exec", () => {
 
   it("passes local-server AppContainer network grants to the helper when sandbox networking is enabled", async () => {
     classifyWin32Command.mockReturnValue({ runner: "bash", reason: "complex-shell" });
-    const bundledShell = "C:\\Hanako\\resources\\git\\bin\\bash.exe";
-    const helper = "C:\\Hanako\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
+    const bundledShell = "C:\\Agentry\\resources\\git\\bin\\bash.exe";
+    const helper = "C:\\Agentry\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
     existsSync.mockImplementation((p) => p === bundledShell || p === helper);
     spawnSync.mockImplementation((cmd, args) => {
       if (cmd === bundledShell && args?.[0] === "-lc") {
@@ -475,7 +475,7 @@ describe("createWin32Exec", () => {
 
     const originalResourcesPath = process.resourcesPath;
     Object.defineProperty(process, "resourcesPath", {
-      value: "C:\\Hanako\\resources",
+      value: "C:\\Agentry\\resources",
       configurable: true,
     });
 
@@ -528,7 +528,7 @@ describe("createWin32Exec", () => {
   it("does not fall back to system Git Bash for sandboxed POSIX commands", async () => {
     classifyWin32Command.mockReturnValue({ runner: "bash", reason: "complex-shell" });
     const systemBash = "C:\\Program Files\\Git\\bin\\bash.exe";
-    const helper = "C:\\Hanako\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
+    const helper = "C:\\Agentry\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
     existsSync.mockImplementation((p) => p === systemBash || p === helper);
     spawnSync.mockImplementation((cmd, args) => {
       if (cmd === systemBash && args?.[0] === "-c") {
@@ -539,7 +539,7 @@ describe("createWin32Exec", () => {
 
     const originalResourcesPath = process.resourcesPath;
     Object.defineProperty(process, "resourcesPath", {
-      value: "C:\\Hanako\\resources",
+      value: "C:\\Agentry\\resources",
       configurable: true,
     });
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { TOTAL_STEPS } from './constants';
-import type { HanaFetch } from './onboarding-actions';
+import type { AgentryFetch } from './onboarding-actions';
 import { LocaleStep } from './steps/LocaleStep';
 import { NameStep } from './steps/NameStep';
 import { ProviderStep } from './steps/ProviderStep';
@@ -36,7 +36,7 @@ export function OnboardingApp({ preview, skipToTutorial }: OnboardingAppProps) {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const localeLoadSeq = useRef(0);
 
-  const hanaFetch: HanaFetch = useCallback((path, opts = {}) => {
+  const hanaFetch: AgentryFetch = useCallback((path, opts = {}) => {
     if (!serverConnection) {
       throw new Error(`onboarding hanaFetch ${path}: server connection not ready`);
     }
@@ -87,7 +87,7 @@ export function OnboardingApp({ preview, skipToTutorial }: OnboardingAppProps) {
         setServerConnection(createLocalServerConnection({ serverPort: port, serverToken: token }));
         const splashInfo = await window.hana.getSplashInfo?.();
         const loc = splashInfo?.locale || 'zh-CN';
-        const name = splashInfo?.agentName || 'Hanako';
+        const name = splashInfo?.agentName || 'Agentry';
         setLocale(loc);
         await i18n.load(loc);
         i18n.defaultName = name;

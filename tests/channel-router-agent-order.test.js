@@ -31,7 +31,7 @@ describe("ChannelRouter agent order", () => {
     tmpDir = mktemp();
     const agentsDir = path.join(tmpDir, "agents");
     fs.mkdirSync(path.join(agentsDir, "hana"), { recursive: true });
-    fs.writeFileSync(path.join(agentsDir, "hana", "config.yaml"), "agent:\n  name: Hana\n", "utf-8");
+    fs.writeFileSync(path.join(agentsDir, "hana", "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
     fs.mkdirSync(path.join(agentsDir, "yui"), { recursive: true });
     fs.writeFileSync(path.join(agentsDir, "yui", "config.yaml"), "agent:\n  name: Yui\n", "utf-8");
     fs.writeFileSync(path.join(agentsDir, "yui", "channels.md"), "# 频道\n\n", "utf-8");

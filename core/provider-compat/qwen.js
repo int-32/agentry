@@ -3,7 +3,7 @@
  *
  * 处理 provider:
  *   - 任何 model.quirks 包含 "enable_thinking" 的模型（known-models.json 声明）
- *   - DashScope OpenAI-compatible 视频模型（Hana compat 声明 video，且 shared 层确认可走 video_url）
+ *   - DashScope OpenAI-compatible 视频模型（Agentry compat 声明 video，且 shared 层确认可走 video_url）
  *
  * 注：dashscope-coding 下托管的 Kimi 系列模型（kimi-k2 / kimi-k2.5）虽然不是 Qwen 模型，
  * 但通过阿里 dashscope 协议暴露，同样使用 enable_thinking 字段控制思考模式，故走本子模块。

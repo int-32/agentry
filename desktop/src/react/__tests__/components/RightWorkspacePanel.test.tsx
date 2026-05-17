@@ -40,8 +40,8 @@ const tMap: Record<string, string> = {
   'rightWorkspace.sessionFiles.actions.sendToBridgeEmpty': '没有可发送的 Bridge 会话',
   'rightWorkspace.sessionFiles.actions.sendToBridgeLoadFailed': 'Bridge 会话加载失败',
   'rightWorkspace.sessionFiles.bridgeLoadFailed': '加载 Bridge 会话失败：boom',
-  'rightWorkspace.sessionFiles.sendSuccess': '已发送到 Hana：飞书 · 小群',
-  'rightWorkspace.sessionFiles.sendFailed': '发送到 Hana：飞书 · 小群 失败：boom',
+  'rightWorkspace.sessionFiles.sendSuccess': '已发送到 Agentry：飞书 · 小群',
+  'rightWorkspace.sessionFiles.sendFailed': '发送到 Agentry：飞书 · 小群 失败：boom',
   'rightWorkspace.sessionFiles.list': '对话文件列表',
   'rightWorkspace.sessionFiles.sort.label': '对话文件排序',
   'rightWorkspace.sessionFiles.sort.timeDesc': '时间↓',
@@ -76,7 +76,7 @@ function resetStore(items: ChatListItem[] = []) {
     deskCurrentPath: '',
     deskFiles: [],
     deskJianContent: '',
-    agents: [{ id: 'hana', name: 'Hana', yuan: 'hanako', hasAvatar: false }],
+    agents: [{ id: 'hana', name: 'Agentry', yuan: 'hanako', hasAvatar: false }],
     currentAgentId: 'hana',
     selectedFolder: null,
     homeFolder: null,
@@ -489,7 +489,7 @@ describe('RightWorkspacePanel', () => {
     fireEvent.contextMenu(screen.getByTestId('session-file-row'), { clientX: 24, clientY: 48 });
 
     fireEvent.mouseEnter(screen.getByText('发送到...'));
-    fireEvent.click(await screen.findByText('Hana：飞书 · 小群'));
+    fireEvent.click(await screen.findByText('Agentry：飞书 · 小群'));
 
     await waitFor(() => {
       expect(sendBodies).toEqual([

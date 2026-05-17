@@ -15,6 +15,7 @@ import { SettingsSection } from "../../components/SettingsSection";
 const BRIDGE_BASE_URL = "http://127.0.0.1:51720/v1";
 const BRIDGE_API_KEY = "dummy";
 const BRIDGE_PROTOCOL = "openai-completions";
+const AUTO_REFRESH_AFTER_MS = 30 * 60 * 1000;
 
 interface CliInfo {
   id: string;
@@ -35,6 +36,41 @@ interface ModelInfo {
   reasoning: boolean;
 }
 
+interface CliScanResponse {
+  ok: boolean;
+  clis?: CliInfo[];
+  cached?: boolean;
+  stale?: boolean;
+  scannedAt?: string | null;
+  error?: string;
+}
+
+type SettingsModelEntry = string | { id?: unknown };
+type SettingsProvidersConfig = Record<string, { models?: SettingsModelEntry[] } | undefined>;
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function isStaleScan(scannedAt: string | null | undefined): boolean {
+  if (!scannedAt) return true;
+  const scannedAtMs = Date.parse(scannedAt);
+  if (!Number.isFinite(scannedAtMs)) return true;
+  return Date.now() - scannedAtMs > AUTO_REFRESH_AFTER_MS;
+}
+
+function formatScanTime(scannedAt: string | null): string | null {
+  if (!scannedAt) return null;
+  const date = new Date(scannedAt);
+  if (!Number.isFinite(date.getTime())) return null;
+  return date.toLocaleString(undefined, {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function LocalCliSection() {
   const { currentAgentId, settingsConfig, showToast } = useSettingsStore(
     useShallow(s => ({
@@ -47,17 +83,24 @@ export function LocalCliSection() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [models, setModels] = useState<Record<string, ModelInfo[]>>({});
   const [scanning, setScanning] = useState(false);
+  const [backgroundRefreshing, setBackgroundRefreshing] = useState(false);
+  const [lastScannedAt, setLastScannedAt] = useState<string | null>(null);
+  const [loadedFromCache, setLoadedFromCache] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
 
   // 已启用之模型清单：从 settingsConfig.providers[cli-<id>].models 派生
   const enabledByCli = React.useMemo(() => {
     const out: Record<string, Set<string>> = {};
-    const ps = (settingsConfig as any)?.providers || {};
+    const ps: SettingsProvidersConfig = (
+      settingsConfig && typeof settingsConfig === "object" && "providers" in settingsConfig
+        ? (settingsConfig as { providers?: SettingsProvidersConfig }).providers
+        : undefined
+    ) || {};
     for (const cli of (cliS || [])) {
       const pid = `cli-${cli.id}`;
       const cfg = ps[pid];
       const ids: string[] = Array.isArray(cfg?.models)
-        ? cfg.models.map((m: any) => typeof m === "string" ? m : (m?.id || ""))
+        ? cfg.models.map((m) => typeof m === "string" ? m : (typeof m?.id === "string" ? m.id : ""))
         : [];
       out[cli.id] = new Set(ids.filter(Boolean));
     }
@@ -92,8 +135,8 @@ export function LocalCliSection() {
     try {
       await writeCliModels(cliId, list.map(m => m.id));
       showToast?.(`已启用 ${list.length} 个模型`, "success");
-    } catch (err: any) {
-      showToast?.(`启用失败: ${err?.message || err}`, "error");
+    } catch (err: unknown) {
+      showToast?.(`启用失败: ${errorMessage(err)}`, "error");
     } finally {
       setPending(null);
     }
@@ -105,8 +148,8 @@ export function LocalCliSection() {
     try {
       await writeCliModels(cliId, []);
       showToast?.("已停用全部", "success");
-    } catch (err: any) {
-      showToast?.(`停用失败: ${err?.message || err}`, "error");
+    } catch (err: unknown) {
+      showToast?.(`停用失败: ${errorMessage(err)}`, "error");
     } finally {
       setPending(null);
     }
@@ -139,40 +182,92 @@ export function LocalCliSection() {
       });
       await loadSettingsConfig();
       showToast?.(next.has(modelId) ? `已加入 ${modelId}` : `已移除 ${modelId}`, "success");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("[local-cli] toggle model failed:", err);
-      showToast?.(`操作失败: ${err?.message || err}`, "error");
+      showToast?.(`操作失败: ${errorMessage(err)}`, "error");
     } finally {
       setPending(null);
     }
   }, [currentAgentId, enabledByCli, showToast]);
 
-  const scan = useCallback(async () => {
-    setScanning(true);
-    try {
-      const res = await hanaFetch("/api/local-cli/scan");
-      const data = await res.json();
-      const list: CliInfo[] = data.clis || [];
-      setCliS(list);
-      // 同步预载所有已装 CLI 之模型清单 —— 一键启用 / 已启用计数无需展开
-      const installed = list.filter(c => c.installed);
-      const preloaded: Record<string, ModelInfo[]> = {};
-      await Promise.all(installed.map(async c => {
-        try {
-          const r = await hanaFetch(`/api/local-cli/${c.id}/models`);
-          const j = await r.json();
-          preloaded[c.id] = j.models || [];
-        } catch { /* swallow */ }
-      }));
-      setModels(prev => ({ ...prev, ...preloaded }));
-    } catch (err) {
-      console.warn("[local-cli] scan failed:", err);
-    } finally {
-      setScanning(false);
-    }
+  const preloadInstalledModels = useCallback(async (list: CliInfo[]) => {
+    const installed = list.filter(c => c.installed);
+    const preloaded: Record<string, ModelInfo[]> = {};
+    await Promise.all(installed.map(async c => {
+      try {
+        const r = await hanaFetch(`/api/local-cli/${c.id}/models`);
+        const j = await r.json();
+        preloaded[c.id] = j.models || [];
+      } catch { /* swallow */ }
+    }));
+    setModels(prev => ({ ...prev, ...preloaded }));
   }, []);
 
-  useEffect(() => { scan(); }, [scan]);
+  const applyScanResult = useCallback(async (data: CliScanResponse) => {
+    const list: CliInfo[] = data.clis || [];
+    setCliS(list);
+    setLastScannedAt(data.scannedAt || null);
+    setLoadedFromCache(!!data.cached);
+    await preloadInstalledModels(list);
+  }, [preloadInstalledModels]);
+
+  const scan = useCallback(async ({
+    force = false,
+    cachedOnly = false,
+    background = false,
+    apply = true,
+    silent = false,
+  } = {}) => {
+    if (!silent) {
+      if (background) setBackgroundRefreshing(true);
+      else setScanning(true);
+    }
+    try {
+      const params = new URLSearchParams();
+      if (force) params.set("refresh", "1");
+      if (cachedOnly) params.set("cached", "1");
+      const suffix = params.toString() ? `?${params.toString()}` : "";
+      const res = await hanaFetch(`/api/local-cli/scan${suffix}`);
+      const data: CliScanResponse = await res.json();
+      if (!res.ok || data.ok === false) throw new Error(data.error || res.statusText);
+      if (apply) await applyScanResult(data);
+      return data;
+    } catch (err) {
+      console.warn("[local-cli] scan failed:", err);
+      return null;
+    } finally {
+      if (!silent) {
+        if (background) setBackgroundRefreshing(false);
+        else setScanning(false);
+      }
+    }
+  }, [applyScanResult]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const cached = await scan({ cachedOnly: true, apply: false, silent: true });
+      if (cancelled) return;
+      if (cached?.cached && Array.isArray(cached.clis)) {
+        await applyScanResult(cached);
+        if (!cancelled && isStaleScan(cached.scannedAt)) {
+          void scan({ force: true, background: true });
+        }
+        return;
+      }
+      await scan({ force: true });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [applyScanResult, scan]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void scan({ force: true, background: true });
+    }, AUTO_REFRESH_AFTER_MS);
+    return () => window.clearInterval(id);
+  }, [scan]);
 
   const loadModels = useCallback(async (id: string) => {
     if (models[id]) return;
@@ -344,9 +439,9 @@ export function LocalCliSection() {
         })}
       </div>
 
-      <div style={{ padding: "0 var(--space-md) var(--space-md)" }}>
+      <div style={{ padding: "0 var(--space-md) var(--space-md)", display: "flex", gap: "var(--space-sm)", alignItems: "center" }}>
         <button
-          onClick={scan}
+          onClick={() => { void scan({ force: true }); }}
           disabled={scanning}
           style={{
             padding: "var(--space-xs) var(--space-md)",
@@ -360,6 +455,13 @@ export function LocalCliSection() {
         >
           {scanning ? "扫描中…" : "重新扫描 PATH"}
         </button>
+        {(lastScannedAt || backgroundRefreshing) && (
+          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>
+            {backgroundRefreshing
+              ? "后台刷新中…"
+              : `${loadedFromCache ? "已用缓存" : "已刷新"}${formatScanTime(lastScannedAt) ? ` · ${formatScanTime(lastScannedAt)}` : ""}`}
+          </span>
+        )}
       </div>
     </SettingsSection>
   );

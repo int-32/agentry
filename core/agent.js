@@ -148,7 +148,7 @@ export class Agent {
     // 0. 兼容性检查（目录、数据库、配置文件）
     await runCompatChecks({
       agentDir: this.agentDir,
-      hanakoHome: path.dirname(path.dirname(this.agentDir)),
+      agentryHome: path.dirname(path.dirname(this.agentDir)),
       log,
     });
 
@@ -311,7 +311,7 @@ export class Agent {
       getSessionPath: () => this._cb?.getCurrentSessionPath?.(),
     });
     this._artifactTool = createArtifactTool({
-      getHanakoHome: () => this._cb?.getEngine?.()?.hanakoHome,
+      getHanakoHome: () => this._cb?.getEngine?.()?.agentryHome,
       registerSessionFile: (entry) => this._cb?.registerSessionFile?.(entry),
       getSessionPath: () => this._cb?.getCurrentSessionPath?.(),
     });
@@ -322,7 +322,7 @@ export class Agent {
       },
       getVisionBridge: () => this._cb?.getEngine?.()?.getVisionBridge?.() || null,
       isVisionAuxiliaryEnabled: () => this._cb?.getEngine?.()?.isVisionAuxiliaryEnabled?.() === true,
-      getHanakoHome: () => this._cb?.getEngine?.()?.hanakoHome,
+      getHanakoHome: () => this._cb?.getEngine?.()?.agentryHome,
       registerSessionFile: (entry) => this._cb?.registerSessionFile?.(entry),
     });
     this._notifyTool = createNotifyTool({
@@ -859,8 +859,8 @@ export class Agent {
     // 叙事顺序上先告诉模型"用户是谁"，再告诉它"你是谁、你和用户什么关系"。
     const parts = [
       isZh
-        ? "你运行在 OpenHanako 平台上，由 liliMozi 开发。项目主页：https://github.com/liliMozi/openhanako"
-        : "You are running on the OpenHanako platform, developed by liliMozi. Project page: https://github.com/liliMozi/openhanako",
+        ? "你运行在 Agentry 平台上。项目主页：https://github.com/int-32/agentry"
+        : "You are running on the Agentry platform. Project page: https://github.com/int-32/agentry",
     ];
     const platformPrompt = getPlatformPromptNote({ platform: process.platform });
     if (platformPrompt) {
@@ -1011,11 +1011,11 @@ export class Agent {
       parts.push(isZh
         ? "\n## 本机应用控制\n\n" +
           "用户要求打开、查看、点击、输入或控制本机 GUI 应用时，优先使用 computer 工具。" +
-          "不要用 bash、AppleScript、osascript、open -a 或平台脚本控制 GUI 应用；这些路径会绕过 Hana 的应用审批列表，也更容易撞到系统隐私权限。" +
+          "不要用 bash、AppleScript、osascript、open -a 或平台脚本控制 GUI 应用；这些路径会绕过 Agentry 的应用审批列表，也更容易撞到系统隐私权限。" +
           "如果需要控制一个新应用，先用 computer 的 start/list_apps 流程触发应用级确认，让用户在输入框上方同意。"
         : "\n## Desktop App Control\n\n" +
           "When the user asks to open, inspect, click, type in, or control a local GUI application, prefer the computer tool. " +
-          "Do not use bash, AppleScript, osascript, open -a, or platform scripts to control GUI applications; those paths bypass Hana's app approval list and are more likely to hit OS privacy permissions. " +
+          "Do not use bash, AppleScript, osascript, open -a, or platform scripts to control GUI applications; those paths bypass Agentry's app approval list and are more likely to hit OS privacy permissions. " +
           "For a new app, use the computer start/list_apps flow so the input-area app approval prompt can ask the user to approve it."
       );
     }

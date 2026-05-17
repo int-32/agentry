@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { hana } from '@hana/plugin-sdk';
+import { hana } from '@agentry/plugin-sdk';
 import {
   Button,
   CardShell,
   EmptyState,
-  HanaThemeProvider,
+  AgentryThemeProvider,
   List,
   Select,
   SettingRow,
   Switch,
   TextInput,
-} from '@hana/plugin-components';
-import '@hana/plugin-components/styles.css';
+} from '@agentry/plugin-components';
+import '@agentry/plugin-components/styles.css';
 
 type ThemeMode = 'inherit' | 'hana' | 'custom';
 
@@ -39,10 +39,10 @@ function Panel() {
   }
 
   return (
-    <HanaThemeProvider mode={themeMode} theme={customTheme || (themeMode === 'hana' ? 'warm-paper' : undefined)}>
+    <AgentryThemeProvider mode={themeMode} theme={customTheme || (themeMode === 'hana' ? 'warm-paper' : undefined)}>
       <CardShell
         title={title}
-        description="A compact example using Hana plugin SDK packages."
+        description="A compact example using Agentry plugin SDK packages."
         actions={<Button variant="ghost" onClick={() => hana.external.open('https://example.com')}>Open</Button>}
         footer={<Button variant="primary" onClick={copyTitle}>Copy title</Button>}
       >
@@ -58,7 +58,7 @@ function Panel() {
               value={themeMode}
               onChange={(value) => setThemeMode(value as ThemeMode)}
               options={[
-                { value: 'inherit', label: 'Follow Hana' },
+                { value: 'inherit', label: 'Follow Agentry' },
                 { value: 'hana', label: 'Warm paper' },
                 { value: 'custom', label: 'Custom' },
               ]}
@@ -68,14 +68,14 @@ function Panel() {
         <TextInput label="Title" value={title} onChange={(event) => setTitle(event.currentTarget.value)} />
         <List
           items={[
-            { id: 'runtime', title: '@hana/plugin-runtime', meta: 'Node' },
-            { id: 'sdk', title: '@hana/plugin-sdk', meta: 'iframe' },
-            { id: 'components', title: '@hana/plugin-components', meta: 'React' },
+            { id: 'runtime', title: '@agentry/plugin-runtime', meta: 'Node' },
+            { id: 'sdk', title: '@agentry/plugin-sdk', meta: 'iframe' },
+            { id: 'components', title: '@agentry/plugin-components', meta: 'React' },
           ]}
         />
         {!enabled && <EmptyState title="Paused" description="Turn the switch back on to resume actions." />}
       </CardShell>
-    </HanaThemeProvider>
+    </AgentryThemeProvider>
   );
 }
 

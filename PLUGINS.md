@@ -40,7 +40,7 @@ export async function execute(input) {
 | Tool-only | 没有 UI，只给 Agent 增加工具能力 | `restricted` |
 | Runtime | 需要生命周期、EventBus、后台任务、动态工具 | `full-access` |
 | UI | 需要 page / widget / iframe card | `full-access` |
-| Marketplace entry | 让插件出现在插件市场 | 写入 `OH-Plugins/plugins/<id>.yaml` |
+| Marketplace entry | 让插件出现在插件市场 | 写入 `agentry-plugins/plugins/<id>.yaml` |
 
 推荐先用 `hana-plugin-creator` 脚手架生成，再按需求删减：
 
@@ -48,14 +48,14 @@ export async function execute(input) {
 python3 skills2set/hana-plugin-creator/scripts/create_hana_plugin.py "My Plugin" --path examples/plugins --kind full
 ```
 
-调试顺序：本地文件夹安装 → 设置页诊断 → 补 README/manifest → 需要公开时再写 `OH-Plugins` 市场条目。
+调试顺序：本地文件夹安装 → 设置页诊断 → 补 README/manifest → 需要公开时再写 `agentry-plugins` 市场条目。
 
 ### Agent 辅助开发循环
 
-当 Hana / Codex 这类 Agent 直接帮用户开发插件时，优先走 dev loop，而不是把半成品复制到正式插件目录：
+当 Agentry / Codex 这类 Agent 直接帮用户开发插件时，优先走 dev loop，而不是把半成品复制到正式插件目录：
 
-1. 插件源码放在当前工作区，或 `${HANA_HOME}/plugin-dev-sources/`。
-2. 调用 EventBus `plugin.dev.install` 或 HTTP `POST /api/plugins/dev/install`，把源码复制到 `${HANA_HOME}/plugins-dev/<pluginId>` 并加载。
+1. 插件源码放在当前工作区，或 `${AGENTRY_HOME}/plugin-dev-sources/`。
+2. 调用 EventBus `plugin.dev.install` 或 HTTP `POST /api/plugins/dev/install`，把源码复制到 `${AGENTRY_HOME}/plugins-dev/<pluginId>` 并加载。
 3. 修改源码后调用 `plugin.dev.reload` 或 `POST /api/plugins/dev/:id/reload`。
 4. 需要控制生命周期时调用 `plugin.dev.disable`、`plugin.dev.enable`、`plugin.dev.reset`、`plugin.dev.uninstall`，或对应 HTTP：`PUT /api/plugins/dev/:id/enabled`、`POST /api/plugins/dev/:id/reset`、`DELETE /api/plugins/dev/:id`。
 5. 工具插件用 `plugin.dev.invokeTool` 或 `POST /api/plugins/dev/:id/tools/:toolName/invoke` 做 smoke test。
@@ -63,7 +63,7 @@ python3 skills2set/hana-plugin-creator/scripts/create_hana_plugin.py "My Plugin"
 
 Agent 可见的 dev 工具默认关闭。用户需要在设置 → 插件 → 权限中开启"允许 Agent 插件开发工具"，开启后 Agent 才会看到 `plugin_dev_install`、`plugin_dev_reload`、`plugin_dev_disable`、`plugin_dev_enable`、`plugin_dev_reset`、`plugin_dev_uninstall`、`plugin_dev_invoke_tool`、`plugin_dev_diagnostics`、`plugin_dev_list_surfaces`、`plugin_dev_describe_surface`、`plugin_dev_run_scenario`。
 
-开发态权限来自 Hana 记住的 dev slot，而不是 manifest 自己声明。`devRunId` 是一次 dev install/reload 的运行护栏，调用 enable/disable/reset/uninstall 时建议带上，避免旧上下文误操作新的开发槽。dev 操作只允许作用于 `${HANA_HOME}/plugins-dev/` 中的 runtime copy，不会写入 `${HANA_HOME}/plugins/`，也不会污染正式插件的禁用偏好。
+开发态权限来自 Agentry 记住的 dev slot，而不是 manifest 自己声明。`devRunId` 是一次 dev install/reload 的运行护栏，调用 enable/disable/reset/uninstall 时建议带上，避免旧上下文误操作新的开发槽。dev 操作只允许作用于 `${AGENTRY_HOME}/plugins-dev/` 中的 runtime copy，不会写入 `${AGENTRY_HOME}/plugins/`，也不会污染正式插件的禁用偏好。
 
 `full-access` dev 插件必须显式传 `allowFullAccess: true`，全局社区插件开关不会自动授权开发态插件。
 
@@ -80,8 +80,8 @@ UI 插件调试时，先用 `plugin.dev.listSurfaces` 找到 page / widget，再
       {
         "id": "hello-tool",
         "steps": [
-          { "invokeTool": { "name": "hello", "input": { "name": "Hana" } } },
-          { "expectToolText": "hello Hana" }
+          { "invokeTool": { "name": "hello", "input": { "name": "Agentry" } } },
+          { "expectToolText": "hello Agentry" }
         ]
       }
     ]
@@ -97,7 +97,7 @@ UI 插件调试时，先用 `plugin.dev.listSurfaces` 找到 page / widget，再
 
 - **拖拽安装**：将插件文件夹或 .zip 拖入设置 → 插件页面的安装区
 - **文件选择器**：点击安装区，通过文件选择器选择插件文件夹或 .zip
-- **手动安装**：将插件目录放到 `${HANA_HOME}/plugins/`。实际目录可在设置 → 插件页面或 `/api/plugins/settings` 的 `plugins_dir` 查看
+- **手动安装**：将插件目录放到 `${AGENTRY_HOME}/plugins/`。实际目录可在设置 → 插件页面或 `/api/plugins/settings` 的 `plugins_dir` 查看
 
 ### 管理操作
 
@@ -109,7 +109,7 @@ UI 插件调试时，先用 `plugin.dev.listSurfaces` 找到 page / widget，再
 
 ### 插件数据
 
-插件私有数据自动存放在 `${HANA_HOME}/plugin-data/{pluginId}/`。删除插件时此目录保留，重新安装后配置还在。
+插件私有数据自动存放在 `${AGENTRY_HOME}/plugin-data/{pluginId}/`。删除插件时此目录保留，重新安装后配置还在。
 
 ## 目录结构
 
@@ -209,10 +209,10 @@ export async function execute(input, toolCtx) {  // 必须
 
 - 自动加命名空间前缀：`pluginId_name`（如 `my-plugin_search`）
 - restricted 插件的 `toolCtx.bus` 只有 `emit/subscribe/request`，没有 `handle`
-- 新插件可以使用 `@hana/plugin-runtime` 的 `defineTool()` 获得类型和默认参数；当前静态 `tools/*.js` loader 仍读取命名导出。
+- 新插件可以使用 `@agentry/plugin-runtime` 的 `defineTool()` 获得类型和默认参数；当前静态 `tools/*.js` loader 仍读取命名导出。
 
 ```js
-import { defineTool } from '@hana/plugin-runtime';
+import { defineTool } from '@agentry/plugin-runtime';
 
 const tool = defineTool({
   name: "search",
@@ -236,7 +236,7 @@ export const { name, description, parameters, execute } = tool;
 工具需要交付文件时，使用 `toolCtx.stageFile()` 把本地文件登记成当前 session 的 `SessionFile`，并直接复用它返回的 `mediaItem`：
 
 ```js
-import { createMediaDetails } from "@hana/plugin-runtime";
+import { createMediaDetails } from "@agentry/plugin-runtime";
 
 const staged = toolCtx.stageFile({
   sessionPath: toolCtx.sessionPath,
@@ -456,11 +456,11 @@ export const capabilities = {
 };
 ```
 
-CLI provider 必须使用结构化参数绑定。不要拼 shell 字符串；Hana 会通过 `execFile` / `spawn` 的非 shell 模式运行命令，并把输出收束进媒体任务目录。
+CLI provider 必须使用结构化参数绑定。不要拼 shell 字符串；Agentry 会通过 `execFile` / `spawn` 的非 shell 模式运行命令，并把输出收束进媒体任务目录。
 
 ### Configuration（配置 schema）
 
-在 `manifest.json` 的 `contributes.configuration` 中声明配置 schema。Hana 会规范化字段、写入默认值、校验类型，并在设置 API 中自动隐藏敏感字段：
+在 `manifest.json` 的 `contributes.configuration` 中声明配置 schema。Agentry 会规范化字段、写入默认值、校验类型，并在设置 API 中自动隐藏敏感字段：
 
 ```json
 {
@@ -532,10 +532,10 @@ const value = await ctx.config.get("agentMode", { scope: "per-agent", agentId: "
 - 悬停 tab 时显示插件全名（tooltip）
 - Tab 超过 5 个时自动折叠到 overflow 下拉菜单，用户可拖拽排序
 
-插件页面通过 iframe 渲染。新插件建议使用 `@hana/plugin-sdk` 发送握手和宿主请求：
+插件页面通过 iframe 渲染。新插件建议使用 `@agentry/plugin-sdk` 发送握手和宿主请求：
 
 ```js
-import { hana } from '@hana/plugin-sdk';
+import { hana } from '@agentry/plugin-sdk';
 
 hana.ready();
 hana.ui.resize({ height: 320 });
@@ -573,11 +573,11 @@ window.parent.postMessage({ type: 'ready' }, '*');
 <link rel="stylesheet" href="${new URLSearchParams(location.search).get('hana-css')}">
 ```
 
-React 插件 UI 建议使用 `@hana/plugin-components`，它提供和 Hana 当前控件接近的 Button、IconButton、TextInput、Textarea、Select、Switch、SettingRow、CardShell、List、EmptyState 等基础组件：
+React 插件 UI 建议使用 `@agentry/plugin-components`，它提供和 Agentry 当前控件接近的 Button、IconButton、TextInput、Textarea、Select、Switch、SettingRow、CardShell、List、EmptyState 等基础组件：
 
 ```tsx
-import { Button, CardShell, HanaThemeProvider, SettingRow, Switch } from "@hana/plugin-components";
-import "@hana/plugin-components/styles.css";
+import { Button, CardShell, HanaThemeProvider, SettingRow, Switch } from "@agentry/plugin-components";
+import "@agentry/plugin-components/styles.css";
 
 export function PluginPanel() {
   return (
@@ -591,7 +591,7 @@ export function PluginPanel() {
 }
 ```
 
-`HanaThemeProvider` 支持三种模式：`inherit` 读取宿主 CSS 变量并走 SDK fallback；`hana` 固定使用某个 Hana 主题 token；`custom` 只覆盖插件显式传入的 token，未传字段继续 fallback。组件只依赖 `hana-plugin-*` class 和 CSS 变量，不导入 renderer 内部组件。
+`HanaThemeProvider` 支持三种模式：`inherit` 读取宿主 CSS 变量并走 SDK fallback；`hana` 固定使用某个 Agentry 主题 token；`custom` 只覆盖插件显式传入的 token，未传字段继续 fallback。组件只依赖 `hana-plugin-*` class 和 CSS 变量，不导入 renderer 内部组件。
 
 ### Widget（侧栏组件）⚡ full-access
 
@@ -699,10 +699,10 @@ Widget 同样通过 iframe 渲染，需要发送 `ready` 握手信号。
 }
 ```
 
-新插件建议使用 `@hana/plugin-runtime` 的 `definePlugin()`。它会返回兼容当前 PluginManager 的 class：
+新插件建议使用 `@agentry/plugin-runtime` 的 `definePlugin()`。它会返回兼容当前 PluginManager 的 class：
 
 ```js
-import { definePlugin } from '@hana/plugin-runtime';
+import { definePlugin } from '@agentry/plugin-runtime';
 
 export default definePlugin({
   async onload(ctx, { register }) {
@@ -716,7 +716,7 @@ export default definePlugin({
 也可以继续使用传统 class 形式：
 
 ```js
-import { HANA_BUS_SKIP } from "@hana/plugin-runtime";
+import { HANA_BUS_SKIP } from "@agentry/plugin-runtime";
 
 export default class MyPlugin {
   async onload() {
@@ -751,10 +751,10 @@ export default class MyPlugin {
 
 ## 总线通信（bus.request / bus.handle）
 
-Plugin 间通信通过 EventBus 的请求-响应机制。`bus.handle` 需要 full-access 权限，`bus.request` 所有插件都可以用。`bus.listCapabilities()` / `bus.getCapability(type)` 可以读取当前稳定能力目录，目录记录能力名、输入输出 schema、权限要求、错误码、稳定性和当前是否有 handler 可用。新插件建议用 `@hana/plugin-runtime` 的 `defineBusHandler()`、`requestBus()` 和 `HANA_BUS_SKIP`，这样 handler 类型、请求参数和链式跳过语义都来自 SDK，而不是手写约定。
+Plugin 间通信通过 EventBus 的请求-响应机制。`bus.handle` 需要 full-access 权限，`bus.request` 所有插件都可以用。`bus.listCapabilities()` / `bus.getCapability(type)` 可以读取当前稳定能力目录，目录记录能力名、输入输出 schema、权限要求、错误码、稳定性和当前是否有 handler 可用。新插件建议用 `@agentry/plugin-runtime` 的 `defineBusHandler()`、`requestBus()` 和 `HANA_BUS_SKIP`，这样 handler 类型、请求参数和链式跳过语义都来自 SDK，而不是手写约定。
 
 ```js
-import { defineBusHandler, HANA_BUS_SKIP, requestBus } from "@hana/plugin-runtime";
+import { defineBusHandler, HANA_BUS_SKIP, requestBus } from "@agentry/plugin-runtime";
 
 // Plugin A（full-access）: 注册能力
 const bridgeSend = defineBusHandler({
@@ -925,24 +925,24 @@ const schedules = await this.ctx.bus.request("task:list-schedules", {
 
 `task:*` 管理运行时生命周期（注册、终止），`deferred:*` 管理结果送达。后台任务通常同时使用两套协议：`deferred:register` 注册结果占位，`task:register` 注册运行时实例；完成时 `deferred:resolve` 送达结果，`task:remove` 清理运行时状态。
 
-**重启恢复**：Hana 持久化任务与 schedule 元数据，不持久化插件函数。插件需要在 `onload()` 时重新注册 `task:register-handler`，然后调用 `task:list` 查询 `status: "recovering"` 的本插件任务，按自己的业务存储恢复或失败它们。
+**重启恢复**：Agentry 持久化任务与 schedule 元数据，不持久化插件函数。插件需要在 `onload()` 时重新注册 `task:register-handler`，然后调用 `task:list` 查询 `status: "recovering"` 的本插件任务，按自己的业务存储恢复或失败它们。
 
 ### 官方插件市场
 
-设置 → 插件里的「打开插件市场」会进入独立的市场子页，该页面读取 `/api/plugins/marketplace`。Hana 采用 Obsidian 式官方社区插件目录：第三方开发者把插件提交到 `OH-Plugins`，用户只浏览、安装、启用、禁用，不管理市场源。
+设置 → 插件里的「打开插件市场」会进入独立的市场子页，该页面读取 `/api/plugins/marketplace`。Agentry 采用 Obsidian 式官方社区插件目录：第三方开发者把插件提交到 `agentry-plugins`，用户只浏览、安装、启用、禁用，不管理市场源。
 
 默认官方目录：
 
 ```text
-https://raw.githubusercontent.com/liliMozi/OH-Plugins/main/marketplace.json
+https://raw.githubusercontent.com/int-32/agentry-plugins/main/marketplace.json
 ```
 
 开发调试仍可用环境变量覆盖：
 
-- `HANA_PLUGIN_MARKETPLACE_FILE=/path/to/marketplace.json`
-- `HANA_PLUGIN_MARKETPLACE_URL=https://.../marketplace.json`
+- `AGENTRY_PLUGIN_MARKETPLACE_FILE=/path/to/marketplace.json`
+- `AGENTRY_PLUGIN_MARKETPLACE_URL=https://.../marketplace.json`
 
-没有配置环境变量时，Hana 会先尝试读取 `${HANA_HOME}/plugin-marketplace/marketplace.json`（本地开发覆盖），如果不存在则读取官方 `OH-Plugins` URL。市场 index 的基本形状与 `OH-Plugins` 仓库一致：
+没有配置环境变量时，Agentry 会先尝试读取 `${AGENTRY_HOME}/plugin-marketplace/marketplace.json`（本地开发覆盖），如果不存在则读取官方 `agentry-plugins` URL。市场 index 的基本形状与 `agentry-plugins` 仓库一致：
 
 ```json
 {
@@ -951,7 +951,7 @@ https://raw.githubusercontent.com/liliMozi/OH-Plugins/main/marketplace.json
     "schemaVersion": 1,
     "id": "demo",
     "name": "Demo",
-    "publisher": "Hana",
+    "publisher": "Agentry",
     "version": "1.0.0",
     "description": "Demo plugin",
     "repository": "https://example.com/demo",
@@ -961,7 +961,7 @@ https://raw.githubusercontent.com/liliMozi/OH-Plugins/main/marketplace.json
     "contributions": ["tools"],
     "distribution": {
       "kind": "release",
-      "packageUrl": "https://github.com/liliMozi/OH-Plugins/releases/download/demo-v1.0.0/demo.zip",
+      "packageUrl": "https://github.com/int-32/agentry-plugins/releases/download/demo-v1.0.0/demo.zip",
       "sha256": "..."
     },
     "versions": [
@@ -970,7 +970,7 @@ https://raw.githubusercontent.com/liliMozi/OH-Plugins/main/marketplace.json
         "compatibility": { "minAppVersion": "0.170.0" },
         "distribution": {
           "kind": "release",
-          "packageUrl": "https://github.com/liliMozi/OH-Plugins/releases/download/demo-v1.0.0/demo.zip",
+          "packageUrl": "https://github.com/int-32/agentry-plugins/releases/download/demo-v1.0.0/demo.zip",
           "sha256": "..."
         }
       }
@@ -982,9 +982,9 @@ https://raw.githubusercontent.com/liliMozi/OH-Plugins/main/marketplace.json
 
 市场 UI 会在设置主区域内展示更宽的插件列表和 README 单页视图，点击插件后读取 `/api/plugins/marketplace/:id/readme` 展示 README。`distribution.kind: "release"` 会下载 zip、校验 `sha256`，再安装到用户插件目录。`distribution.kind: "source"` 仅用于本地开发文件市场，因为 source path 必须能在本机解析成目录。
 
-市场版本管理以 `versions[]` 为长期契约：每一项声明 `version`、该版本的 `compatibility.minAppVersion` 和对应的 `distribution`。没有 `versions[]` 时，Hana 会把根级 `version` / `compatibility` / `distribution` 视为单版本条目。客户端会按 SemVer 选择“当前 app 能运行的最高版本”，同时保留 `latestVersion`、`selectedVersion`、`installedVersion`、`updateAvailable`、`downgrade`、`reinstall`、`compatible`、`installAction` 和 `canInstall` 给 UI 展示。
+市场版本管理以 `versions[]` 为长期契约：每一项声明 `version`、该版本的 `compatibility.minAppVersion` 和对应的 `distribution`。没有 `versions[]` 时，Agentry 会把根级 `version` / `compatibility` / `distribution` 视为单版本条目。客户端会按 SemVer 选择“当前 app 能运行的最高版本”，同时保留 `latestVersion`、`selectedVersion`、`installedVersion`、`updateAvailable`、`downgrade`、`reinstall`、`compatible`、`installAction` 和 `canInstall` 给 UI 展示。
 
-如果已安装版本高于当前 app 可兼容的最高市场版本，安装动作会被标记为 `downgrade`，必须显式传 `allowDowngrade: true` 才能继续。拖拽 / 本地路径安装同样会阻止隐式降级。更新安装会先备份旧目录到 `${HANA_HOME}/plugin-backups/<pluginId>/`，新版本加载失败时恢复旧目录并重新加载；成功后 `${HANA_HOME}/plugin-installs.json` 会记录来源、版本、release URL 和 sha256，供后续市场状态判断。
+如果已安装版本高于当前 app 可兼容的最高市场版本，安装动作会被标记为 `downgrade`，必须显式传 `allowDowngrade: true` 才能继续。拖拽 / 本地路径安装同样会阻止隐式降级。更新安装会先备份旧目录到 `${AGENTRY_HOME}/plugin-backups/<pluginId>/`，新版本加载失败时恢复旧目录并重新加载；成功后 `${AGENTRY_HOME}/plugin-installs.json` 会记录来源、版本、release URL 和 sha256，供后续市场状态判断。
 
 ## 前向兼容
 
@@ -1002,7 +1002,7 @@ https://raw.githubusercontent.com/liliMozi/OH-Plugins/main/marketplace.json
 
 ## 并发设计
 
-Hana 支持多 session / 多 agent 并行运行。插件开发时需注意：
+Agentry 支持多 session / 多 agent 并行运行。插件开发时需注意：
 
 - 所有 EventBus 的 session 相关事件（`session:send`、`session:abort` 等）必须携带 `sessionPath` 参数，用于标识目标 session
 - 工具（tool）通过 `ctx.sessionManager.getSessionFile()` 获取当前 session 路径

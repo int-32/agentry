@@ -1,9 +1,9 @@
 /**
- * Hanako Desktop — Electron 主进程
+ * Agentry Desktop — Electron 主进程
  *
  * 职责：
  * 1. 创建启动窗口（splash）
- * 2. spawn() 启动 Hanako Server
+ * 2. spawn() 启动 Agentry Server
  * 3. 等待 server 就绪 + 主窗口初始化完成
  * 4. 关闭 splash，显示主窗口
  * 5. 优雅关闭
@@ -35,9 +35,10 @@ const {
 const {
   configureProcessPiSdkEnv,
   ensureHanaPiSdkDirs,
-  resolveHanakoHome,
+  resolveAgentryHome,
+  migrateLegacyHomeIfNeeded,
   withHanaPiSdkEnv,
-} = require("../shared/hana-runtime-paths.cjs");
+} = require("../shared/agentry-runtime-paths.cjs");
 const {
   buildBrowserSearchExtractionScript,
   buildBrowserSearchLoadOptions,
@@ -64,7 +65,7 @@ app.setName(APP_NAME);
   const preloadPath = path.join(__dirname, "preload.bundle.cjs");
   if (!fs.existsSync(preloadPath)) {
     const msg = `Missing preload bundle:\n${preloadPath}\n\nBuild is incomplete. Run 'npm run build:preload' or rebuild the installer.`;
-    try { dialog.showErrorBox("Hanako failed to start", msg); } catch {}
+    try { dialog.showErrorBox("Agentry failed to start", msg); } catch {}
     console.error("[desktop] " + redactLogText(msg));
     process.exit(1);
   }
@@ -102,17 +103,19 @@ function safeReadJSON(filePath, fallback = null) {
   }
 }
 
-const hanakoHome = resolveHanakoHome(process.env.HANA_HOME);
-process.env.HANA_HOME = hanakoHome;
-ensureHanaPiSdkDirs(hanakoHome);
-configureProcessPiSdkEnv(hanakoHome);
+const agentryHome = resolveAgentryHome();
+migrateLegacyHomeIfNeeded(agentryHome);
+process.env.AGENTRY_HOME = agentryHome;
+process.env.HANA_HOME = agentryHome; // 兼容期保留
+ensureHanaPiSdkDirs(agentryHome);
+configureProcessPiSdkEnv(agentryHome);
 
 function redactMainLogText(value) {
-  return redactLogText(value, { homeDir: os.homedir(), extraPaths: [hanakoHome] });
+  return redactLogText(value, { homeDir: os.homedir(), extraPaths: [agentryHome] });
 }
 
 function readNetworkProxyPreference() {
-  const prefsPath = path.join(hanakoHome, "user", "preferences.json");
+  const prefsPath = path.join(agentryHome, "user", "preferences.json");
   const prefs = safeReadJSON(prefsPath, {});
   return normalizeNetworkProxyConfig(prefs?.network_proxy);
 }
@@ -188,12 +191,12 @@ async function serverEnvironmentForNetworkProxy(baseEnv) {
   return env;
 }
 
-// 按 HANA_HOME 隔离 Electron userData（localStorage / cache / session）
-// 生产: ~/Library/Application Support/Hanako
-// 开发: ~/Library/Application Support/Hanako-dev
-const defaultHome = path.join(os.homedir(), ".hanako");
+// 按 home 隔离 Electron userData（localStorage / cache / session）
+// 生产: ~/Library/Application Support/Agentry
+// 开发: ~/Library/Application Support/Agentry-dev
+const defaultHome = path.join(os.homedir(), ".agentry");
 configureClientSingleInstance(app, {
-  hanakoHome,
+  agentryHome,
   defaultHome,
   onSecondInstance: () => showPrimaryWindow(),
 });
@@ -280,7 +283,7 @@ function _getMainI18n() {
     // 从 preferences.json 读取全局 locale（和 server/renderer 一致）
     let locale = null;
     try {
-      const prefs = JSON.parse(fs.readFileSync(path.join(hanakoHome, "user", "preferences.json"), "utf-8"));
+      const prefs = JSON.parse(fs.readFileSync(path.join(agentryHome, "user", "preferences.json"), "utf-8"));
       locale = prefs.locale || null;
     } catch { /* preferences.json 不存在时 fallback */ }
     const key = _resolveLocaleKey(locale);
@@ -405,8 +408,8 @@ function applyWindowThemeColors(win, rawTheme) {
  * 优先读 user/preferences.json，fallback 扫描 agents/ 第一个有效目录
  */
 function getCurrentAgentId() {
-  const prefsPath = path.join(hanakoHome, "user", "preferences.json");
-  const agentsDir = path.join(hanakoHome, "agents");
+  const prefsPath = path.join(agentryHome, "user", "preferences.json");
+  const agentsDir = path.join(agentryHome, "agents");
 
   // 1. 读 preferences
   try {
@@ -439,7 +442,7 @@ function getCurrentAgentId() {
  * 只看 preferences.json 的 setupComplete 标记
  */
 function isSetupComplete() {
-  const prefsPath = path.join(hanakoHome, "user", "preferences.json");
+  const prefsPath = path.join(agentryHome, "user", "preferences.json");
   try {
     return JSON.parse(fs.readFileSync(prefsPath, "utf-8")).setupComplete === true;
   } catch {}
@@ -454,7 +457,7 @@ function hasExistingConfig() {
   try {
     const agentId = getCurrentAgentId();
     if (!agentId) return false;
-    const configPath = path.join(hanakoHome, "agents", agentId, "config.yaml");
+    const configPath = path.join(agentryHome, "agents", agentId, "config.yaml");
     const configText = fs.readFileSync(configPath, "utf-8");
     return /api_key:\s*["']?[^"'\s]+/.test(configText);
   } catch {}
@@ -472,14 +475,14 @@ function migrateSetupComplete() {
   // 不能只看 agents/*/config.yaml 是否存在，因为 ensureFirstRun 会为全新用户
   // 播种默认 agent（含 config.yaml），导致新用户被误判为老用户而跳过 onboarding。
   try {
-    const modelsPath = path.join(hanakoHome, "added-models.yaml");
+    const modelsPath = path.join(agentryHome, "added-models.yaml");
     if (!fs.existsSync(modelsPath)) return;
     const content = fs.readFileSync(modelsPath, "utf-8");
     if (!/api_key:\s*["']?[^"'\s]+/.test(content)) return;
   } catch {
     return;
   }
-  const prefsPath = path.join(hanakoHome, "user", "preferences.json");
+  const prefsPath = path.join(agentryHome, "user", "preferences.json");
   try {
     let prefs = {};
     try { prefs = JSON.parse(fs.readFileSync(prefsPath, "utf-8")); } catch {}
@@ -605,7 +608,7 @@ function pollServerInfo(infoPath, {
 }
 
 async function startServer() {
-  const serverInfoPath = path.join(hanakoHome, "server-info.json");
+  const serverInfoPath = path.join(agentryHome, "server-info.json");
 
   // ── 1. 检查是否有已运行的 server（Electron crash 后遗留的守护进程） ──
   let existingInfo = null;
@@ -719,7 +722,11 @@ async function _spawnServerOnce(serverInfoPath) {
   _serverLogs = [];
   _lastServerProgressAtMs = null;
 
-  let serverEnv = { ...withHanaPiSdkEnv(process.env, hanakoHome), HANA_HOME: hanakoHome };
+  let serverEnv = {
+    ...withHanaPiSdkEnv(process.env, agentryHome),
+    AGENTRY_HOME: agentryHome,
+    HANA_HOME: agentryHome, // 兼容期保留
+  };
   serverEnv = await serverEnvironmentForNetworkProxy(serverEnv);
 
   // Windows: 注入 PortableGit 路径
@@ -867,14 +874,14 @@ function monitorServer() {
       } catch (err) {
         console.error("[desktop] Server 重启失败:", err.message);
         writeCrashLog(`Server 重启失败: ${err.message}`);
-        dialog.showErrorBox("Hanako Server", mt("dialog.serverRestartFailed", {
+        dialog.showErrorBox("Agentry Server", mt("dialog.serverRestartFailed", {
           version: app?.getVersion?.() || "unknown",
           error: err.message,
         }));
       }
     } else {
       writeCrashLog(`Server 多次崩溃 (${reason})，放弃重启`);
-      dialog.showErrorBox("Hanako Server", mt("dialog.serverMultipleCrash", {
+      dialog.showErrorBox("Agentry Server", mt("dialog.serverMultipleCrash", {
         version: app?.getVersion?.() || "unknown",
         reason,
       }));
@@ -900,7 +907,7 @@ function showPrimaryWindow() {
 /**
  * 创建系统托盘图标
  * - 双击：显示主窗口
- * - 右键菜单：显示 Hanako / 设置 / 退出
+ * - 右键菜单：显示 Agentry / 设置 / 退出
  */
 function createTray() {
   const isDev = !app.isPackaged;
@@ -937,7 +944,7 @@ function createTray() {
 }
 
 /**
- * 将崩溃日志写入 HANA_HOME/crash.log（默认 ~/.hanako/crash.log）并返回日志内容
+ * 将崩溃日志写入 AGENTRY_HOME/crash.log（默认 ~/.agentry/crash.log）并返回日志内容
  */
 function buildServerCrashDiagnostics() {
   // production 时 server 在 resources/server/，dev 时在 __dirname/../server/
@@ -953,7 +960,7 @@ function buildServerCrashDiagnostics() {
   const items = [
     ``,
     `--- Diagnostics ---`,
-    `HANA_HOME: ${hanakoHome}`,
+    `AGENTRY_HOME: ${agentryHome}`,
     `Server dir: ${serverDir}`,
     `Packaged: ${!!isPackaged}`,
     `bundle/index.js exists: ${fs.existsSync(bundlePath)}`,
@@ -995,8 +1002,8 @@ function writeCrashLog(errorMessage) {
   const diagnostics = buildServerCrashDiagnostics();
 
   const content = redactMainLogText([
-    `=== Hanako Crash Log ===`,
-    `Hanako: v${app?.getVersion?.() || "unknown"}`,
+    `=== Agentry Crash Log ===`,
+    `Agentry: v${app?.getVersion?.() || "unknown"}`,
     `Time: ${timestamp}`,
     `Error: ${errorMessage}`,
     `Platform: ${process.platform} ${process.arch}`,
@@ -1011,8 +1018,8 @@ function writeCrashLog(errorMessage) {
 
   // 写入文件（best effort）
   try {
-    const crashLogPath = path.join(hanakoHome, "crash.log");
-    fs.mkdirSync(hanakoHome, { recursive: true });
+    const crashLogPath = path.join(agentryHome, "crash.log");
+    fs.mkdirSync(agentryHome, { recursive: true });
     fs.writeFileSync(crashLogPath, content, "utf-8");
   } catch (e) {
     console.error("[desktop] 写入 crash.log 失败:", e.message);
@@ -1051,7 +1058,7 @@ function createSplashWindow() {
 }
 
 // ── 窗口状态记忆 ──
-const windowStatePath = path.join(hanakoHome, "user", "window-state.json");
+const windowStatePath = path.join(agentryHome, "user", "window-state.json");
 
 function loadWindowState() {
   try {
@@ -1114,7 +1121,7 @@ function createMainWindow() {
   if (!_autoUpdaterInitialized) {
     initAutoUpdater(mainWindow, {
       setIsUpdating: (v) => { _isUpdating = v; },
-      hanakoHome,
+      agentryHome,
     });
     _autoUpdaterInitialized = true;
   } else {
@@ -2180,7 +2187,7 @@ function setupBrowserCommands() {
       try { msg = JSON.parse(data); } catch { return; }
       if (msg?.type !== "browser-cmd") return;
       const { id, cmd, params } = msg;
-      const _bLog = (line) => { try { require("fs").appendFileSync(require("path").join(hanakoHome, "browser-cmd.log"), `${new Date().toISOString()} ${redactMainLogText(line)}\n`); } catch {} };
+      const _bLog = (line) => { try { require("fs").appendFileSync(require("path").join(agentryHome, "browser-cmd.log"), `${new Date().toISOString()} ${redactMainLogText(line)}\n`); } catch {} };
       _bLog(`→ received cmd=${cmd} id=${id}`);
       try {
         const result = await handleBrowserCommand(cmd, params || {});
@@ -2469,7 +2476,7 @@ function buildScreenshotHTML(payload) {
   ${bodyHTML}
   <footer class="watermark">
     <img class="watermark-logo" src="${logoUrl}" />
-    <span class="watermark-text">OpenHanako</span>
+    <span class="watermark-text">Agentry</span>
   </footer>
 </body>
 </html>`;
@@ -2686,8 +2693,8 @@ wrapIpcHandler("get-avatar-path", (_event, role) => {
   const agentId = getCurrentAgentId();
   // agent 头像在 agents/{id}/avatars/，user 头像在 user/avatars/
   const baseDir = role === "user"
-    ? path.join(hanakoHome, "user")
-    : agentId ? path.join(hanakoHome, "agents", agentId) : null;
+    ? path.join(agentryHome, "user")
+    : agentId ? path.join(agentryHome, "agents", agentId) : null;
   if (!baseDir) return null;
   const avatarDir = path.join(baseDir, "avatars");
   for (const ext of ["png", "jpg", "jpeg", "webp"]) {
@@ -2702,7 +2709,7 @@ wrapIpcHandler("get-splash-info", () => {
   try {
     const agentId = getCurrentAgentId();
     if (!agentId) return { agentName: null, locale: "zh-CN", yuan: "hanako" };
-    const configPath = path.join(hanakoHome, "agents", agentId, "config.yaml");
+    const configPath = path.join(agentryHome, "agents", agentId, "config.yaml");
     const text = fs.readFileSync(configPath, "utf-8");
     // 简易提取：agent:\n  name: xxx / yuan: xxx 和顶层 locale: xxx
     const agentMatch = text.match(/^agent:\s*\n\s+name:\s*([^#\n]+)/m);
@@ -2787,7 +2794,7 @@ wrapIpcBestEffortHandler("open-skill-viewer", (_event, data) => {
       const baseName = path.basename(data.skillPath, fileExt);
 
       // 先检查同名 skill 是否已安装在 skills 目录
-      const installedDir = path.join(hanakoHome, "skills", baseName);
+      const installedDir = path.join(agentryHome, "skills", baseName);
       if (fs.existsSync(path.join(installedDir, "SKILL.md"))) {
         _showSkillViewer({ name: baseName, baseDir: installedDir, installed: false }, fromSettings);
         return;
@@ -3150,7 +3157,7 @@ wrapIpcBestEffortHandler("reload-main-window", () => {
 wrapIpcBestEffortHandler("show-notification", (_event, title, body) => {
   if (!Notification.isSupported()) return;
   const notif = new Notification({
-    title: title || "Hana",
+    title: title || "Agentry",
     body: body || "",
     silent: false,
   });
@@ -3184,7 +3191,7 @@ wrapIpcBestEffortHandler("debug-open-onboarding-preview", () => {
 
 // Onboarding 完成后，写标记 → 创建主窗口
 wrapIpcHandler("onboarding-complete", () => {
-  const prefsPath = path.join(hanakoHome, "user", "preferences.json");
+  const prefsPath = path.join(agentryHome, "user", "preferences.json");
   try {
     let prefs = {};
     try { prefs = JSON.parse(fs.readFileSync(prefsPath, "utf-8")); } catch {}
@@ -3224,7 +3231,7 @@ wrapIpcBestEffortHandler("app-ready", () => {
     const settings = systemPreferences.getNotificationSettings?.();
     const status = settings?.authorizationStatus;
     if (settings && status === "not-determined") {
-      const notif = new Notification({ title: "Hana", body: mt("notification.ready", null, "Notifications enabled"), silent: true });
+      const notif = new Notification({ title: "Agentry", body: mt("notification.ready", null, "Notifications enabled"), silent: true });
       notif.show();
     }
   }
@@ -3256,7 +3263,7 @@ app.whenReady().then(async () => {
     await applyDesktopNetworkProxy(readNetworkProxyPreference(), { reason: "startup" });
 
     // 2. 后台启动 server（PATH 已就绪）
-    console.log("[desktop] 启动 Hanako Server...");
+    console.log("[desktop] 启动 Agentry Server...");
     await startServer();
     console.log(`[desktop] Server 就绪，端口: ${serverPort}`);
     monitorServer();
@@ -3293,7 +3300,7 @@ app.whenReady().then(async () => {
     // 5. 后台检查更新（不阻塞启动）
     // 从 preferences.json 同步更新通道
     try {
-      const prefsPath = path.join(hanakoHome, "user", "preferences.json");
+      const prefsPath = path.join(agentryHome, "user", "preferences.json");
       if (fs.existsSync(prefsPath)) {
         const prefs = JSON.parse(fs.readFileSync(prefsPath, "utf-8"));
         if (prefs.update_channel) setUpdateChannel(prefs.update_channel);
@@ -3307,11 +3314,11 @@ app.whenReady().then(async () => {
     // 截取最后 800 字符放进 dialog（太长会显示不全）
     const tail = crashInfo.length > 800 ? "...\n" + crashInfo.slice(-800) : crashInfo;
     dialog.showErrorBox(
-      mt("dialog.launchFailedTitle", null, "Hanako Launch Failed"),
+      mt("dialog.launchFailedTitle", null, "Agentry Launch Failed"),
       mt("dialog.launchFailedBody", {
         version: app?.getVersion?.() || "unknown",
         detail: tail,
-        logPath: path.join(hanakoHome, "crash.log"),
+        logPath: path.join(agentryHome, "crash.log"),
       })
     );
     forceQuitApp = true;
@@ -3449,7 +3456,7 @@ async function shutdownServer() {
   }
   // 清理 server-info.json，防止更新后新版 Electron 误连旧 server
   if (removeServerInfo) {
-    try { fs.unlinkSync(path.join(hanakoHome, "server-info.json")); } catch {}
+    try { fs.unlinkSync(path.join(agentryHome, "server-info.json")); } catch {}
   } else {
     console.warn("[desktop] shutdownServer: 保留 server-info.json，供下次启动识别残留 server");
   }

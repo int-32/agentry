@@ -36,7 +36,7 @@ describe("updateConfig with agentId", () => {
       focusAgent,
       targetAgent,
       deps: {
-        hanakoHome: "/tmp/test",
+        agentryHome: "/tmp/test",
         agentsDir: "/tmp/test/agents",
         getAgent: () => focusAgent,
         getAgentById: (id) => (id === "target" ? targetAgent : null),
@@ -336,7 +336,7 @@ describe("updateConfig with agentId", () => {
     };
     const writeSessionMeta = vi.fn();
     const coord = new ConfigCoordinator({
-      hanakoHome: "/tmp/test",
+      agentryHome: "/tmp/test",
       agentsDir: "/tmp/test/agents",
       getAgent: () => focusAgent,
       getAgentById: () => null,

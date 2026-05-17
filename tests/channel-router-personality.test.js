@@ -40,8 +40,8 @@ describe("ChannelRouter._executeCheck phone delivery", () => {
     callTextMock.mockClear();
     const mockAgent = {
       agentDir: "/tmp/hana-agent-phone-delivery",
-      config: { agent: { name: "Hana", yuan: "hanako" } },
-      personality: "我是 Hana，一个温柔的助手。这是内存中的 personality。",
+      config: { agent: { name: "Agentry", yuan: "hanako" } },
+      personality: "我是 Agentry，一个温柔的助手。这是内存中的 personality。",
     };
     const resolveUtilityConfig = vi.fn(() => ({
       utility_large: "test-model-large",

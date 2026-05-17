@@ -96,7 +96,7 @@ describe("Windows UIA provider", () => {
     ]);
   });
 
-  it("normalizes helper snapshots into Hana snapshots", async () => {
+  it("normalizes helper snapshots into Agentry snapshots", async () => {
     const { runner } = makeRunner(() => helperResult({
       appId: "pid:12",
       windowId: "123",
@@ -198,7 +198,7 @@ describe("Windows UIA provider", () => {
       .rejects.toMatchObject({ code: COMPUTER_USE_ERRORS.ACTION_BLOCKED_BY_POLICY });
   });
 
-  it("converts helper errors into typed Hana errors", async () => {
+  it("converts helper errors into typed Agentry errors", async () => {
     const { runner } = makeRunner(() => ({
       stdout: JSON.stringify({ ok: false, errorCode: "TARGET_NOT_FOUND", message: "Window not found." }),
       stderr: "",

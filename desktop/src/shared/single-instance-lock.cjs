@@ -1,8 +1,8 @@
 /**
  * Electron client single-instance guard.
  *
- * Electron's requestSingleInstanceLock() is scoped by userData, so Hana sets
- * userData from HANA_HOME before requesting the lock. Production and dev homes
+ * Electron's requestSingleInstanceLock() is scoped by userData, so Agentry sets
+ * userData from AGENTRY_HOME before requesting the lock. Production and dev homes
  * get different namespaces, while duplicate launches within the same home are
  * redirected to the first client.
  */
@@ -13,12 +13,12 @@ function normalizeForCompare(filePath) {
   return process.platform === "win32" ? resolved.toLowerCase() : resolved;
 }
 
-function getUserDataAppName(hanakoHome, defaultHome) {
-  if (normalizeForCompare(hanakoHome) === normalizeForCompare(defaultHome)) {
+function getUserDataAppName(agentryHome, defaultHome) {
+  if (normalizeForCompare(agentryHome) === normalizeForCompare(defaultHome)) {
     return null;
   }
-  const suffix = path.basename(hanakoHome).replace(/^\./, "");
-  if (!suffix) return "Hanako";
+  const suffix = path.basename(agentryHome).replace(/^\./, "");
+  if (!suffix) return "Agentry";
   return suffix.charAt(0).toUpperCase() + suffix.slice(1);
 }
 
@@ -39,13 +39,13 @@ function focusExistingWindow(win) {
 }
 
 function configureClientSingleInstance(app, opts) {
-  const { hanakoHome, defaultHome, onSecondInstance } = opts;
-  const appName = getUserDataAppName(hanakoHome, defaultHome);
+  const { agentryHome, defaultHome, onSecondInstance } = opts;
+  const appName = getUserDataAppName(agentryHome, defaultHome);
   if (appName) {
     app.setPath("userData", path.join(app.getPath("appData"), appName));
   }
 
-  const gotLock = app.requestSingleInstanceLock({ hanakoHome });
+  const gotLock = app.requestSingleInstanceLock({ agentryHome });
   if (!gotLock) {
     exitDuplicateClient(app);
     return false;

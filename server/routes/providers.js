@@ -14,7 +14,7 @@ import { clearConfigCache } from "../../lib/memory/config-loader.js";
 // ── Models-cache helpers ──
 
 function getCachePath(engine) {
-  return path.join(engine.hanakoHome, "models-cache.json");
+  return path.join(engine.agentryHome, "models-cache.json");
 }
 
 function readModelsCache(engine) {
@@ -59,6 +59,7 @@ export function createProvidersRoute(engine) {
     for (const [name, p] of Object.entries(rawProviders)) {
       const entry = engine.providerRegistry.get(name);
       providers[name] = {
+        display_name: p.display_name || "",
         base_url: p.base_url || entry?.baseUrl || "",
         api_key: p.api_key || "",
         api: p.api || entry?.api || "",
@@ -95,6 +96,7 @@ export function createProvidersRoute(engine) {
 
     // 先处理 added-models.yaml 中的 provider（保持顺序）
     for (const [name, p] of Object.entries(providers)) {
+      const entry = provRegistry.get(name);
       const isOAuth = provRegistry.isOAuth(name);
       const authType = provRegistry.getAuthType?.(name) || (isOAuth ? "oauth" : "api-key");
       const oauthInfo = getOAuthLoginInfo(name);
@@ -113,7 +115,7 @@ export function createProvidersRoute(engine) {
       result[name] = {
         type: isOAuth ? "oauth" : "api-key",
         auth_type: authType,
-        display_name: oauthInfo?.name || name,
+        display_name: p.display_name || entry?.displayName || oauthInfo?.name || name,
         base_url: p.base_url || "",
         api: p.api || "",
         api_key: p.api_key || "",

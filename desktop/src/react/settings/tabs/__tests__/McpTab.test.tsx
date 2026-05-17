@@ -63,7 +63,7 @@ describe('McpTab', () => {
     apiMocks.setMcpEnabled.mockResolvedValue(undefined);
     useSettingsStore.setState({
       currentAgentId: 'hanako',
-      agents: [{ id: 'hanako', name: 'Hanako', yuan: 'hanako', isPrimary: true }],
+      agents: [{ id: 'hanako', name: 'Agentry', yuan: 'hanako', isPrimary: true }],
     });
 
     render(<McpTab />);
@@ -81,7 +81,7 @@ describe('McpTab', () => {
     apiMocks.setMcpEnabled.mockResolvedValue(undefined);
     useSettingsStore.setState({
       currentAgentId: 'hanako',
-      agents: [{ id: 'hanako', name: 'Hanako', yuan: 'hanako', isPrimary: true }],
+      agents: [{ id: 'hanako', name: 'Agentry', yuan: 'hanako', isPrimary: true }],
     });
 
     render(<McpTab />);

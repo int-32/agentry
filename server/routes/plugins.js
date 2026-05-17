@@ -5,7 +5,7 @@ import os from "os";
 import crypto from "crypto";
 import { extractZip } from "../../lib/extract-zip.js";
 import { resolveAgent } from "../utils/resolve-agent.js";
-import { fromRoot } from "../../shared/hana-root.js";
+import { fromRoot } from "../../shared/agentry-root.js";
 import { DEFAULT_THEME } from "../../desktop/src/shared/theme-registry.cjs";
 import { registerSessionFileFromRequest } from "../../lib/session-files/session-file-response.js";
 import {
@@ -25,7 +25,7 @@ const MAX_PLUGIN_RELEASE_PACKAGE_SIZE = 50 * 1024 * 1024;
  * @param {import("hono").Context} c
  * @param {import("hono").Hono} pluginApp
  * @param {string} pluginId
- * @param {string} [agentId] - 当前 agent id，注入到子请求的 X-Hana-Agent-Id header
+ * @param {string} [agentId] - 当前 agent id，注入到子请求的 X-Agentry-Agent-Id header
  */
 async function proxyToPlugin(c, pluginApp, pluginId, agentId) {
   const url = new URL(c.req.url);
@@ -37,7 +37,7 @@ async function proxyToPlugin(c, pluginApp, pluginId, agentId) {
   url.pathname = subPath;
 
   const headers = new Headers(c.req.raw.headers);
-  if (agentId) headers.set("X-Hana-Agent-Id", agentId);
+  if (agentId) headers.set("X-Agentry-Agent-Id", agentId);
 
   const hasBody = c.req.method !== "GET" && c.req.method !== "HEAD";
   const subReq = new Request(url.toString(), {
@@ -250,7 +250,7 @@ async function installPluginFromPath({
     }
 
     backup = createPluginInstallBackup({
-      hanakoHome: engine.hanakoHome,
+      agentryHome: engine.agentryHome,
       pluginId: desc.id,
       pluginDir: targetDir,
       version: installedVersion,
@@ -345,8 +345,8 @@ async function downloadMarketplaceRelease({ engine, plugin }) {
     err.status = 500;
     throw err;
   }
-  if (!engine.hanakoHome) {
-    const err = new Error("HANA_HOME is unavailable for plugin release installation");
+  if (!engine.agentryHome) {
+    const err = new Error("AGENTRY_HOME is unavailable for plugin release installation");
     err.status = 500;
     throw err;
   }
@@ -379,7 +379,7 @@ async function downloadMarketplaceRelease({ engine, plugin }) {
 
   const pluginId = safePathSegment(plugin.id, "plugin");
   const version = safePathSegment(plugin.version, "0.0.0");
-  const downloadsDir = path.join(engine.hanakoHome, "plugin-install-sources", pluginId, version);
+  const downloadsDir = path.join(engine.agentryHome, "plugin-install-sources", pluginId, version);
   fs.mkdirSync(downloadsDir, { recursive: true });
   const packagePath = path.join(downloadsDir, `${pluginId}-${version}.zip`);
   fs.writeFileSync(packagePath, body);
@@ -466,7 +466,7 @@ function sanitizeMarketplacePluginForClient(plugin) {
 
 /**
  * Plugin management REST API + route proxy (combined).
- * @param {import('../../core/engine.js').HanaEngine} engine
+ * @param {import('../../core/engine.js').AgentryEngine} engine
  */
 export function createPluginsRoute(engine) {
   const route = new Hono();
@@ -673,7 +673,7 @@ export function createPluginsRoute(engine) {
 
   function getMarketplace() {
     return engine.pluginMarketplace || createDefaultPluginMarketplace({
-      hanakoHome: engine.hanakoHome,
+      agentryHome: engine.agentryHome,
       fetchImpl: engine.fetch,
     });
   }

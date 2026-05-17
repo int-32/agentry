@@ -5,7 +5,7 @@ describe("buildWin32SandboxHelperArgs", () => {
   it("emits requested AppContainer network capabilities only when requested", () => {
     const base = {
       cwd: "C:\\work",
-      executable: "C:\\Hanako\\resources\\git\\bin\\bash.exe",
+      executable: "C:\\Agentry\\resources\\git\\bin\\bash.exe",
       args: ["-lc", "curl https://example.com"],
       grants: { writePaths: ["C:\\work"] },
     };
@@ -30,7 +30,7 @@ describe("buildWin32SandboxHelperArgs", () => {
       "--grant-write",
       "C:\\work",
       "--",
-      "C:\\Hanako\\resources\\git\\bin\\bash.exe",
+      "C:\\Agentry\\resources\\git\\bin\\bash.exe",
       "-lc",
       "curl https://example.com",
     ]);

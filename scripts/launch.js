@@ -10,7 +10,11 @@ import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-process.env.HANA_HOME = join(homedir(), ".hanako-dev");
+// dev 数据目录：~/.agentry-dev（与生产 ~/.agentry 隔离）
+// 同时设置 AGENTRY_HOME 和 HANA_HOME，兼容期内任何下游代码读哪个都对
+const devHome = join(homedir(), ".agentry-dev");
+process.env.AGENTRY_HOME = devHome;
+process.env.HANA_HOME = devHome;
 // 本地 Electron 再拉起 server 时，显式把当前 Node runtime 传下去。
 // 这样开发模式的 server/source 进程就不会误用 Electron 自带 Node，避免 native addon ABI 漂移。
 process.env.HANA_DEV_NODE_BIN = process.execPath;

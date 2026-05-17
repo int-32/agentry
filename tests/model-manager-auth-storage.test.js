@@ -66,7 +66,7 @@ describe("ModelManager AuthStorage ownership", () => {
       deepseek: deepseekProvider(undefined),
     });
 
-    const manager = new ModelManager({ hanakoHome: tmpDir });
+    const manager = new ModelManager({ agentryHome: tmpDir });
     manager.init();
     await manager.syncAndRefresh();
 
@@ -93,7 +93,7 @@ describe("ModelManager AuthStorage ownership", () => {
       },
     });
 
-    const manager = new ModelManager({ hanakoHome: tmpDir });
+    const manager = new ModelManager({ agentryHome: tmpDir });
     manager.init();
     await manager.syncAndRefresh();
 
@@ -110,7 +110,7 @@ describe("ModelManager AuthStorage ownership", () => {
       deepseek: deepseekProvider("sk-new-999c"),
     });
 
-    const manager = new ModelManager({ hanakoHome: tmpDir });
+    const manager = new ModelManager({ agentryHome: tmpDir });
     manager.init();
     await manager.syncAndRefresh();
 
@@ -127,7 +127,7 @@ describe("ModelManager AuthStorage ownership", () => {
       deepseek: deepseekProvider(""),
     });
 
-    const manager = new ModelManager({ hanakoHome: tmpDir });
+    const manager = new ModelManager({ agentryHome: tmpDir });
     manager.init();
     await manager.syncAndRefresh();
 
@@ -138,6 +138,31 @@ describe("ModelManager AuthStorage ownership", () => {
     expect(manager.availableModels.filter((m) => m.provider === "deepseek")).toHaveLength(0);
   });
 
+  it("does not resurrect a cleared built-in provider from a local dummy projection", async () => {
+    writeAuth({});
+    writeAddedModels({});
+    writeModelsJson({
+      providers: {
+        openai: {
+          baseUrl: "http://127.0.0.1:51720/v1",
+          api: "openai-completions",
+          apiKey: "dummy",
+          models: [
+            { id: "codex" },
+            { id: "gemini-3" },
+          ],
+        },
+      },
+    });
+
+    const manager = new ModelManager({ agentryHome: tmpDir });
+    manager.init();
+    await manager.reloadAndSync();
+
+    const persistedProviders = YAML.load(fs.readFileSync(path.join(tmpDir, "added-models.yaml"), "utf-8")).providers;
+    expect(persistedProviders.openai).toBeUndefined();
+  });
+
   it("reloadAndSync clears stale in-memory API-key auth before refreshing models", async () => {
     writeAuth({
       deepseek: { type: "api_key", key: "sk-old-3ffa" },
@@ -146,7 +171,7 @@ describe("ModelManager AuthStorage ownership", () => {
       deepseek: deepseekProvider("sk-new-999c"),
     });
 
-    const manager = new ModelManager({ hanakoHome: tmpDir });
+    const manager = new ModelManager({ agentryHome: tmpDir });
     manager.init();
     writeAuth({});
 

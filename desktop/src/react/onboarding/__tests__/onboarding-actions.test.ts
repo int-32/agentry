@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { saveModel, saveWorkspace } from '../onboarding-actions';
-import type { HanaFetch } from '../onboarding-actions';
+import type { AgentryFetch } from '../onboarding-actions';
 
 function jsonResponse(body: unknown): Response {
   return { json: async () => body } as Response;
@@ -8,7 +8,7 @@ function jsonResponse(body: unknown): Response {
 
 describe('onboarding saveModel', () => {
   it('persists only models the user explicitly added to the provider', async () => {
-    const hanaFetch = vi.fn<HanaFetch>(async () => jsonResponse({ ok: true }));
+    const hanaFetch = vi.fn<AgentryFetch>(async () => jsonResponse({ ok: true }));
 
     await saveModel({
       hanaFetch,
@@ -45,7 +45,7 @@ describe('onboarding saveModel', () => {
 
 describe('onboarding saveWorkspace', () => {
   it('creates the default workspace before saving the agent desk config', async () => {
-    const hanaFetch = vi.fn<HanaFetch>(async () => jsonResponse({ ok: true }));
+    const hanaFetch = vi.fn<AgentryFetch>(async () => jsonResponse({ ok: true }));
 
     await saveWorkspace({
       hanaFetch,

@@ -884,6 +884,7 @@
       "empty": "还没有注册供应商",
       "fetchModels": "读取模型",
       "delete": "删除供应商",
+      "clearConfig": "清除配置",
       "modelCount": "{n} 个模型",
       "fetchSuccess": "{name} 获取了 {n} 个模型",
       "fetchFailed": "拉取失败",
@@ -892,6 +893,7 @@
       "apiRequired": "请选择 API 协议",
       "added": "已添加 {name}",
       "deleted": "已删除 {name}",
+      "clearedConfig": "已清除 {name} 配置",
       "noModels": "暂无模型",
       "resetModels": "重置模型",
       "apiType": "API 类型",
@@ -906,7 +908,8 @@
       "addCustom": "添加自定义供应商",
       "noKey": "未配置",
       "remove": "移除",
-      "deleteConfirm": "确定删除供应商 {name}？相关模型将一并清除。"
+      "deleteConfirm": "确定删除供应商 {name}？相关模型将一并清除。",
+      "clearConfigConfirm": "确定清除 {name} 的 API Key、Base URL 和模型？供应商入口仍会保留，方便重新配置。"
     },
     "media": {
       "imageGeneration": "图片生成",

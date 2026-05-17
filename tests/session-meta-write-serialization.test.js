@@ -214,7 +214,7 @@ describe("SessionCoordinator.writeSessionMeta serialization", () => {
 
     const coord = new SessionCoordinator(makeCoordinatorDeps({
       agentsDir,
-      listAgents: () => [{ id: "hana", name: "Hana" }],
+      listAgents: () => [{ id: "hana", name: "Agentry" }],
       agentIdFromSessionPath: (p) => {
         const rel = path.relative(agentsDir, p);
         return rel.split(path.sep)[0] || null;

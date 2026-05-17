@@ -23,7 +23,7 @@ function readJson(filePath) {
 
 function writeProvidersYaml(filePath, raw, providers) {
   const header =
-    "# Hanako 供应商配置（全局，跨 agent 共享）\n" +
+    "# Agentry 供应商配置（全局，跨 agent 共享）\n" +
     "# 由设置页面管理\n\n";
   const tmpPath = filePath + ".tmp";
   fs.writeFileSync(
@@ -60,7 +60,7 @@ function extractProjectedApiKey(providerConfig) {
 }
 
 function isSyntheticLocalApiKey(apiKey, entry, providerConfig) {
-  if (apiKey !== "local") return false;
+  if (apiKey !== "local" && apiKey !== "dummy") return false;
   return providerCredentialAllowsMissingApiKey({
     authType: entry?.authType,
     baseUrl: providerConfig?.baseUrl || entry?.baseUrl || "",
@@ -140,17 +140,17 @@ function filterInvalidProviderModels(providerId, models, baseUrl) {
  * - 凭证来源优先级为 added-models.yaml 显式值 > models.json 投影值 > auth.json 旧值；
  * - 尽量从 provider 插件或旧 models.json 回填 base_url/api/models，帮助旧配置自愈。
  */
-export function migrateLegacyApiKeyAuthToProviders({ hanakoHome, providerRegistry, log = () => {} }) {
-  if (!hanakoHome) return { migrated: 0, providers: [] };
+export function migrateLegacyApiKeyAuthToProviders({ agentryHome, providerRegistry, log = () => {} }) {
+  if (!agentryHome) return { migrated: 0, providers: [] };
 
-  const authPath = path.join(hanakoHome, "auth.json");
-  const providersPath = path.join(hanakoHome, "added-models.yaml");
+  const authPath = path.join(agentryHome, "auth.json");
+  const providersPath = path.join(agentryHome, "added-models.yaml");
   const auth = readJson(authPath);
 
   providerRegistry?.reload?.();
   const raw = safeReadYAMLSync(providersPath, {}, YAML) || {};
   const providers = isPlainObject(raw.providers) ? { ...raw.providers } : {};
-  const modelsJsonProvidersRaw = readJson(path.join(hanakoHome, "models.json")).providers || {};
+  const modelsJsonProvidersRaw = readJson(path.join(agentryHome, "models.json")).providers || {};
   const modelsJsonProviders = isPlainObject(modelsJsonProvidersRaw) ? modelsJsonProvidersRaw : {};
   const providerKeys = new Set([
     ...(isPlainObject(auth) ? Object.keys(auth) : []),

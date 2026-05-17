@@ -40,7 +40,7 @@ describe("AgentManager.deleteAgent skill bundle lifecycle", () => {
       savePreferences: vi.fn(),
     };
     manager = new AgentManager({
-      hanakoHome: tempDir,
+      agentryHome: tempDir,
       agentsDir,
       productDir: tempDir,
       userDir: tempDir,

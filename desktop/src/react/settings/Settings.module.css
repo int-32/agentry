@@ -12,6 +12,7 @@
 .settings-panel-modal {
     --settings-nav-width: 160px;
     --settings-main-x-padding: var(--space-xl);
+    --settings-main-max-width: 700px;
     width: 100%;
     height: 100%;
     padding-top: var(--space-sm);
@@ -63,7 +64,7 @@
 
 .settings-header-modal {
     display: grid;
-    grid-template-columns: calc(var(--settings-nav-width, 160px) + var(--settings-main-x-padding, var(--space-xl))) minmax(0, 640px);
+    grid-template-columns: calc(var(--settings-nav-width, 160px) + var(--settings-main-x-padding, var(--space-xl))) minmax(0, var(--settings-main-max-width, 640px));
     align-items: center;
     padding: var(--space-lg) 0 var(--space-md);
     gap: 0;
@@ -172,7 +173,7 @@
     flex: 1;
     overflow-y: auto;
     padding: 0 var(--settings-main-x-padding, var(--space-xl)) var(--space-xl);
-    max-width: 640px;
+    max-width: var(--settings-main-max-width, 640px);
 }
 
 .settings-main-wide {
@@ -3813,6 +3814,37 @@ a.about-link:hover {
     color: var(--text);
 }
 
+.pv-detail-title-input {
+    flex: 1;
+    min-width: 0;
+    max-width: 320px;
+    margin: 0;
+    padding: 4px 6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-input, 4px);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.pv-detail-title-input:hover {
+    border-color: var(--border-light, var(--overlay-light));
+    background: var(--bg-hover);
+}
+
+.pv-detail-title-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--bg);
+}
+
+.pv-detail-title-input:disabled {
+    color: var(--text);
+    opacity: 1;
+}
+
 .pv-empty {
     display: flex;
     align-items: center;
@@ -3894,7 +3926,8 @@ a.about-link:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
+    min-width: 52px;
+    padding: 0 10px;
     height: 28px;
     background: none;
     border: 1px solid var(--border);
@@ -3903,6 +3936,8 @@ a.about-link:hover {
     cursor: pointer;
     flex-shrink: 0;
     transition: all var(--duration-fast);
+    font-family: inherit;
+    font-size: 0.72rem;
 }
 
 .pv-cred-conn-icon:hover { color: var(--accent); border-color: var(--accent); }

@@ -28,7 +28,7 @@ describe("skills route", () => {
     const agentId = "hana";
     const agentDir = path.join(tempRoot, agentId);
     fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Hana\n", "utf-8");
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
 
     const { createSkillsRoute } = await import("../server/routes/skills.js");
     const app = new Hono();
@@ -70,7 +70,7 @@ describe("skills route", () => {
     const agentId = "hana";
     const agentDir = path.join(tempRoot, agentId);
     fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Hana\n", "utf-8");
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
 
     const { createSkillsRoute } = await import("../server/routes/skills.js");
     const app = new Hono();
@@ -105,7 +105,7 @@ describe("skills route", () => {
     const agentId = "hana";
     const agentDir = path.join(tempRoot, agentId);
     fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Hana\n", "utf-8");
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
 
     const { createSkillsRoute } = await import("../server/routes/skills.js");
     const app = new Hono();
@@ -150,7 +150,7 @@ describe("skills route", () => {
     const agentId = "hana";
     const agentDir = path.join(tempRoot, agentId);
     fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Hana\n", "utf-8");
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
 
     const { createSkillsRoute } = await import("../server/routes/skills.js");
     const app = new Hono();
@@ -200,7 +200,7 @@ describe("skills route", () => {
     const agentId = "hana";
     const agentDir = path.join(tempRoot, agentId);
     fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Hana\n", "utf-8");
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
     fs.writeFileSync(path.join(tempRoot, "skill-bundles.json"), JSON.stringify({
       schemaVersion: 1,
       bundles: [
@@ -220,7 +220,7 @@ describe("skills route", () => {
     const { createSkillsRoute } = await import("../server/routes/skills.js");
     const app = new Hono();
     const engine = {
-      hanakoHome: tempRoot,
+      agentryHome: tempRoot,
       agentsDir: tempRoot,
       getAllSkills: vi.fn(() => [
         { name: "writer", enabled: true, source: "user" },
@@ -258,7 +258,7 @@ describe("skills route", () => {
     const { createSkillsRoute } = await import("../server/routes/skills.js");
     const app = new Hono();
     const engine = {
-      hanakoHome: tempRoot,
+      agentryHome: tempRoot,
       agentsDir: tempRoot,
       emitEvent: vi.fn(),
       getAllSkills: vi.fn(() => [
@@ -316,7 +316,7 @@ describe("skills route", () => {
     const { createSkillsRoute } = await import("../server/routes/skills.js");
     const app = new Hono();
     const engine = {
-      hanakoHome: tempRoot,
+      agentryHome: tempRoot,
       agentsDir: tempRoot,
       emitEvent: vi.fn(),
       getAllSkills: vi.fn(() => [
@@ -385,7 +385,7 @@ describe("skills route", () => {
       ],
     }), "utf-8");
     const engine = {
-      hanakoHome: tempRoot,
+      agentryHome: tempRoot,
       userSkillsDir,
       skillsDir: userSkillsDir,
       cwd: exportsDir,
@@ -446,7 +446,7 @@ describe("skills route", () => {
     const { createSkillsRoute } = await import("../server/routes/skills.js");
     const app = new Hono();
     const engine = {
-      hanakoHome: tempRoot,
+      agentryHome: tempRoot,
       agentsDir: tempRoot,
       getAllSkills: vi.fn(() => [{ name: "writer", enabled: false, source: "user" }]),
       emitEvent: vi.fn(),
@@ -706,7 +706,7 @@ describe("DELETE /skills/:name — per-agent target selection", () => {
       agents: ["agent-a"],
       currentAgentId: "agent-a",
     });
-    engine.hanakoHome = tempRoot;
+    engine.agentryHome = tempRoot;
     writeUserSkill("bundled-skill");
     fs.writeFileSync(path.join(tempRoot, "skill-bundles.json"), JSON.stringify({
       schemaVersion: 1,

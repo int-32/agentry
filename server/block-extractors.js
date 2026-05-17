@@ -153,8 +153,8 @@ function buildComputerAppApprovalBlock(confirmation) {
     kind: "computer_app_approval",
     surface: "input",
     status: confirmation.status || "pending",
-    title: "允许 Hana 使用电脑",
-    body: "Hana 想控制这个应用来继续当前任务。",
+    title: "允许 Agentry 使用电脑",
+    body: "Agentry 想控制这个应用来继续当前任务。",
     subject: {
       label: appName,
       detail: `${approval.providerId} · ${approval.appId}`,

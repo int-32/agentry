@@ -27,7 +27,7 @@ describe("ChannelRouter trigger lifecycle", () => {
     const channelsDir = path.join(tmpDir, "channels");
     const agentsDir = path.join(tmpDir, "agents");
     fs.mkdirSync(path.join(agentsDir, "hana"), { recursive: true });
-    fs.writeFileSync(path.join(agentsDir, "hana", "config.yaml"), "agent:\n  name: Hana\n", "utf-8");
+    fs.writeFileSync(path.join(agentsDir, "hana", "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
     fs.writeFileSync(path.join(agentsDir, "hana", "channels.md"), "# Channels\n\n", "utf-8");
 
     const { id: channelId } = await createChannel(channelsDir, {
@@ -35,7 +35,7 @@ describe("ChannelRouter trigger lifecycle", () => {
       name: "Crew",
       members: ["hana", "butter"],
     });
-    await appendMessage(path.join(channelsDir, `${channelId}.md`), "user", "@Hana hello");
+    await appendMessage(path.join(channelsDir, `${channelId}.md`), "user", "@Agentry hello");
 
     const hub = {
       engine: {
@@ -63,7 +63,7 @@ describe("ChannelRouter trigger lifecycle", () => {
     tmpDir = mktemp();
     const channelsDir = path.join(tmpDir, "channels");
     const agentsDir = path.join(tmpDir, "agents");
-    for (const [agentId, name] of [["hana", "Hana"], ["yui", "Yui Ray"]]) {
+    for (const [agentId, name] of [["hana", "Agentry"], ["yui", "Yui Ray"]]) {
       fs.mkdirSync(path.join(agentsDir, agentId), { recursive: true });
       fs.writeFileSync(path.join(agentsDir, agentId, "config.yaml"), `agent:\n  name: ${name}\n`, "utf-8");
       fs.writeFileSync(path.join(agentsDir, agentId, "channels.md"), "# Channels\n\n", "utf-8");
@@ -85,7 +85,7 @@ describe("ChannelRouter trigger lifecycle", () => {
         agentsDir,
         agents: new Map([["hana", postAgent]]),
         listAgents: () => [
-          { id: "hana", name: "Hana" },
+          { id: "hana", name: "Agentry" },
           { id: "yui", name: "Yui Ray" },
         ],
         isChannelsEnabled: () => true,

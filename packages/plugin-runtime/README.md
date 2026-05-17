@@ -1,11 +1,11 @@
-# @hana/plugin-runtime
+# @agentry/plugin-runtime
 
-Node-side helper package for Hana plugins.
+Node-side helper package for Agentry plugins.
 
-This package is intentionally small. It gives plugin authors stable shapes and TypeScript types while preserving Hana's current plugin loading model.
+This package is intentionally small. It gives plugin authors stable shapes and TypeScript types while preserving Agentry's current plugin loading model.
 
 ```ts
-import { definePlugin, defineTool } from '@hana/plugin-runtime';
+import { definePlugin, defineTool } from '@agentry/plugin-runtime';
 
 export const searchTool = defineTool({
   name: 'search',
@@ -32,12 +32,12 @@ export default definePlugin({
 });
 ```
 
-Static `tools/*.js` and `commands/*.js` still use Hana's named export loader today. Lifecycle plugins can already use `export default definePlugin(...)` because the host expects a default class-compatible value.
+Static `tools/*.js` and `commands/*.js` still use Agentry's named export loader today. Lifecycle plugins can already use `export default definePlugin(...)` because the host expects a default class-compatible value.
 
 ## EventBus helpers
 
 ```ts
-import { defineBusHandler, HANA_BUS_SKIP, requestBus } from '@hana/plugin-runtime';
+import { defineBusHandler, HANA_BUS_SKIP, requestBus } from '@agentry/plugin-runtime';
 
 export const bridgeSend = defineBusHandler<
   { platform: string; text: string },
@@ -78,7 +78,7 @@ the host EventBus capability directory before making optional requests.
 ## SessionFile media helpers
 
 ```ts
-import { createMediaDetails, defineTool } from '@hana/plugin-runtime';
+import { createMediaDetails, defineTool } from '@agentry/plugin-runtime';
 
 export const renderImage = defineTool({
   name: 'render_image',
@@ -107,7 +107,7 @@ Provider plugins live in `providers/*.js` and require `trust: "full-access"`.
 The runtime package exposes provider types and `defineProvider()` for authoring, but the host loader still reads named exports from each provider file.
 
 ```ts
-import { defineProvider } from '@hana/plugin-runtime';
+import { defineProvider } from '@agentry/plugin-runtime';
 
 const provider = defineProvider({
   id: 'my-image-cli',

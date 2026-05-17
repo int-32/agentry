@@ -10,7 +10,7 @@ function makeSession(overrides: Partial<Session>): Session {
     modified: '2026-04-29T01:00:00.000Z',
     messageCount: 1,
     agentId: 'hana',
-    agentName: 'Hana',
+    agentName: 'Agentry',
     cwd: null,
     ...overrides,
   };

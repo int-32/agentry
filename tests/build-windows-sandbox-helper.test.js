@@ -23,7 +23,7 @@ describe("Windows sandbox helper build script", () => {
 
   it("links the Win32 libraries required by AppContainer and ACL APIs", () => {
     const command = buildWindowsSandboxCompileCommand({
-      source: "C:\\repo\\desktop\\native\\HanaWindowsSandboxHelper\\main.cpp",
+      source: "C:\\repo\\desktop\\native\\AgentryWindowsSandboxHelper\\main.cpp",
       output: "C:\\repo\\dist-sandbox\\win-x64\\hana-win-sandbox.exe",
     });
 

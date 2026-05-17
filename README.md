@@ -1,19 +1,21 @@
 <p align="center">
-  <img src=".github/assets/banner.jpg" width="100%" alt="OpenHanako Banner">
+  <img src=".github/assets/banner.jpg" width="100%" alt="Agentry Banner">
 </p>
 
 <p align="center">
-  <img src=".github/assets/Hanako-280.png" width="80" alt="Hanako">
+  <img src=".github/assets/Hanako-280.png" width="80" alt="Agentry">
 </p>
 
-<h1 align="center">OpenHanako</h1>
+<h1 align="center">Agentry</h1>
 
 <p align="center">一个有记忆、有灵魂的私人 AI 助理</p>
+
+<p align="center"><sub>基于 <a href="https://github.com/liliMozi/openhanako">OpenHanako</a> (by liliMozi) fork，由 int-32 维护</sub></p>
 
 <p align="center"><a href="README_EN.md">English</a></p>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/liliMozi/openhanako/releases)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/int-32/agentry/releases)
 
 ---
 
@@ -67,15 +69,15 @@ OpenHanako 是一个更加易用的 AI agent，有记忆，有性格，会主动
 
 ### 下载安装
 
-**macOS（Apple Silicon / Intel）**：从 [Releases](https://github.com/liliMozi/openhanako/releases) 下载最新 `.dmg`。
+**macOS（Apple Silicon / Intel）**：从 [Releases](https://github.com/int-32/agentry/releases) 下载最新 `.dmg`。
 
 应用已通过 Apple Developer ID 签名和公证，macOS 应该可以直接打开。
 
-**Windows**：从 [Releases](https://github.com/liliMozi/openhanako/releases) 下载最新 `.exe` 安装包。
+**Windows**：从 [Releases](https://github.com/int-32/agentry/releases) 下载最新 `.exe` 安装包。
 
 > **Windows SmartScreen 提示：** 安装包暂未经过代码签名，首次运行时 Windows Defender SmartScreen 可能会拦截，点击**更多信息** → **仍要运行**即可，未签名版本的正常现象。
 
-**Linux**：从 [Releases](https://github.com/liliMozi/openhanako/releases) 下载最新 `.AppImage` 或 `.deb`。
+**Linux**：从 [Releases](https://github.com/int-32/agentry/releases) 下载最新 `.AppImage` 或 `.deb`。
 
 ### 首次运行
 
@@ -101,10 +103,10 @@ tests/          Vitest 测试
 
 Session 内的用户可见文件通过 `SessionFile` sidecar 统一登记，桌面端、Bridge 和未来移动端按各自能力消费同一份文件身份。Bridge 平台媒体发送规则见 `.docs/BRIDGE-MEDIA-CAPABILITIES.md`，插件文件贡献规则见 `PLUGINS.md`。
 
-本机 staged 文件优先由各平台 adapter 直接上传：Telegram / 飞书 / 微信走各自上传接口，QQ 走官方 Bot 分片上传接口，再发送 `msg_type: 7` 富媒体消息。`preferences.bridge.mediaPublicBaseUrl` / `HANA_BRIDGE_PUBLIC_BASE_URL` 只用于仍需公网 URL 的平台或远程 fallback；该 URL 作为 `/api/bridge/media/:token` 临时文件路由的 origin，文件本身仍由短期 token、下载次数和本地路径白名单保护。Hana 不会自动开启公网 tunnel，公网入口必须由用户显式提供。
+本机 staged 文件优先由各平台 adapter 直接上传：Telegram / 飞书 / 微信走各自上传接口，QQ 走官方 Bot 分片上传接口，再发送 `msg_type: 7` 富媒体消息。`preferences.bridge.mediaPublicBaseUrl` / `AGENTRY_BRIDGE_PUBLIC_BASE_URL` 只用于仍需公网 URL 的平台或远程 fallback；该 URL 作为 `/api/bridge/media/:token` 临时文件路由的 origin，文件本身仍由短期 token、下载次数和本地路径白名单保护。Agentry 不会自动开启公网 tunnel，公网入口必须由用户显式提供。
 
 Server 以独立 Node.js 进程运行（由 Electron spawn 或独立启动），通过 Vite 打包，@vercel/nft 追踪依赖。与 Electron 渲染进程通过 WebSocket 通信。
-用户数据目录由 `HANA_HOME` 决定（生产默认 `~/.hanako`，开发默认 `~/.hanako-dev`）。Pi SDK 自己的数据隔离在 `${HANA_HOME}/.pi/` 下。
+用户数据目录由 `AGENTRY_HOME` 决定（生产默认 `~/.agentry`，开发默认 `~/.agentry-dev`）。旧 `HANA_HOME` 仍可作 fallback，老 `~/.hanako/` 数据首次启动会自动迁移到新目录。Pi SDK 自己的数据隔离在 `${AGENTRY_HOME}/.pi/` 下。
 
 ## 技术栈
 
@@ -154,9 +156,8 @@ npm run typecheck
 
 ## 链接
 
-- [官网](https://openhanako.com)
-- [提交 Issue](https://github.com/liliMozi/openhanako/issues)
-- [安全页](https://github.com/liliMozi/openhanako/security)
+- [提交 Issue](https://github.com/int-32/agentry/issues)
+- [安全页](https://github.com/int-32/agentry/security)
 - [安全政策](SECURITY.md)
 - [插件开发指南](PLUGINS.md)
 - [贡献指南](CONTRIBUTING.md)

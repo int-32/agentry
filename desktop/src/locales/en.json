@@ -879,6 +879,7 @@
       "empty": "No providers registered yet",
       "fetchModels": "Fetch Models",
       "delete": "Delete provider",
+      "clearConfig": "Clear config",
       "modelCount": "{n} models",
       "fetchSuccess": "Fetched {n} models from {name}",
       "fetchFailed": "Fetch failed",
@@ -887,6 +888,7 @@
       "apiRequired": "API protocol is required",
       "added": "Added {name}",
       "deleted": "Deleted {name}",
+      "clearedConfig": "Cleared config for {name}",
       "noModels": "No models yet",
       "resetModels": "Reset Models",
       "apiType": "API Type",
@@ -901,7 +903,8 @@
       "addCustom": "Add Custom Provider",
       "noKey": "Not configured",
       "remove": "Remove",
-      "deleteConfirm": "Delete provider {name}? Associated models will be removed."
+      "deleteConfirm": "Delete provider {name}? Associated models will be removed.",
+      "clearConfigConfirm": "Clear API Key, Base URL, and models for {name}? The built-in provider entry will stay available for setup."
     },
     "media": {
       "imageGeneration": "Image Generation",

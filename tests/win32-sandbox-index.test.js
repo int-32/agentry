@@ -37,7 +37,7 @@ describe("createSandboxedTools on Windows", () => {
       agentDir: "C:\\hana\\agents\\hana",
       workspace: "C:\\work",
       workspaceFolders: [],
-      hanakoHome: "C:\\hana",
+      agentryHome: "C:\\hana",
       getSandboxEnabled: () => true,
       getSandboxNetworkEnabled,
       getExternalReadPaths,

@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "author": {
-    "name": "liliMozi"
+    "name": "int-32"
   },
   "keywords": [
     "ai-agent",
@@ -40,7 +40,7 @@
     "build:packages": "npm run build --workspaces --if-present",
     "generate:windows-icon": "node scripts/generate-windows-icon.cjs",
     "pack": "npm run build:computer-use-helper && npm run build:server && npm run build:client && electron-builder --dir",
-    "install:local": "npm run pack && rm -rf /Applications/Agentry.app && cp -R dist/mac-arm64/Agentry.app /Applications/ && printf 'provider: github\\nowner: liliMozi\\nrepo: openhanako\\n' > /Applications/Agentry.app/Contents/Resources/app-update.yml && node scripts/sign-local.cjs",
+    "install:local": "npm run pack && rm -rf /Applications/Agentry.app && cp -R dist/mac-arm64/Agentry.app /Applications/ && printf 'provider: github\\nowner: int-32\\nrepo: agentry\\n' > /Applications/Agentry.app/Contents/Resources/app-update.yml && node scripts/sign-local.cjs",
     "dist": "npm run build:computer-use-helper && npm run build:server && npm run build:client && electron-builder --mac dmg",
     "dist:win": "npm run build:computer-use-helper && npm run build:windows-sandbox-helper && npm run generate:windows-icon && npm run build:server && npm run build:client && electron-builder --win nsis",
     "dist:linux": "npm run build:server && npm run build:client && electron-builder --linux AppImage deb",
@@ -187,8 +187,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "liliMozi",
-        "repo": "openhanako"
+        "owner": "int-32",
+        "repo": "agentry"
       }
     ],
     "win": {
@@ -219,7 +219,7 @@
         "AppImage",
         "deb"
       ],
-      "maintainer": "liliMozi <liliMozi@users.noreply.github.com>",
+      "maintainer": "int-32 <int-32@users.noreply.github.com>",
       "category": "Utility",
       "icon": "desktop/src/icon.png",
       "artifactName": "${productName}-${version}-Linux-${arch}.${ext}"

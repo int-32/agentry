@@ -62,7 +62,7 @@ export function ProvidersTab() {
         onClick={() => selectProvider(id)}
       >
         <span className={`${styles['pv-status-dot']}${p.has_credentials  ? ' ' + styles['on'] : ''}`} />
-        <span className={styles['pv-list-item-name']}>{preset?.label || p.display_name || id}</span>
+        <span className={styles['pv-list-item-name']}>{p.display_name || preset?.label || id}</span>
         <span className={styles['pv-list-item-count']}>{modelCount}</span>
       </button>
     );
