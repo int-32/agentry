@@ -20,9 +20,46 @@ import { query as claudeQuery } from "@anthropic-ai/claude-agent-sdk";
 import { Codex } from "@openai/codex-sdk";
 import { spawn } from "node:child_process";
 import readline from "node:readline";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 
 const PORT = parseInt(process.env.AGENTRY_BRIDGE_PORT || "51720", 10);
+
+// ── conversation → backend session 映射 ──
+// Hanako 每轮发完整 messages 历史给 bridge，但 Claude / Codex SDK 之 query 之 prompt 只取最后一条
+// （丢历史）。修法：bridge 维护 fingerprint(model + system + 首 user 内容) → SDK session_id 之
+// 映射；首轮新建并捕 session_id 入表，次轮起以 resume / resumeThread 续接 SDK 端持化之 session。
+// Gemini CLI 之 --resume 取 project-scoped index 不利多 conv 并存，降级走 history concat。
+const conversationSessions = new Map(); // fp -> { backend, sessionId, lastAccessed }
+const CONV_CACHE_MAX = 200; // 简易 LRU 上限
+
+function fingerprintConversation(model, systemPrompt, messages) {
+  // 首条 user 消息 + system 前 1000 字 + model：可对一条 conv 跨轮稳定标识
+  const firstUser = Array.isArray(messages) ? messages.find(m => m && m.role === "user") : null;
+  const firstUserText = firstUser ? flattenContent(firstUser.content) : "";
+  const sysPart = (systemPrompt || "").slice(0, 1000);
+  const usrPart = firstUserText.slice(0, 1000);
+  return createHash("sha256").update(`${model}\0${sysPart}\0${usrPart}`).digest("hex").slice(0, 16);
+}
+
+function rememberSession(fp, backend, sessionId) {
+  if (!fp || !sessionId) return;
+  if (conversationSessions.size >= CONV_CACHE_MAX) {
+    // 淘汰最久未访问
+    let oldest = null, oldestT = Infinity;
+    for (const [k, v] of conversationSessions) {
+      if (v.lastAccessed < oldestT) { oldest = k; oldestT = v.lastAccessed; }
+    }
+    if (oldest) conversationSessions.delete(oldest);
+  }
+  conversationSessions.set(fp, { backend, sessionId, lastAccessed: Date.now() });
+}
+
+function lookupSession(fp, backend) {
+  const entry = conversationSessions.get(fp);
+  if (!entry || entry.backend !== backend) return null;
+  entry.lastAccessed = Date.now();
+  return entry.sessionId;
+}
 
 // ── 路由：按 model 名前缀选 backend ──
 function routeBackend(model) {
@@ -67,6 +104,19 @@ function extractPrompt(messages) {
 function composeForNoSystemBackend(systemPrompt, userPrompt) {
   if (!systemPrompt) return userPrompt;
   return `=== SYSTEM ===\n${systemPrompt}\n\n=== USER ===\n${userPrompt}`;
+}
+
+// ── Gemini 用：把完整 conversation 历史拍平为单段 text（approach A — token 倍增但能跑）──
+// 用于 Gemini 因其 --resume 取 project-scoped index 不利多 conv 并存，故走 history concat 代替
+function flattenHistoryForGemini(systemPrompt, messages) {
+  const parts = [];
+  if (systemPrompt) parts.push(`=== SYSTEM ===\n${systemPrompt}`);
+  if (!Array.isArray(messages)) return parts.join("\n\n");
+  const turns = messages
+    .filter(m => m && (m.role === "user" || m.role === "assistant"))
+    .map(m => `=== ${m.role.toUpperCase()} ===\n${flattenContent(m.content)}`);
+  if (turns.length > 0) parts.push(turns.join("\n\n"));
+  return parts.join("\n\n");
 }
 
 // ── 写 SSE delta chunk ──
@@ -136,7 +186,7 @@ function writeDone(res, id, model, finishReason = "stop", usage = null) {
 //   assistant.thinking   → delta.reasoning_content（pi-ai → thinking 块 / ThinkingBlock）
 //   assistant.tool_use   → markdown 头 "▸ <name>(args)"（不发 delta.tool_calls，避免 Hanako 重执行死循环）
 //   user.tool_result     → markdown fenced code block
-async function streamClaude({ res, id, model, prompt, systemPrompt }) {
+async function streamClaude({ res, id, model, prompt, systemPrompt, conversationFp }) {
   // Claude SDK 隔离配置：
   //   - settingSources: [] —— 禁加载 ~/.claude/settings.json + project/.claude/settings.json
   //     避免本机 CC session 之 SessionStart hook（persona-inject 等）污染 bridge 子进程之 persona
@@ -145,15 +195,23 @@ async function streamClaude({ res, id, model, prompt, systemPrompt }) {
   //     markdown 文本透传，无 GUI prompt 通道；若 agent 调 AskUserQuestion，raw call 会作 markdown
   //     落 Hanako 对话页，陛下无法用 GUI 答 — UX 错位。屏蔽后 agent 改在 text 内列选项让陛下下条
   //     message 答（兼容 GUI 单文本输入框）
+  //   - resume: <sessionId> —— 次轮起续命 SDK 端存于 ~/.claude/projects/ 之 session，保 chat 上下文
   const options = {
     settingSources: [],
     disallowedTools: ["AskUserQuestion", "ExitPlanMode"],
   };
   if (systemPrompt) options.systemPrompt = systemPrompt;
+  const resumeId = conversationFp ? lookupSession(conversationFp, "claude") : null;
+  if (resumeId) options.resume = resumeId;
   const stream = claudeQuery({ prompt, options });
   let usage = null;
+  let capturedSessionId = null;
   const toolNameById = new Map();
   for await (const msg of stream) {
+    // SDK 每条消息皆带 session_id（首轮自生新 UUID，续轮等于 resume 之值）
+    if (msg && typeof msg.session_id === "string" && !capturedSessionId) {
+      capturedSessionId = msg.session_id;
+    }
     if (msg.type === "assistant" && msg.message?.content) {
       for (const block of msg.message.content) {
         if (block.type === "text" && block.text) {
@@ -183,6 +241,9 @@ async function streamClaude({ res, id, model, prompt, systemPrompt }) {
       usage = msg.usage || null;
     }
   }
+  if (conversationFp && capturedSessionId) {
+    rememberSession(conversationFp, "claude", capturedSessionId);
+  }
   writeDone(res, id, model, "stop", usage && {
     prompt_tokens: usage.input_tokens || 0,
     completion_tokens: usage.output_tokens || 0,
@@ -198,17 +259,24 @@ async function streamClaude({ res, id, model, prompt, systemPrompt }) {
 //   item.completed/file_change       → markdown edit 行
 //   item.completed/mcp_tool_call     → markdown 行 + 结果块
 //   item.completed/web_search        → markdown web_search 行
-async function streamCodex({ res, id, model, prompt, systemPrompt }) {
+async function streamCodex({ res, id, model, prompt, systemPrompt, conversationFp }) {
   // Codex SDK ThreadOptions 无 system/instructions 槽，把 systemPrompt prepend 到 prompt
+  // 次轮起以 resumeThread 续命 codex 端存于 ~/.codex/sessions/ 之 thread，保 chat 上下文
   const codex = new Codex();
-  const thread = codex.startThread({ sandboxMode: "read-only", skipGitRepoCheck: true, approvalPolicy: "never" });
-  const finalPrompt = composeForNoSystemBackend(systemPrompt, prompt);
+  const threadOpts = { sandboxMode: "read-only", skipGitRepoCheck: true, approvalPolicy: "never" };
+  const resumeId = conversationFp ? lookupSession(conversationFp, "codex") : null;
+  const thread = resumeId ? codex.resumeThread(resumeId, threadOpts) : codex.startThread(threadOpts);
+  // 续命时 system prompt 不必再 prepend（前轮已植）；首轮才注入
+  const finalPrompt = resumeId ? prompt : composeForNoSystemBackend(systemPrompt, prompt);
   const streamed = await thread.runStreamed(finalPrompt);
 
   let lastText = "";
   let usage = null;
+  let capturedThreadId = resumeId || null;
   for await (const evt of streamed.events) {
-    if (evt.type === "item.updated" && evt.item.type === "agent_message") {
+    if (evt.type === "thread.started" && evt.thread_id) {
+      capturedThreadId = evt.thread_id; // 首轮 codex 生成新 thread_id；续轮等于 resume 之值
+    } else if (evt.type === "item.updated" && evt.item.type === "agent_message") {
       const cur = evt.item.text || "";
       const delta = cur.slice(lastText.length);
       if (delta) writeDelta(res, id, model, delta);
@@ -241,6 +309,9 @@ async function streamCodex({ res, id, model, prompt, systemPrompt }) {
       usage = evt.usage;
     }
   }
+  if (conversationFp && capturedThreadId) {
+    rememberSession(conversationFp, "codex", capturedThreadId);
+  }
   writeDone(res, id, model, "stop", usage && {
     prompt_tokens: usage.input_tokens || 0,
     completion_tokens: usage.output_tokens || 0,
@@ -254,14 +325,14 @@ async function streamCodex({ res, id, model, prompt, systemPrompt }) {
 //   { type:"tool_use", tool_name, tool_id, parameters }         → tool_call
 //   { type:"tool_result", tool_id, status, output, error }      → tool_result block
 //   { type:"result", stats }                                    → usage
-async function streamGemini({ res, id, model, prompt, systemPrompt }) {
-  // gemini CLI 无 --system flag，把 systemPrompt prepend 到 -p prompt。
+async function streamGemini({ res, id, model, fullHistoryPrompt }) {
+  // gemini CLI 无 --system flag，把 systemPrompt + full history prepend 到 -p prompt（approach A）。
+  // --resume 取 project-scoped index 不利多 conv 并存，故 bridge 每轮重发完整 history 代替续命。
   // --approval-mode yolo：bridge 无 GUI 接通道，缺省 default 模式会等用户确认致流挂死
-  const finalPrompt = composeForNoSystemBackend(systemPrompt, prompt);
   return new Promise((resolve) => {
     const child = spawn(
       "gemini",
-      ["-p", finalPrompt, "-o", "stream-json", "--approval-mode", "yolo"],
+      ["-p", fullHistoryPrompt, "-o", "stream-json", "--approval-mode", "yolo"],
       { stdio: ["ignore", "pipe", "pipe"], env: process.env }
     );
     const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
@@ -334,9 +405,14 @@ const server = createServer(async (req, res) => {
       const model = payload.model || "claude-opus-4-1";
       const prompt = extractPrompt(payload.messages);
       const systemPrompt = extractSystemPrompt(payload.messages);
+      const conversationFp = fingerprintConversation(model, systemPrompt, payload.messages);
       const id = `chatcmpl-${randomUUID()}`;
       const backend = routeBackend(model);
       const wantStream = payload.stream === true;
+      // Gemini 走 approach A（history concat），其他走 B（SDK resume by sessionId）
+      const fullHistoryPrompt = (backend === "gemini")
+        ? flattenHistoryForGemini(systemPrompt, payload.messages)
+        : null;
 
       // ── 非流式 (stream: false) —— 累计后一次返完整 ChatCompletion JSON ──
       if (!wantStream) {
@@ -357,11 +433,11 @@ const server = createServer(async (req, res) => {
           },
           end: () => {},
         };
-        console.error(`[bridge] ${new Date().toISOString()} ${backend} ${model} (non-stream) sys=${systemPrompt.length}B prompt=${prompt.slice(0, 60).replace(/\n/g, "↵")}`);
+        console.error(`[bridge] ${new Date().toISOString()} ${backend} ${model} (non-stream) sys=${systemPrompt.length}B fp=${conversationFp.slice(0, 8)} prompt=${prompt.slice(0, 60).replace(/\n/g, "↵")}`);
         try {
-          if (backend === "claude") await streamClaude({ res: fakeRes, id, model, prompt, systemPrompt });
-          else if (backend === "codex") await streamCodex({ res: fakeRes, id, model, prompt, systemPrompt });
-          else if (backend === "gemini") await streamGemini({ res: fakeRes, id, model, prompt, systemPrompt });
+          if (backend === "claude") await streamClaude({ res: fakeRes, id, model, prompt, systemPrompt, conversationFp });
+          else if (backend === "codex") await streamCodex({ res: fakeRes, id, model, prompt, systemPrompt, conversationFp });
+          else if (backend === "gemini") await streamGemini({ res: fakeRes, id, model, fullHistoryPrompt });
         } catch (err) {
           console.error(`[bridge][ERROR non-stream] ${err.message}`);
           textBuf += `\n[bridge:error] ${err.message}`;
@@ -387,12 +463,12 @@ const server = createServer(async (req, res) => {
         "Connection": "keep-alive",
       });
 
-      console.error(`[bridge] ${new Date().toISOString()} ${backend} ${model} (stream) sys=${systemPrompt.length}B prompt=${prompt.slice(0, 60).replace(/\n/g, "↵")}`);
+      console.error(`[bridge] ${new Date().toISOString()} ${backend} ${model} (stream) sys=${systemPrompt.length}B fp=${conversationFp.slice(0, 8)} prompt=${prompt.slice(0, 60).replace(/\n/g, "↵")}`);
 
       try {
-        if (backend === "claude") await streamClaude({ res, id, model, prompt, systemPrompt });
-        else if (backend === "codex") await streamCodex({ res, id, model, prompt, systemPrompt });
-        else if (backend === "gemini") await streamGemini({ res, id, model, prompt, systemPrompt });
+        if (backend === "claude") await streamClaude({ res, id, model, prompt, systemPrompt, conversationFp });
+        else if (backend === "codex") await streamCodex({ res, id, model, prompt, systemPrompt, conversationFp });
+        else if (backend === "gemini") await streamGemini({ res, id, model, fullHistoryPrompt });
         else {
           writeDelta(res, id, model, `[bridge] unknown backend for model ${model}`);
           writeDone(res, id, model);
