@@ -29,7 +29,14 @@ export function OAuthCredentials({ providerId, summary, onRefresh }: {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      platform?.openExternal?.(data.url);
+      if (!data.url) throw new Error('empty url from server');
+      if (!platform?.openExternal) throw new Error('platform.openExternal unavailable');
+      try {
+        await platform.openExternal(data.url);
+      } catch (e: unknown) {
+        const m = e instanceof Error ? e.message : String(e);
+        throw new Error('openExternal failed: ' + m);
+      }
       if (data.instructions) {
         setDeviceCode(data.instructions);
         setPolling(true);

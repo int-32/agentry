@@ -2898,13 +2898,22 @@ wrapIpcBestEffortHandler("open-file", (_event, filePath) => {
 });
 
 wrapIpcBestEffortHandler("open-external", (_event, url) => {
-  if (!url) return;
+  if (!url) {
+    console.warn("[open-external] empty url");
+    return;
+  }
   try {
     const parsed = new URL(url);
     if (parsed.protocol === "https:" || parsed.protocol === "http:") {
-      shell.openExternal(url);
+      shell.openExternal(url).catch((err) => {
+        console.warn("[open-external] shell.openExternal failed:", err?.message || err);
+      });
+    } else {
+      console.warn("[open-external] unsupported protocol:", parsed.protocol);
     }
-  } catch {}
+  } catch (e) {
+    console.warn("[open-external] invalid url:", url, e?.message || e);
+  }
 });
 
 // 读取文件内容（仅文本文件，用于 Artifacts 预览）
