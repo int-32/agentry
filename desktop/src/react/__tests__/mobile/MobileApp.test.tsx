@@ -303,6 +303,92 @@ describe('MobileApp', () => {
       expect(screen.getByText('电脑新会话')).toBeInTheDocument();
     });
   });
+
+  it('opens the session drawer from a left-edge swipe on narrow mobile', async () => {
+    stubNarrowViewport(true);
+    fetchMock.mockImplementation((input: RequestInfo | URL, options?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/web-auth/session')) {
+        return Promise.resolve(jsonResponse({ authenticated: true, principal: principal(['chat', 'resources.read', 'files.read', 'files.write']) }));
+      }
+      return Promise.resolve(jsonResponse(jsonResponseForMobile(url, options)));
+    });
+
+    render(<MobileApp />);
+    await screen.findByText('日常记录');
+    await waitFor(() => expect(useStore.getState().sidebarOpen).toBe(false));
+
+    fireEvent.touchStart(mobileShell(), {
+      touches: [{ clientX: 8, clientY: 220 }],
+    });
+    fireEvent.touchMove(mobileShell(), {
+      touches: [{ clientX: 78, clientY: 228 }],
+    });
+    fireEvent.touchEnd(mobileShell(), {
+      changedTouches: [{ clientX: 82, clientY: 230 }],
+    });
+
+    expect(useStore.getState().sidebarOpen).toBe(true);
+    expect(useStore.getState().jianOpen).toBe(false);
+  });
+
+  it('opens the workbench drawer from a right-edge swipe on narrow mobile', async () => {
+    stubNarrowViewport(true);
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    fetchMock.mockImplementation((input: RequestInfo | URL, options?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/web-auth/session')) {
+        return Promise.resolve(jsonResponse({ authenticated: true, principal: principal(['chat', 'resources.read', 'files.read', 'files.write']) }));
+      }
+      return Promise.resolve(jsonResponse(jsonResponseForMobile(url, options)));
+    });
+
+    render(<MobileApp />);
+    await screen.findByText('日常记录');
+    await waitFor(() => expect(useStore.getState().jianOpen).toBe(false));
+
+    fireEvent.touchStart(mobileShell(), {
+      touches: [{ clientX: 382, clientY: 220 }],
+    });
+    fireEvent.touchMove(mobileShell(), {
+      touches: [{ clientX: 305, clientY: 226 }],
+    });
+    fireEvent.touchEnd(mobileShell(), {
+      changedTouches: [{ clientX: 300, clientY: 228 }],
+    });
+
+    expect(useStore.getState().jianOpen).toBe(true);
+    expect(useStore.getState().sidebarOpen).toBe(false);
+  });
+
+  it('does not open mobile drawers from non-edge swipes', async () => {
+    stubNarrowViewport(true);
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    fetchMock.mockImplementation((input: RequestInfo | URL, options?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/web-auth/session')) {
+        return Promise.resolve(jsonResponse({ authenticated: true, principal: principal(['chat', 'resources.read', 'files.read', 'files.write']) }));
+      }
+      return Promise.resolve(jsonResponse(jsonResponseForMobile(url, options)));
+    });
+
+    render(<MobileApp />);
+    await screen.findByText('日常记录');
+    await waitFor(() => expect(useStore.getState().sidebarOpen).toBe(false));
+
+    fireEvent.touchStart(mobileShell(), {
+      touches: [{ clientX: 120, clientY: 220 }],
+    });
+    fireEvent.touchMove(mobileShell(), {
+      touches: [{ clientX: 200, clientY: 225 }],
+    });
+    fireEvent.touchEnd(mobileShell(), {
+      changedTouches: [{ clientX: 205, clientY: 225 }],
+    });
+
+    expect(useStore.getState().sidebarOpen).toBe(false);
+    expect(useStore.getState().jianOpen).toBe(false);
+  });
 });
 
 function principal(scopes: string[], credentialKind = 'device_credential') {
@@ -391,6 +477,25 @@ function jsonResponse(data: unknown): Response {
     text: async () => typeof data === 'string' ? data : JSON.stringify(data),
     headers: new Headers(),
   } as Response;
+}
+
+function stubNarrowViewport(matches: boolean): void {
+  vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+    matches,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })));
+}
+
+function mobileShell(): HTMLElement {
+  const shell = document.querySelector<HTMLElement>('.mobile-desktop-root');
+  if (!shell) throw new Error('mobile shell not found');
+  return shell;
 }
 
 function resetStoreForMobileTest(): void {

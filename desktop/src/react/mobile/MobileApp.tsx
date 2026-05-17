@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { AppTitlebar } from '../components/app/AppTitlebar';
 import { ChatPage, WorkspaceCompanionRail } from '../components/app/AppPages';
@@ -21,6 +21,17 @@ import {
 type AuthState = 'checking' | 'login' | 'ready';
 type LoginMode = 'device' | 'password';
 const MOBILE_REQUIRED_SCOPES = Object.freeze(['chat', 'resources.read', 'files.read', 'files.write']);
+const MOBILE_EDGE_GESTURE_WIDTH = 28;
+const MOBILE_EDGE_GESTURE_MIN_DISTANCE = 56;
+const MOBILE_EDGE_GESTURE_MAX_VERTICAL_DRIFT = 80;
+const MOBILE_EDGE_GESTURE_DOMINANCE = 1.25;
+
+type MobileEdgeGesture = {
+  edge: 'left' | 'right';
+  startX: number;
+  startY: number;
+  cancelled: boolean;
+};
 
 export function MobileApp(): React.ReactElement {
   const [authState, setAuthState] = useState<AuthState>('checking');
@@ -116,6 +127,7 @@ function MobileDesktopShell({
   const jianOpen = useStore(s => s.jianOpen);
   const currentTab = useStore(s => s.currentTab);
   const isNarrow = useNarrowMobileViewport();
+  const edgeGestureRef = useRef<MobileEdgeGesture | null>(null);
 
   useEffect(() => {
     useStore.setState({ currentTab: 'chat' });
@@ -126,9 +138,88 @@ function MobileDesktopShell({
   }, [isNarrow]);
 
   const showDrawerScrim = (sidebarOpen || jianOpen) && isNarrow;
+  const openMobileDrawerFromGesture = useCallback((edge: MobileEdgeGesture['edge']) => {
+    if (edge === 'left') {
+      useStore.setState({ jianOpen: false });
+      toggleSidebar(true);
+      return;
+    }
+    useStore.setState({ sidebarOpen: false });
+    toggleJianSidebar(true);
+  }, []);
+
+  const handleTouchStart = useCallback((event: React.TouchEvent<HTMLElement>) => {
+    edgeGestureRef.current = null;
+    if (!isNarrow || sidebarOpen || jianOpen || event.touches.length !== 1) return;
+    if (shouldIgnoreMobileEdgeGestureTarget(event.target)) return;
+
+    const touch = event.touches[0];
+    const width = window.innerWidth || document.documentElement.clientWidth;
+    if (touch.clientX <= MOBILE_EDGE_GESTURE_WIDTH) {
+      edgeGestureRef.current = {
+        edge: 'left',
+        startX: touch.clientX,
+        startY: touch.clientY,
+        cancelled: false,
+      };
+      return;
+    }
+    if (touch.clientX >= width - MOBILE_EDGE_GESTURE_WIDTH) {
+      edgeGestureRef.current = {
+        edge: 'right',
+        startX: touch.clientX,
+        startY: touch.clientY,
+        cancelled: false,
+      };
+    }
+  }, [isNarrow, jianOpen, sidebarOpen]);
+
+  const handleTouchMove = useCallback((event: React.TouchEvent<HTMLElement>) => {
+    const gesture = edgeGestureRef.current;
+    if (!gesture || event.touches.length !== 1) return;
+
+    const touch = event.touches[0];
+    const dx = touch.clientX - gesture.startX;
+    const dy = touch.clientY - gesture.startY;
+    const horizontalDistance = gesture.edge === 'left' ? dx : -dx;
+    const verticalDistance = Math.abs(dy);
+
+    if (verticalDistance > 18 && verticalDistance > Math.abs(dx)) {
+      gesture.cancelled = true;
+      return;
+    }
+    if (horizontalDistance > 12 && horizontalDistance > verticalDistance * MOBILE_EDGE_GESTURE_DOMINANCE) {
+      event.preventDefault();
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback((event: React.TouchEvent<HTMLElement>) => {
+    const gesture = edgeGestureRef.current;
+    edgeGestureRef.current = null;
+    if (!gesture || gesture.cancelled) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+
+    const dx = touch.clientX - gesture.startX;
+    const dy = touch.clientY - gesture.startY;
+    const horizontalDistance = gesture.edge === 'left' ? dx : -dx;
+    const verticalDistance = Math.abs(dy);
+    const isDrawerSwipe = horizontalDistance >= MOBILE_EDGE_GESTURE_MIN_DISTANCE
+      && verticalDistance <= MOBILE_EDGE_GESTURE_MAX_VERTICAL_DRIFT
+      && horizontalDistance > verticalDistance * MOBILE_EDGE_GESTURE_DOMINANCE;
+    if (!isDrawerSwipe) return;
+    openMobileDrawerFromGesture(gesture.edge);
+  }, [openMobileDrawerFromGesture]);
 
   return (
-    <main className="mobile-desktop-root" data-mobile-principal={principal?.credentialKind || 'session'}>
+    <main
+      className="mobile-desktop-root"
+      data-mobile-principal={principal?.credentialKind || 'session'}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={() => { edgeGestureRef.current = null; }}
+    >
       <AppTitlebar
         sidebarOpen={sidebarOpen}
         jianOpen={jianOpen}
@@ -254,6 +345,11 @@ function MobileLoginScreen({
 
 function closeMobileDrawers() {
   useStore.setState({ sidebarOpen: false, jianOpen: false });
+}
+
+function shouldIgnoreMobileEdgeGestureTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest('input, textarea, select, button, [contenteditable="true"], [data-mobile-gesture-ignore="true"]'));
 }
 
 function principalHasRequiredScopes(principal: MobilePrincipal, requiredScopes: readonly string[]): boolean {
