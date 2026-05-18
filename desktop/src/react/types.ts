@@ -82,6 +82,7 @@ export interface Channel {
   messageCount?: number;
   newMessageCount: number;
   isDM?: boolean;
+  dmOwnerId?: string;
   peerId?: string;
   peerName?: string;
 }
