@@ -75,4 +75,15 @@ describe("lib/extract-zip", () => {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
   });
+
+  it("keeps search tool zip downloads on the hardened wrapper", () => {
+    const source = fs.readFileSync(
+      path.join(process.cwd(), "lib", "pi-sdk", "search-tools.js"),
+      "utf-8",
+    );
+
+    expect(source).toContain('import { extractZip } from "../extract-zip.js";');
+    expect(source).not.toContain('from "extract-zip"');
+    expect(source).toContain("await extractZip(archivePath, extractDir);");
+  });
 });
