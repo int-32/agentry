@@ -1575,6 +1575,7 @@
     "fileLabel": "파일",
     "openWithDefault": "기본 앱으로 열기",
     "refresh": "새로고침",
+    "newMarkdownFileName": "제목 없음.md",
     "newFolder": "새 폴더",
     "ctx": {
       "open": "열기",
@@ -1590,6 +1591,7 @@
     "deleteConfirm": "\"{name}\"을 시스템 휴지통으로 이동할까요?",
     "deleteSelectedConfirm": "선택한 {count}개 항목을 시스템 휴지통으로 이동할까요?",
     "trashFailed": "시스템 휴지통으로 이동하지 못했습니다",
+    "createFailed": "생성 실패",
     "renameInvalid": "파일 이름에는 경로 구분자를 사용할 수 없습니다",
     "renameFailed": "이름 변경 실패",
     "sort": {

@@ -1615,6 +1615,7 @@
     "fileLabel": "file",
     "openWithDefault": "Open with default app",
     "refresh": "Refresh",
+    "newMarkdownFileName": "Untitled.md",
     "newFolder": "New Folder",
     "ctx": {
       "open": "Open",
@@ -1630,6 +1631,7 @@
     "deleteConfirm": "Move \"{name}\" to the system Trash?",
     "deleteSelectedConfirm": "Move {count} selected items to the system Trash?",
     "trashFailed": "Failed to move item to the system Trash",
+    "createFailed": "Create failed",
     "renameInvalid": "File names cannot contain path separators",
     "renameFailed": "Rename failed",
     "sort": {

@@ -1620,6 +1620,7 @@
     "fileLabel": "文件",
     "openWithDefault": "用默认应用打开",
     "refresh": "刷新",
+    "newMarkdownFileName": "未命名.md",
     "newFolder": "新建文件夹",
     "ctx": {
       "open": "打开",
@@ -1635,6 +1636,7 @@
     "deleteConfirm": "要把「{name}」移到系统废纸篓吗？",
     "deleteSelectedConfirm": "要把选中的 {count} 项移到系统废纸篓吗？",
     "trashFailed": "移到系统废纸篓失败",
+    "createFailed": "创建失败",
     "renameInvalid": "文件名不能包含路径分隔符",
     "renameFailed": "重命名失败",
     "sort": {

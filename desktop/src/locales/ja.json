@@ -1575,6 +1575,7 @@
     "fileLabel": "ファイル",
     "openWithDefault": "デフォルトアプリで開く",
     "refresh": "再読み込み",
+    "newMarkdownFileName": "無題.md",
     "newFolder": "新しいフォルダ",
     "ctx": {
       "open": "開く",
@@ -1590,6 +1591,7 @@
     "deleteConfirm": "「{name}」をシステムのゴミ箱に移動しますか？",
     "deleteSelectedConfirm": "選択した {count} 件をシステムのゴミ箱に移動しますか？",
     "trashFailed": "システムのゴミ箱への移動に失敗しました",
+    "createFailed": "作成に失敗しました",
     "renameInvalid": "ファイル名にパス区切り文字は使えません",
     "renameFailed": "名前の変更に失敗しました",
     "sort": {
