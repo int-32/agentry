@@ -188,7 +188,7 @@ export function createAgentsRoute(engine) {
       emitAppEvent(engine, "agent-created", { agentId: result.id, name: result.name });
       return c.json({ ok: true, ...result });
     } catch (err) {
-      return c.json({ error: err.message }, err.message.includes("已存在") ? 409 : 500);
+      return c.json({ error: err.message }, err.statusCode || (err.message.includes("已存在") ? 409 : 500));
     }
   });
 

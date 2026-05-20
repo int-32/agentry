@@ -71,6 +71,31 @@ describe("agents route", () => {
     expect(engine.emitEvent).not.toHaveBeenCalled();
   });
 
+  it("returns create validation status codes without emitting agent-created", async () => {
+    const { createAgentsRoute } = await import("../server/routes/agents.js");
+    const app = new Hono();
+    const err = new Error('Invalid yuan "caikangyong": template not found in lib/yuan');
+    err.code = "INVALID_YUAN";
+    err.statusCode = 400;
+    const engine = {
+      createAgent: vi.fn().mockRejectedValue(err),
+      emitEvent: vi.fn(),
+    };
+
+    app.route("/api", createAgentsRoute(engine));
+
+    const res = await app.request("/api/agents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "蔡康永", yuan: "caikangyong" }),
+    });
+    const data = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(data.error).toContain('Invalid yuan "caikangyong"');
+    expect(engine.emitEvent).not.toHaveBeenCalled();
+  });
+
   it("returns and emits the switched session workspace contract", async () => {
     const { createAgentsRoute } = await import("../server/routes/agents.js");
     const app = new Hono();
