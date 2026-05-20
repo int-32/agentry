@@ -14,6 +14,99 @@ function normalizeSlashes(value) {
   return String(value || "").replace(/\\/g, "/");
 }
 
+function direntType(entry) {
+  if (entry.isDirectory()) return "directory";
+  if (entry.isFile()) return "file";
+  if (entry.isSymbolicLink()) return "symlink";
+  return "other";
+}
+
+function inspectDirectoryEntries(dirPath, maxEntries = 40) {
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+      .map(entry => ({
+        name: entry.name,
+        type: direntType(entry),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return {
+      entries: entries.slice(0, maxEntries),
+      truncated: entries.length > maxEntries,
+      entryCount: entries.length,
+    };
+  } catch (err) {
+    return {
+      entries: [],
+      truncated: false,
+      entryCount: null,
+      error: {
+        code: err?.code || null,
+        message: err?.message || String(err),
+      },
+    };
+  }
+}
+
+function inspectInstallPath({ filePath, relativePath, listEntries = false, maxEntries = 40 }) {
+  const base = {
+    relativePath,
+    path: normalizeSlashes(filePath),
+    exists: false,
+    readable: false,
+    type: "missing",
+  };
+
+  try {
+    const stat = fs.statSync(filePath);
+    const type = stat.isDirectory() ? "directory" : stat.isFile() ? "file" : "other";
+    const result = {
+      ...base,
+      exists: true,
+      readable: canRead(filePath),
+      type,
+      size: stat.isFile() ? stat.size : null,
+    };
+    if (listEntries && stat.isDirectory()) {
+      return {
+        ...result,
+        ...inspectDirectoryEntries(filePath, maxEntries),
+      };
+    }
+    return result;
+  } catch (err) {
+    return {
+      ...base,
+      error: err?.code || null,
+    };
+  }
+}
+
+function buildWindowsInstallSurfaceContext({ execPath, resourcesPath } = {}) {
+  const executablePath = execPath || "";
+  const appRoot = executablePath ? path.dirname(executablePath) : "";
+  const resourcesRoot = resourcesPath || (appRoot ? path.join(appRoot, "resources") : "");
+  return {
+    appRoot: normalizeSlashes(appRoot),
+    resourcesRoot: normalizeSlashes(resourcesRoot),
+    appAsar: inspectInstallPath({
+      filePath: path.join(resourcesRoot, "app.asar"),
+      relativePath: "resources/app.asar",
+    }),
+    legacyAppDirectory: inspectInstallPath({
+      filePath: path.join(resourcesRoot, "app"),
+      relativePath: "resources/app",
+      listEntries: true,
+      maxEntries: 40,
+    }),
+    resourcesDirectory: inspectInstallPath({
+      filePath: resourcesRoot,
+      relativePath: "resources",
+      listEntries: true,
+      maxEntries: 80,
+    }),
+  };
+}
+
 function buildWindowsInstallSurfaceChecks({ execPath, resourcesPath } = {}) {
   const executablePath = execPath || "";
   const appRoot = executablePath ? path.dirname(executablePath) : "";
@@ -100,6 +193,7 @@ function checkWindowsInstallSurface(opts = {}) {
     ok: missing.length === 0,
     checked,
     missing,
+    context: buildWindowsInstallSurfaceContext(opts),
   };
 }
 
@@ -150,6 +244,7 @@ function formatInstallSurfaceError(result, diagnosticPath) {
 
 module.exports = {
   appendLaunchLog,
+  buildWindowsInstallSurfaceContext,
   buildWindowsInstallSurfaceChecks,
   checkWindowsInstallSurface,
   formatInstallSurfaceError,

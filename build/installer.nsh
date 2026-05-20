@@ -304,6 +304,7 @@ CRCCheck off
   RMDir /r "$INSTDIR\resources\server"
   RMDir /r "$INSTDIR\resources\git"
   RMDir /r "$INSTDIR\resources\screenshot-themes"
+  RMDir /r "$INSTDIR\resources\app"
   RMDir /r "$INSTDIR\resources\app.asar.unpacked"
   Delete "$INSTDIR\resources\app.asar"
   Delete "$INSTDIR\resources\app-update.yml"

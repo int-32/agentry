@@ -102,6 +102,41 @@ describe("desktop launch integrity helper", () => {
     ]);
   });
 
+  it("records legacy unpacked app directory diagnostics without accepting it as a fallback", () => {
+    const helper = loadHelper();
+    if (!helper) return;
+
+    const tmp = makeTempDir();
+    const resourcesPath = path.join(tmp, "resources");
+    writeFile(tmp, "Hanako.exe");
+    writeFile(resourcesPath, "app/desktop/bootstrap.cjs");
+    writeFile(resourcesPath, "app/package.json");
+    writeFile(resourcesPath, "app-update.yml");
+    writeFile(resourcesPath, "server/hana-server.exe");
+    writeFile(resourcesPath, "server/bootstrap.js");
+    writeFile(resourcesPath, "server/bundle/index.js");
+    writeFile(resourcesPath, "server/node_modules/better-sqlite3/build/Release/better_sqlite3.node");
+    writeFile(resourcesPath, "git/cmd/git.exe");
+    writeFile(resourcesPath, "git/usr/bin/bash.exe");
+
+    const result = helper.checkWindowsInstallSurface({
+      execPath: path.join(tmp, "Hanako.exe"),
+      resourcesPath,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.missing.map(item => item.id)).toEqual(["app-asar"]);
+    expect(result.context.legacyAppDirectory).toMatchObject({
+      relativePath: "resources/app",
+      exists: true,
+      type: "directory",
+    });
+    expect(result.context.legacyAppDirectory.entries.map(item => item.name)).toEqual([
+      "desktop",
+      "package.json",
+    ]);
+  });
+
   it("writes a launch diagnostic file with the failed self-check payload", () => {
     const helper = loadHelper();
     if (!helper) return;

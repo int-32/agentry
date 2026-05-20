@@ -37,6 +37,13 @@ describe("Windows NSIS installer contract", () => {
     expect(source).toContain('RMDir /r "$INSTDIR\\resources\\server"');
   });
 
+  it("removes legacy unpacked Electron app directories before overlaying new files", () => {
+    const source = fs.readFileSync(path.join(root, "build", "installer.nsh"), "utf-8");
+    const macro = extractMacro(source, "hanakoRemoveOwnedInstallTrees");
+
+    expect(macro).toContain('RMDir /r "$INSTDIR\\resources\\app"');
+  });
+
   it("cleans processes by install-directory ownership, not only fixed image names", () => {
     const source = fs.readFileSync(path.join(root, "build", "installer.nsh"), "utf-8");
     const macro = extractMacro(source, "hanakoStopInstallDirProcesses");
