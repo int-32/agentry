@@ -39,6 +39,9 @@ import { createTerminalTool } from "../lib/tools/terminal-tool.js";
 import { runCompatChecks } from "../lib/compat/index.js";
 import { getPlatformPromptNote } from "./platform-prompt.js";
 import { assertAgentConfigPatchYuan, getAgentConfigRepairState } from "./yuan-registry.js";
+import { createModuleLogger } from "../lib/debug-log.js";
+
+const moduleLog = createModuleLogger("agent");
 
 export class Agent {
   /**
@@ -207,7 +210,7 @@ export class Agent {
         // 写迁移标记，防止重复迁移
         fs.writeFileSync(migrationDone, new Date().toISOString());
       } catch (err) {
-        console.error(`[agent] v1→v2 迁移失败（不影响启动）: ${err.message}`);
+        moduleLog.error(`v1→v2 迁移失败（不影响启动）: ${err.message}`);
         // 迁移失败也写标记，避免每次启动重试
         try { fs.writeFileSync(migrationDone, `failed: ${err.message}`); } catch {}
       }
@@ -224,10 +227,10 @@ export class Agent {
     this._memoryModel = userSetUtilityLarge || chatModelRef;
 
     if (!userSetUtility && chatModelRef) {
-      console.log(`[agent] utility 模型未配置，使用聊天模型作为工具模型`);
+      moduleLog.log(`utility 模型未配置，使用聊天模型作为工具模型`);
     }
     if (!userSetUtilityLarge && chatModelRef) {
-      console.log(`[agent] utility_large 模型未配置，使用聊天模型作为记忆模型`);
+      moduleLog.log(`utility_large 模型未配置，使用聊天模型作为记忆模型`);
     }
 
     // 保存解析函数：每次 tick 现场调用，拿到最新凭证。
@@ -240,11 +243,11 @@ export class Agent {
         this._resolveModel(this._memoryModel, this._config);
       } catch (err) {
         const src = userSetUtilityLarge ? "utility_large" : "聊天模型 fallback";
-        console.warn(`[memory] ${src} 解析失败，记忆系统暂不可用（改完凭证后 tick 会自动恢复） — ${err.message}`);
+        moduleLog.warn(`记忆系统暂不可用：${src} 解析失败（改完凭证后 tick 会自动恢复） — ${err.message}`);
         this._cb?.emitDevLog?.(`记忆系统暂不可用：${src} 解析失败 — ${err.message}`, "warn");
       }
     } else if (!this._memoryModel) {
-      console.warn("[memory] 记忆系统未启动：utility_large 未配置且无聊天模型可 fallback");
+      moduleLog.warn("记忆系统未启动：utility_large 未配置且无聊天模型可 fallback");
       this._cb?.emitDevLog?.("记忆系统未启动：未配置工具模型且无聊天模型可 fallback", "warn");
     }
 
@@ -263,7 +266,7 @@ export class Agent {
           // _systemPrompt 是非 session 路径（巡检/cron/频道/DM/bridge owner 新建）
           // 共享的 cache，必须按 master 构建，不被 per-session 开关污染。
           this._systemPrompt = this.buildSystemPrompt({ forceMemoryEnabled: this._memoryMasterEnabled });
-          console.log(`[${this.agentName}] 记忆编译完成，system prompt 已刷新`);
+          moduleLog.log(`${this.agentName} 记忆编译完成，system prompt 已刷新`);
         },
         sessionDir: this.sessionDir,
         memoryDir: path.dirname(this.memoryMdPath),
@@ -279,7 +282,7 @@ export class Agent {
       // 避免 agent runtime 初始化时直接抢前台 CPU。
       this._memoryTicker.start();
     } else {
-      console.warn(`[agent] ⚠ 未配置 utility 模型，记忆系统暂不可用（用户可在设置中配置后重启）`);
+      moduleLog.warn(`⚠ 未配置 utility 模型，记忆系统暂不可用（用户可在设置中配置后重启）`);
     }
 
     // 7. 创建工具（记忆 + 通用）
@@ -728,7 +731,7 @@ export class Agent {
 
     // yuan 切换只需更新 config，buildSystemPrompt 会实时读模板
     if (partial.agent?.yuan) {
-      console.log(`[agent] yuan type switched to: ${partial.agent.yuan}`);
+      moduleLog.log(`yuan type switched to: ${partial.agent.yuan}`);
     }
 
     // 记忆总开关

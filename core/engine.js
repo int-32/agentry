@@ -20,7 +20,7 @@ import { migrateToProvidersYaml } from "./migrate-providers.js";
 import { migrateProviderMediaConfig } from "./provider-media-config.js";
 import { runMigrations } from "./migrations.js";
 import { createServerRuntimeContext } from "./server-runtime-context.js";
-import { StudioCronService } from "../lib/desk/studio-cron-service.js";
+import { StudioCronService } from "./studio-cron-service.js";
 import { createRuntimeExecutionBoundary } from "./execution-boundary.js";
 import { ResourceAccessService } from "./resource-access-service.js";
 import { ResourceService } from "./resource-service.js";
@@ -105,7 +105,7 @@ import {
   summarizeActivity as _summarizeActivity,
   summarizeActivityQuick as _summarizeActivityQuick,
 } from "./llm-utils.js";
-import { debugLog } from "../lib/debug-log.js";
+import { debugLog, createModuleLogger } from "../lib/debug-log.js";
 import { createSandboxedTools } from "../lib/sandbox/index.js";
 import { externalReadPathsFromSessionFiles } from "../lib/sandbox/win32-policy.js";
 import { t } from "../server/i18n.js";
@@ -134,6 +134,9 @@ import {
   getSkillNameTranslationCachePath,
   translateSkillNamesWithCache,
 } from "../lib/skills/skill-name-translation-cache.js";
+
+const moduleLog = createModuleLogger("engine");
+const toolAvailabilityLog = createModuleLogger("tool-availability");
 
 export class HanaEngine {
   /**
@@ -1182,13 +1185,13 @@ export class HanaEngine {
 
     // 4. 模型发现
     log(`[init] 4/5 发现可用模型...`);
-    try { await this.syncModelsAndRefresh(); } catch {}
+    try { await this.syncModelsAndRefresh(); } catch (err) { moduleLog.warn(`[init] syncModelsAndRefresh failed: ${err?.message}`); }
     await this._models.refreshAvailable();
     this._configCoord.normalizeUtilityApiPreferences(log);
     const availableModels = this._models.availableModels;
     log(`[init] 4/5 找到 ${availableModels.length} 个模型: ${availableModels.map(m => `${m.provider}/${m.id}`).join(", ")}`);
     if (availableModels.length === 0) {
-      console.warn("[engine] ⚠ 未找到可用模型，请在设置中配置 API key");
+      moduleLog.warn("⚠ 未找到可用模型，请在设置中配置 API key");
       this._models.defaultModel = null;
     } else {
       // migrations #5 之后 models.chat 必为 {id, provider} 对象；
@@ -1197,12 +1200,12 @@ export class HanaEngine {
       const chatRef = this.agent.config.models?.chat;
       const ref = (typeof chatRef === "object" && chatRef?.id && chatRef?.provider) ? chatRef : null;
       if (!ref) {
-        console.warn("[engine] ⚠ 未配置 models.chat（或配置缺 provider），defaultModel 为 null");
+        moduleLog.warn("⚠ 未配置 models.chat（或配置缺 provider），defaultModel 为 null");
         this._models.defaultModel = null;
       } else {
         const model = findModel(availableModels, ref.id, ref.provider);
         if (!model) {
-          console.error(`[engine] ⚠ 配置的模型 "${ref.provider}/${ref.id}" 不在可用列表中，defaultModel 为 null`);
+          moduleLog.error(`⚠ 配置的模型 "${ref.provider}/${ref.id}" 不在可用列表中，defaultModel 为 null`);
           this._models.defaultModel = null;
         } else {
           this._models.defaultModel = model;
@@ -1220,7 +1223,7 @@ export class HanaEngine {
     });
 
     // 7. Bridge 孤儿清理
-    try { this._bridge.reconcile(); } catch {}
+    try { this._bridge.reconcile(); } catch (err) { moduleLog.warn(`[init] bridge reconcile failed: ${err?.message}`); }
 
     // 8. 沙盒日志
     const sandboxEnabled = this._readPreferences().sandbox !== false;
@@ -1249,10 +1252,14 @@ export class HanaEngine {
           try {
             const stat = fs.statSync(filePath);
             if (now - stat.mtimeMs > maxAge) fs.unlinkSync(filePath);
-          } catch { /* best effort */ }
+          } catch {
+            // 过期 ephemeral 文件清理 best-effort：单个文件 stat/unlink 失败跳过即可，下次启动再试。
+          }
         }
       }
-    } catch { /* best effort */ }
+    } catch {
+      // 整体清理 best-effort：扫描 agents 目录失败不应阻塞 init 后续步骤。
+    }
   }
 
   async dispose() {
@@ -1299,7 +1306,9 @@ export class HanaEngine {
     try {
       const pkgPath = path.join(this.productDir, "..", "package.json");
       appVersion = JSON.parse(fs.readFileSync(pkgPath, "utf-8")).version || "0.0.0";
-    } catch {}
+    } catch {
+      // package.json 缺失/损坏时沿用上面的 "0.0.0" 默认值，仅用于插件兼容性检查。
+    }
     this.appVersion = appVersion;
 
     this._pluginManager = new PluginManager({
@@ -1446,7 +1455,7 @@ export class HanaEngine {
         agentId,
         channelsEnabled: resolveChannelsEnabledForToolAvailability(this),
       },
-      { warn: (msg) => console.warn(`[tool-availability] ${msg}`) },
+      { warn: (msg) => toolAvailabilityLog.warn(msg) },
     );
 
     const effectiveAgentDir = opts.agentDir || this.agent.agentDir;
@@ -1573,7 +1582,8 @@ export class HanaEngine {
       this._eventBus.emit(event, sessionPath);
     } else {
       for (const fn of this._listeners) {
-        try { fn(event, sessionPath); } catch {}
+        // 单个 listener 抛错不能中断对其余 listener 的分发，但要记录避免静默漏处理事件。
+        try { fn(event, sessionPath); } catch (err) { moduleLog.warn(`event listener threw for ${event?.type}: ${err?.message}`); }
       }
     }
   }
@@ -1702,7 +1712,9 @@ export class HanaEngine {
         .map(e => {
           const fp = path.join(dir, e.name);
           let mtime = 0;
-          try { mtime = fs.statSync(fp).mtimeMs; } catch {}
+          try { mtime = fs.statSync(fp).mtimeMs; } catch {
+            // 文件在 readdir 之后被删 / 无权限时 stat 失败，mtime 保持 0 兜底。
+          }
           return { name: e.name, isDir: e.isDirectory(), mtime };
         });
     } catch {

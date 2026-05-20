@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { atomicWriteSync } from "../shared/safe-fs.js";
 import crypto from "crypto";
 
 const DEFAULT_LOG_LIMIT = 200;
@@ -429,7 +430,7 @@ export class PluginDevService {
     const runDir = path.join(this._runDataDir, record.pluginId);
     fs.mkdirSync(runDir, { recursive: true });
     const runPath = path.join(runDir, `${record.devRunId}.json`);
-    fs.writeFileSync(runPath, JSON.stringify(record, null, 2));
+    atomicWriteSync(runPath, JSON.stringify(record, null, 2));
     return runPath;
   }
 

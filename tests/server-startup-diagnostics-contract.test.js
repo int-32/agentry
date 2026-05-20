@@ -100,7 +100,7 @@ describe("server startup diagnostics contract", () => {
     expect(mainSource).toContain("HANA_CREATE_STARTUP_SESSION");
     expect(mainSource).toContain('"0"');
     expect(serverSource).toContain('process.env.HANA_CREATE_STARTUP_SESSION !== "0"');
-    expect(serverSource).toContain("[server] ③ 跳过启动期 session 创建");
+    expect(serverSource).toContain("③ 跳过启动期 session 创建");
   });
 
   it("keeps waiting after the first server-info deadline while startup output is still progressing", () => {

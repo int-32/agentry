@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, describe, expect, it } from "vitest";
-import { StudioCronService } from "../lib/desk/studio-cron-service.js";
+import { StudioCronService } from "../core/studio-cron-service.js";
 
 function makeRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "hana-studio-cron-"));

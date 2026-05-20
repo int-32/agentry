@@ -22,7 +22,7 @@ import { extractMentionedAgentIds } from "../lib/channels/channel-mentions.js";
 import { loadConfig } from "../lib/memory/config-loader.js";
 import { callText } from "../core/llm-client.js";
 import { runAgentPhoneSession } from "./agent-executor.js";
-import { debugLog } from "../lib/debug-log.js";
+import { debugLog, createModuleLogger } from "../lib/debug-log.js";
 import { getLocale } from "../server/i18n.js";
 import {
   getAgentPhoneProjectionPath,
@@ -37,6 +37,8 @@ import {
   positiveIntegerOrDefault,
   positiveIntegerOrNull,
 } from "../lib/conversations/agent-phone-prompt.js";
+
+const log = createModuleLogger("channel");
 
 export class ChannelRouter {
   /**
@@ -402,7 +404,7 @@ export class ChannelRouter {
         const mentionedAgents = this._extractMentionedAgents(channelName, message);
         const opts = mentionedAgents.length > 0 ? { mentionedAgents } : undefined;
         this.triggerImmediate(channelName, opts)?.catch(err =>
-          console.error(`[channel] agent post delivery 失败: ${err.message}`)
+          log.error(`agent post delivery 失败: ${err.message}`)
         );
       });
     }
@@ -489,8 +491,7 @@ export class ChannelRouter {
       });
 
       if (decision?.replied) {
-        console.log(`\x1b[90m[channel] ${agentId} replied #${channelName} (${decision.replyContent.length} chars)\x1b[0m`);
-        debugLog()?.log("channel", `${agentId} replied #${channelName} (${decision.replyContent.length} chars)`);
+        log.log(`${agentId} replied #${channelName} (${decision.replyContent.length} chars)`);
         await this._recordPhoneActivity(
           agentId,
           channelName,
@@ -539,8 +540,7 @@ export class ChannelRouter {
       );
       return { replied: false, missingDecision: true };
     } catch (err) {
-      console.error(`[channel] 回复失败 (${agentId}/#${channelName}): ${err.message}`);
-      debugLog()?.error("channel", `回复失败 (${agentId}/#${channelName}): ${err.message}`);
+      log.error(`回复失败 (${agentId}/#${channelName}): ${err.message}`);
       await this._recordPhoneActivity(
         agentId,
         channelName,
@@ -849,14 +849,14 @@ export class ChannelRouter {
       const agentInstance = this._getAgentInstance(agentId);
       const memoryMasterOn = this._resolveMemoryMasterEnabled(agentId, { agentInstance });
       if (!memoryMasterOn) {
-        console.log(`\x1b[90m[channel] ${agentId} memory master 已关闭，跳过频道记忆摘要\x1b[0m`);
+        log.log(`${agentId} memory master 已关闭，跳过频道记忆摘要`);
         return;
       }
 
       const utilCfg = engine.resolveUtilityConfig({ agentId }) || {};
       const { utility: model, api_key, base_url, api } = utilCfg;
       if (!api_key || !base_url || !api) {
-        console.log(`\x1b[90m[channel] ${agentId} 无 API 配置，跳过记忆摘要\x1b[0m`);
+        log.log(`${agentId} 无 API 配置，跳过记忆摘要`);
         return;
       }
 
@@ -894,7 +894,7 @@ export class ChannelRouter {
       const now = new Date();
       this._clearPreviousChannelMemoryFacts(factStore, sessionId, previousFacts);
       if (this._isEmptyChannelMemorySummary(summaryText)) {
-        console.log(`\x1b[90m[channel] ${agentId} memory cleared/no durable summary (#${channelName})\x1b[0m`);
+        log.log(`${agentId} memory cleared/no durable summary (#${channelName})`);
         return;
       }
       factStore.add({
@@ -904,9 +904,9 @@ export class ChannelRouter {
         session_id: sessionId,
       });
 
-      console.log(`\x1b[90m[channel] ${agentId} memory saved (#${channelName}, ${summaryText.length} chars)\x1b[0m`);
+      log.log(`${agentId} memory saved (#${channelName}, ${summaryText.length} chars)`);
     } catch (err) {
-      console.error(`[channel] 记忆摘要失败 (${agentId}/#${channelName}): ${err.message}`);
+      log.error(`记忆摘要失败 (${agentId}/#${channelName}): ${err.message}`);
     } finally {
       if (needClose) factStore?.close?.();
     }

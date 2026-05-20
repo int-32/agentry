@@ -115,8 +115,8 @@ export class AgentManager {
       });
       activeRuntimeReady = true;
     } catch (err) {
-      console.error(`[agent-manager] 焦点 agent "${this._activeAgentId}" init 失败: ${err.message}`);
-      if (err.stack) console.error(err.stack);
+      log.error(`焦点 agent "${this._activeAgentId}" init 失败: ${err.message}`);
+      if (err.stack) log.error(err.stack);
       // 仍然创建实例放入 map，让应用能启动。
       // 关键：必须至少把 config 加载进来，否则 agent.config.models.chat 读不到，
       // 下游会误判为"没配模型"，触发 session 创建跳过 / 记忆系统未启动等连锁崩溃（#414）。
@@ -136,7 +136,7 @@ export class AgentManager {
     try {
       ag.loadConfigOnly();
     } catch (err) {
-      console.error(`[agent-manager] agent "${agentId}" config load 失败: ${err.message}`);
+      log.error(`agent "${agentId}" config load 失败: ${err.message}`);
       if (!required) return null;
     }
     this._registerAgent(agentId, ag);
@@ -212,7 +212,7 @@ export class AgentManager {
       this._memoryMaintenanceRunning++;
       this._runMemoryMaintenanceTask(task)
         .catch((err) => {
-          console.error(`[记忆] 后台维护出错 (${task.agentId}, ${task.reason}): ${err.message}`);
+          log.error(`记忆后台维护出错 (${task.agentId}, ${task.reason}): ${err.message}`);
         })
         .finally(() => {
           this._memoryMaintenanceQueued.delete(task.agentId);
@@ -355,7 +355,7 @@ export class AgentManager {
       fs.writeFileSync(descPath, `<!-- sourceHash: ${hash} -->\n${desc}`, "utf-8");
       log.log(`[description] ${agentId}: 已更新`);
     } catch (err) {
-      console.warn(`[agent-mgr] _refreshDescription(${agentId}) failed:`, err.message);
+      log.warn(`_refreshDescription(${agentId}) failed: ${err.message}`);
     }
   }
 

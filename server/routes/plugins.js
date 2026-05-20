@@ -18,6 +18,9 @@ import {
   restorePluginInstallBackup,
 } from "../../lib/plugin-install-backups.js";
 import { detectIncompatiblePluginFormat } from "../../lib/plugin-format-guard.js";
+import { createModuleLogger } from "../../lib/debug-log.js";
+
+const log = createModuleLogger("plugin-install");
 
 const MAX_PLUGIN_RELEASE_PACKAGE_SIZE = 50 * 1024 * 1024;
 
@@ -214,7 +217,7 @@ async function restoreAfterFailedInstall({ engine, pm, backup, targetDir, desc }
       await pm.installPlugin(targetDir, { source: "community" });
       await engine.syncPluginExtensions();
     } catch (restoreErr) {
-      console.warn(`[plugin-install] failed to reload restored plugin "${desc.id}":`, restoreErr.message);
+      log.warn(`failed to reload restored plugin "${desc.id}": ${restoreErr.message}`);
     }
     return;
   }

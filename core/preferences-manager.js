@@ -6,6 +6,7 @@
  */
 import fs from "fs";
 import path from "path";
+import { atomicWriteSync } from "../shared/safe-fs.js";
 import {
   approveComputerUseApp,
   normalizeComputerUseSettings,
@@ -22,6 +23,9 @@ import {
 } from "../shared/workspace-ui-state.js";
 import { normalizeWorkspacePath } from "../shared/workspace-history.js";
 import { normalizeNetworkProxyConfig } from "../shared/network-proxy.js";
+import { createModuleLogger } from "../lib/debug-log.js";
+
+const log = createModuleLogger("preferences");
 
 export class PreferencesManager {
   /**
@@ -65,13 +69,11 @@ export class PreferencesManager {
   savePreferences(prefs) {
     const next = this._preserveDiskSetupComplete(structuredClone(prefs));
     fs.mkdirSync(this._userDir, { recursive: true });
-    const tmp = this._path + ".tmp";
     try {
-      fs.writeFileSync(tmp, JSON.stringify(next, null, 2) + "\n", "utf-8");
-      fs.renameSync(tmp, this._path);
+      atomicWriteSync(this._path, JSON.stringify(next, null, 2) + "\n");
       this._cache = this._readFromDiskStrict();
     } catch (err) {
-      try { fs.unlinkSync(tmp); } catch {}
+      try { fs.unlinkSync(this._path + ".tmp"); } catch {}
       throw err;
     }
   }
@@ -82,7 +84,7 @@ export class PreferencesManager {
       return this._readFromDiskStrict();
     } catch (err) {
       if (err.code === "ENOENT") return {};
-      console.warn(`[preferences] failed to read ${this._path}: ${err.message}`);
+      log.warn(`failed to read ${this._path}: ${err.message}`);
       return {};
     }
   }

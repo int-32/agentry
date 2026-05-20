@@ -51,6 +51,9 @@ import {
 import { denySecretMutationWithoutScope, denyWithoutScope } from "../http/capability-guard.js";
 import { recordSecurityAuditEvent } from "../http/security-audit.js";
 import { assertAgentConfigPatchYuan } from "../../core/yuan-registry.js";
+import { createModuleLogger } from "../../lib/debug-log.js";
+
+const log = createModuleLogger("agents");
 
 // ── 工具函数 ──
 
@@ -412,7 +415,7 @@ export function createAgentsRoute(engine) {
         // agentExists(engine, id) already guarded above; reaching here means
         // engine.getAgent diverged from agentExists. That's a bug, not a missing
         // resource — log it but don't 500 the response.
-        console.warn(
+        log.warn(
           `GET /agents/${id}/config: agent not found by keyed lookup despite passing agentExists check`
         );
         config.availableTools = [];

@@ -71,8 +71,15 @@ vi.mock("@larksuiteoapi/node-sdk", () => {
   };
 });
 
+const moduleLoggerMock = vi.hoisted(() => ({
+  log: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+
 vi.mock("../lib/debug-log.js", () => ({
   debugLog: () => null,
+  createModuleLogger: () => moduleLoggerMock,
 }));
 
 import { createFeishuAdapter } from "../lib/bridge/feishu-adapter.js";
@@ -107,6 +114,9 @@ describe("createFeishuAdapter", () => {
     mockFileCreate.mockReset();
     mockWsStart.mockReset();
     mockWsClose.mockReset();
+    moduleLoggerMock.log.mockClear();
+    moduleLoggerMock.warn.mockClear();
+    moduleLoggerMock.error.mockClear();
 
     mockWsStart.mockResolvedValue(undefined);
     mockContactUserGet.mockResolvedValue({
@@ -326,7 +336,6 @@ describe("createFeishuAdapter", () => {
 
   it("surfaces unsupported Feishu message content instead of silently dropping it", async () => {
     const onMessage = vi.fn();
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     createFeishuAdapter({
       appId: "app-id",
@@ -358,12 +367,10 @@ describe("createFeishuAdapter", () => {
       },
     });
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Unsupported Feishu post tag: widget"));
+    expect(moduleLoggerMock.warn).toHaveBeenCalledWith(expect.stringContaining("Unsupported Feishu post tag: widget"));
     expect(onMessage).toHaveBeenCalledWith(expect.objectContaining({
       text: "[Unsupported Feishu post tag: widget]",
     }));
-
-    warn.mockRestore();
   });
 
   it("downloads inbound images via message resource API", async () => {

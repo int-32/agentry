@@ -7,6 +7,7 @@ import { buildChannelUnreadDeliveryWindow, createChannelTicker } from "../lib/ch
 
 vi.mock("../lib/debug-log.js", () => ({
   debugLog: () => ({ log: vi.fn(), error: vi.fn(), warn: vi.fn() }),
+  createModuleLogger: () => ({ log: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
 function mktemp() {

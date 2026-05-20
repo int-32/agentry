@@ -14,6 +14,10 @@ import { createCronScheduler } from "../lib/desk/cron-scheduler.js";
 import { getLocale } from "../server/i18n.js";
 import { createFreshCompactDailyScheduler } from "../lib/fresh-compact/daily-scheduler.js";
 import { FreshCompactMaintainer } from "./fresh-compact-maintainer.js";
+import { createModuleLogger } from "../lib/debug-log.js";
+
+const log = createModuleLogger("scheduler");
+const freshCompactLog = createModuleLogger("fresh-compact");
 
 function normalizeCronExecutionContext(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -49,7 +53,7 @@ export class Scheduler {
     this._freshCompactMaintainer = new FreshCompactMaintainer({ hub });
     this._freshCompactScheduler = createFreshCompactDailyScheduler({
       runDaily: (opts) => this._freshCompactMaintainer.runDaily(opts),
-      warn: (msg) => console.warn(msg),
+      warn: (msg) => freshCompactLog.warn(msg),
     });
   }
 
@@ -189,7 +193,7 @@ export class Scheduler {
       executeJob: (job) => this._executeCronJob(job),
       abortJob: (jobId) => {
         const ac = this._executingJobs.get(jobId);
-        if (ac) { ac.abort(); console.log(`\x1b[90m[scheduler] cron abort ${jobId} (timeout)\x1b[0m`); }
+        if (ac) { ac.abort(); log.log(`cron abort ${jobId} (timeout)`); }
       },
       onJobDone: (job, result) => {
         this._hub.eventBus.emit(
@@ -207,7 +211,7 @@ export class Scheduler {
     });
     this._cronScheduler = sched;
     sched.start();
-    console.log("\x1b[90m[scheduler] Studio cron 已启动\x1b[0m");
+    log.log("Studio cron 已启动");
   }
 
   // ──────────── 执行 ────────────
@@ -227,7 +231,7 @@ export class Scheduler {
   async _executeCronJobForAgent(agentId, job) {
     // per-job 锁：同一 job 不并发，但同一 agent 的不同 job 可以并行
     if (this._executingJobs.has(job.id)) {
-      console.log(`\x1b[90m[scheduler] cron 跳过 ${job.id}：上一次仍在执行\x1b[0m`);
+      log.log(`cron 跳过 ${job.id}：上一次仍在执行`);
       const err = new Error(`cron job ${job.id} 仍在执行，跳过`);
       err.skipped = true;
       throw err;

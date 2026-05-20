@@ -21,6 +21,7 @@ vi.mock("../lib/bridge/feishu-adapter.js", () => ({
 }));
 vi.mock("../lib/debug-log.js", () => ({
   debugLog: () => null,
+  createModuleLogger: () => ({ log: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
 import os from "os";

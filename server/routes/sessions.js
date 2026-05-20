@@ -45,6 +45,11 @@ import {
 } from "../../shared/model-capabilities.js";
 import { replayLatestUserTurn } from "../../core/session-turn-actions.js";
 import { createRequestContext } from "../http/boundary.js";
+import { createModuleLogger } from "../../lib/debug-log.js";
+
+const log = createModuleLogger("sessions");
+const lifecycleLog = createModuleLogger("sessions/lifecycle");
+const switchLog = createModuleLogger("sessions/switch");
 
 function rcPlatformFromSessionKey(sessionKey) {
   const match = /^([a-z]+)_/i.exec(sessionKey || "");
@@ -257,37 +262,37 @@ export function createSessionsRoute(engine, hub = null) {
       try {
         engine.taskRegistry?.abortByParentSession?.(sessionPath, reason);
       } catch (err) {
-        console.warn(`[sessions/lifecycle] task cleanup failed for ${sessionPath}: ${err.message}`);
+        lifecycleLog.warn(`task cleanup failed for ${sessionPath}: ${err.message}`);
       }
       try {
         engine.subagentRuns?.abortByParentSession?.(sessionPath, reason);
       } catch (err) {
-        console.warn(`[sessions/lifecycle] subagent run cleanup failed for ${sessionPath}: ${err.message}`);
+        lifecycleLog.warn(`subagent run cleanup failed for ${sessionPath}: ${err.message}`);
       }
       try {
         engine.deferredResults?.suppressBySession?.(sessionPath, reason);
       } catch (err) {
-        console.warn(`[sessions/lifecycle] deferred cleanup failed for ${sessionPath}: ${err.message}`);
+        lifecycleLog.warn(`deferred cleanup failed for ${sessionPath}: ${err.message}`);
       }
       try {
         engine.confirmStore?.abortBySession?.(sessionPath);
       } catch (err) {
-        console.warn(`[sessions/lifecycle] confirm cleanup failed for ${sessionPath}: ${err.message}`);
+        lifecycleLog.warn(`confirm cleanup failed for ${sessionPath}: ${err.message}`);
       }
       try {
         await engine.abortSessionByPath?.(sessionPath);
       } catch (err) {
-        console.warn(`[sessions/lifecycle] session abort failed for ${sessionPath}: ${err.message}`);
+        lifecycleLog.warn(`session abort failed for ${sessionPath}: ${err.message}`);
       }
       try {
         await bm.closeBrowserForSession(sessionPath);
       } catch (err) {
-        console.warn(`[sessions/lifecycle] browser cleanup failed for ${sessionPath}: ${err.message}`);
+        lifecycleLog.warn(`browser cleanup failed for ${sessionPath}: ${err.message}`);
       }
       try {
         engine.terminalSessions?.closeForSession?.(sessionPath);
       } catch (err) {
-        console.warn(`[sessions/lifecycle] terminal cleanup failed for ${sessionPath}: ${err.message}`);
+        lifecycleLog.warn(`terminal cleanup failed for ${sessionPath}: ${err.message}`);
       }
       invalidateRcTarget(sessionPath);
     }
@@ -677,11 +682,11 @@ export function createSessionsRoute(engine, hub = null) {
         ? body.workspaceFolders.filter(p => typeof p === "string" && p.trim())
         : [];
       const memFlag = memoryEnabled !== false; // 默认 true
-      console.log("[sessions] 新建 session", {
+      log.log(`新建 session ${JSON.stringify({
         hasCwd: !!cwd,
         memoryEnabled: memFlag,
         customAgent: !!agentId,
-      });
+      })}`);
 
       // 新建前挂起浏览器（保存当前 session 的浏览器状态）
       const bm = BrowserManager.instance();
@@ -715,7 +720,7 @@ export function createSessionsRoute(engine, hub = null) {
         await engine.updateConfig({ last_cwd: cwd, cwd_history: history });
       }
 
-      console.log("[sessions] session 创建完成");
+      log.log("session 创建完成");
       const response = {
         ok: true,
         path: newSessionPath,
@@ -807,7 +812,7 @@ export function createSessionsRoute(engine, hub = null) {
       });
     } catch (err) {
       const errDetail = `${err.message}\n${err.stack || ""}`;
-      console.error("[sessions/switch] error:", errDetail);
+      switchLog.error(`error: ${errDetail}`);
       try { appendFileSync(path.join(engine.hanakoHome, "switch-error.log"), `${new Date().toISOString()}\n${errDetail}\n---\n`); } catch {}
       return c.json({ error: err.message }, 500);
     }

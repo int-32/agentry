@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { StudioCronService } from "../lib/desk/studio-cron-service.js";
+import { StudioCronService } from "../core/studio-cron-service.js";
 
 function writeLegacyJobs(root, agentId, jobs) {
   const deskDir = path.join(root, "agents", agentId, "desk");

@@ -1,6 +1,9 @@
 import fs from "fs";
 import path from "path";
-import { CronStore } from "./cron-store.js";
+import { CronStore } from "../lib/desk/cron-store.js";
+import { createModuleLogger } from "../lib/debug-log.js";
+
+const log = createModuleLogger("studio-cron");
 
 function assertValidPathSegment(value, label) {
   if (typeof value !== "string" || !value.trim()) {
@@ -145,7 +148,7 @@ export class StudioCronService {
       try {
         data = readJsonIfPresent(jobsPath);
       } catch (err) {
-        console.warn(`[StudioCronService] skipped invalid legacy cron store for ${agentId}: ${err.message}`);
+        log.warn(`skipped invalid legacy cron store for ${agentId}: ${err.message}`);
         continue;
       }
       if (!data || !Array.isArray(data.jobs)) continue;

@@ -5,6 +5,9 @@ import { freshImport } from "./fresh-import.js";
 import { normalizePluginConfigSchema } from "./plugin-config.js";
 import { semverGte } from "../lib/plugin-versioning.js";
 import { detectIncompatiblePluginFormat } from "../lib/plugin-format-guard.js";
+import { createModuleLogger } from "../lib/debug-log.js";
+
+const log = createModuleLogger("plugin-manager");
 
 const KNOWN_CONTRIBUTION_DIRS = [
   "tools", "routes", "skills", "agents", "commands", "providers",
@@ -57,7 +60,7 @@ function normalizeUiHostCapabilities(raw, pluginId) {
     if (typeof item !== "string" || item.trim() === "") continue;
     const capability = item.trim();
     if (!KNOWN_UI_HOST_CAPABILITIES.has(capability)) {
-      console.warn(`[plugin-manager] plugin "${pluginId}" declares unknown UI host capability "${capability}", ignoring`);
+      log.warn(`plugin "${pluginId}" declares unknown UI host capability "${capability}", ignoring`);
       continue;
     }
     if (seen.has(capability)) continue;
@@ -252,13 +255,13 @@ export class PluginManager {
           desc.pluginKey = createPluginKey(source, desc.id);
           const idKey = `${source}:id:${desc.id}`;
           if (seen.has(idKey)) {
-            console.warn(`[plugin-manager] plugin id "${desc.id}" 冲突（source "${source}", 目录 "${entry.name}"），跳过`);
+            log.warn(`plugin id "${desc.id}" 冲突（source "${source}", 目录 "${entry.name}"），跳过`);
             continue;
           }
           seen.add(idKey);
           results.push(desc);
         } catch (err) {
-          console.error(`[plugin-manager] failed to read plugin "${entry.name}":`, err.message);
+          log.error(`failed to read plugin "${entry.name}": ${err.message}`);
         }
       }
     }
@@ -311,7 +314,7 @@ export class PluginManager {
         entry.status = "incompatible";
         entry.error = desc.formatIssue.message;
         this._setPluginEntry(entry);
-        console.warn(`[plugin-manager] "${desc.id}" skipped: ${entry.error}`);
+        log.warn(`"${desc.id}" skipped: ${entry.error}`);
         continue;
       }
 
@@ -330,7 +333,7 @@ export class PluginManager {
         entry.status = "incompatible";
         entry.error = `requires app v${minVer}+, current v${this._appVersion}`;
         this._setPluginEntry(entry);
-        console.warn(`[plugin-manager] "${desc.id}" skipped: ${entry.error}`);
+        log.warn(`"${desc.id}" skipped: ${entry.error}`);
         continue;
       }
 
@@ -344,7 +347,7 @@ export class PluginManager {
         entry.status = "failed";
         entry.error = err.message;
         this._refreshRouteRegistryForId(entry.id);
-        console.error(`[plugin-manager] plugin "${desc.id}" failed to load:`, err.message);
+        log.error(`plugin "${desc.id}" failed to load: ${err.message}`);
       }
     }
   }
@@ -355,7 +358,7 @@ export class PluginManager {
     entry._loadCancelled = false;
     entry.error = null;
     const start = Date.now();
-    console.log(`[plugin-manager] loading plugin "${entry.id}"...`);
+    log.log(`loading plugin "${entry.id}"...`);
 
     try {
       await this._withLoadTimeout(
@@ -366,7 +369,7 @@ export class PluginManager {
       if (entry._loadToken !== loadToken || entry._loadCancelled) {
         throw new Error(`Plugin "${entry.id}" load was cancelled`);
       }
-      console.log(`[plugin-manager] plugin "${entry.id}" loaded (${Date.now() - start}ms)`);
+      log.log(`plugin "${entry.id}" loaded (${Date.now() - start}ms)`);
     } catch (err) {
       entry._loadCancelled = true;
       await this._cleanupPluginEntry(entry);
@@ -395,13 +398,13 @@ export class PluginManager {
   async _runLoadStage(entry, stage, fn) {
     const start = Date.now();
     entry._loadStage = stage;
-    console.log(`[plugin-manager] loading "${entry.id}" ${stage}...`);
+    log.log(`loading "${entry.id}" ${stage}...`);
     try {
       const result = await fn();
-      console.log(`[plugin-manager] loaded "${entry.id}" ${stage} (${Date.now() - start}ms)`);
+      log.log(`loaded "${entry.id}" ${stage} (${Date.now() - start}ms)`);
       return result;
     } catch (err) {
-      console.error(`[plugin-manager] "${entry.id}" ${stage} failed:`, err?.message || err);
+      log.error(`"${entry.id}" ${stage} failed: ${err?.message || err}`);
       throw err;
     }
   }
@@ -494,7 +497,7 @@ export class PluginManager {
             if (typeof disposable !== "function") return;
             if (entry._loadToken !== loadToken || entry._loadCancelled) {
               try { disposable(); } catch (err) {
-                console.error(`[plugin-manager] "${entry.id}" late disposable error:`, err.message);
+                log.error(`"${entry.id}" late disposable error: ${err.message}`);
               }
               return;
             }
@@ -504,7 +507,7 @@ export class PluginManager {
             const dispose = this.addTool(entry.id, toolDef, { pluginKey: entry.pluginKey, source: entry.source });
             if (entry._loadToken !== loadToken || entry._loadCancelled) {
               try { dispose(); } catch (err) {
-                console.error(`[plugin-manager] "${entry.id}" late dynamic tool cleanup error:`, err.message);
+                log.error(`"${entry.id}" late dynamic tool cleanup error: ${err.message}`);
               }
               return () => {};
             }
@@ -598,7 +601,7 @@ export class PluginManager {
           _pluginSource: entry.source,
         });
       } catch (err) {
-        console.error(`[plugin-manager] tool "${file}" in "${entry.id}" failed to load:`, err.message);
+        log.error(`tool "${file}" in "${entry.id}" failed to load: ${err.message}`);
       }
     }
   }
@@ -683,8 +686,8 @@ export class PluginManager {
         if (hasHandler) {
           // 纪律 #1：Full-access 闸门。restricted 插件不得注册 slash handler
           if (entry.accessLevel !== "full-access") {
-            console.warn(
-              `[plugin-manager] "${entry.id}/${file}" declares slash handler but plugin is restricted; skipped. ` +
+            log.warn(
+              `"${entry.id}/${file}" declares slash handler but plugin is restricted; skipped. ` +
               `Requires builtin source or manifest.trust="full-access".`
             );
             continue;
@@ -717,7 +720,7 @@ export class PluginManager {
           });
         }
       } catch (err) {
-        console.error(`[plugin-manager] command "${file}" in "${entry.id}" failed to load:`, err.message);
+        log.error(`command "${file}" in "${entry.id}" failed to load: ${err.message}`);
       }
     }
   }
@@ -778,7 +781,7 @@ export class PluginManager {
           mod.register(app, ctx);
         }
       } catch (err) {
-        console.error(`[plugin-manager] route "${file}" in "${entry.id}" failed to load:`, err.message);
+        log.error(`route "${file}" in "${entry.id}" failed to load: ${err.message}`);
       }
     }
     this._routeApps.set(entry.pluginKey, {
@@ -806,12 +809,12 @@ export class PluginManager {
         const mod = await freshImport(filePath);
         const factory = mod.default ?? mod;
         if (typeof factory !== "function") {
-          console.warn(`[plugin-manager] extension "${file}" in "${entry.id}" does not export a function, skipped`);
+          log.warn(`extension "${file}" in "${entry.id}" does not export a function, skipped`);
           continue;
         }
         this._extensionFactories.push({ pluginId: entry.id, pluginKey: entry.pluginKey, source: entry.source, factory });
       } catch (err) {
-        console.error(`[plugin-manager] extension "${file}" in "${entry.id}" failed to load:`, err.message);
+        log.error(`extension "${file}" in "${entry.id}" failed to load: ${err.message}`);
       }
     }
   }
@@ -956,7 +959,7 @@ export class PluginManager {
         template._pluginSource = entry.source;
         this._agentTemplates.push(template);
       } catch (err) {
-        console.error(`[plugin-manager] agent template "${file}" in "${entry.id}" failed to load:`, err.message);
+        log.error(`agent template "${file}" in "${entry.id}" failed to load: ${err.message}`);
       }
     }
   }
@@ -979,7 +982,7 @@ export class PluginManager {
         if (!mod.id) continue;
         this._providerPlugins.push({ ...mod, _pluginId: entry.id, _pluginKey: entry.pluginKey, _pluginSource: entry.source });
       } catch (err) {
-        console.error(`[plugin-manager] provider "${file}" in "${entry.id}" failed to load:`, err.message);
+        log.error(`provider "${file}" in "${entry.id}" failed to load: ${err.message}`);
       }
     }
   }
@@ -996,7 +999,7 @@ export class PluginManager {
   _enqueue(fn) {
     const op = this._opQueue.then(fn);
     this._opQueue = op.catch(err => {
-      console.error("[plugin-manager] op failed:", err);
+      log.error(`op failed: ${err?.stack || err}`);
     });
     return op; // caller gets success/failure
   }
@@ -1098,7 +1101,7 @@ export class PluginManager {
           disabled.filter(id => id !== entry.id)
         );
       } else {
-        console.warn("[plugin-manager] removePlugin: preferencesManager unavailable, disabled list not updated");
+        log.warn("removePlugin: preferencesManager unavailable, disabled list not updated");
       }
       this._refreshRouteRegistryForId(entry.id);
       this._bus?.emit({ type: "plugin_ui_changed" });
@@ -1124,7 +1127,7 @@ export class PluginManager {
           this._preferencesManager.setDisabledPlugins([...disabled, entry.id]);
         }
       } else {
-        console.warn("[plugin-manager] disablePlugin: preferencesManager unavailable, preference not persisted");
+        log.warn("disablePlugin: preferencesManager unavailable, preference not persisted");
       }
       this._refreshRouteRegistryForId(entry.id);
       this._bus?.emit({ type: "plugin_ui_changed" });
@@ -1146,7 +1149,7 @@ export class PluginManager {
           disabled.filter(id => id !== entry.id)
         );
       } else {
-        console.warn("[plugin-manager] enablePlugin: preferencesManager unavailable, preference not persisted");
+        log.warn("enablePlugin: preferencesManager unavailable, preference not persisted");
       }
       if (entry.trust === "full-access" && !this._isFullAccessAllowed(entry, options)) {
         entry.status = "restricted";
@@ -1176,7 +1179,7 @@ export class PluginManager {
       if (this._preferencesManager) {
         this._preferencesManager.setAllowFullAccessPlugins(allow);
       } else {
-        console.warn("[plugin-manager] setFullAccess: preferencesManager unavailable, preference not persisted");
+        log.warn("setFullAccess: preferencesManager unavailable, preference not persisted");
       }
       for (const entry of this._plugins.values()) {
         if (entry.source !== "community" || entry.trust !== "full-access") continue;
@@ -1213,12 +1216,12 @@ export class PluginManager {
     if (entry.instance) {
       if (typeof entry.instance.onunload === "function") {
         try { await entry.instance.onunload(); } catch (err) {
-          console.error(`[plugin-manager] "${pluginId}" onunload error:`, err.message);
+          log.error(`"${pluginId}" onunload error: ${err.message}`);
         }
       }
       for (const d of entry._disposables.reverse()) {
         try { d(); } catch (err) {
-          console.error(`[plugin-manager] "${pluginId}" disposable error:`, err.message);
+          log.error(`"${pluginId}" disposable error: ${err.message}`);
         }
       }
       entry._disposables = [];

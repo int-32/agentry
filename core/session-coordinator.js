@@ -449,7 +449,9 @@ export class SessionCoordinator {
           primaryCwd: effectiveCwd,
           workspaceFolders: restoredFolders,
         });
-      } catch {}
+      } catch {
+        // session-meta 可选：读取或解析失败时沿用上面 fresh 算出的 workspaceScope。
+      }
     }
     const includeLegacyArtifactTool = restore
       ? await this._shouldIncludeLegacyArtifactToolForRestore(agent, sessionPathForMeta)
@@ -2129,7 +2131,9 @@ export class SessionCoordinator {
         for (const sp of sessionPaths) {
           if (dirTitles[sp]) titles[sp] = dirTitles[sp];
         }
-      } catch { /* ignore */ }
+      } catch {
+        // titles 可选：某个目录的 session-titles.json 缺失/损坏时，该目录下路径保持预设的 null。
+      }
     }
 
     return titles;
@@ -2202,7 +2206,10 @@ export class SessionCoordinator {
     if (typeof finalSystemPrompt !== "string") return;
     try {
       session._baseSystemPrompt = finalSystemPrompt;
-    } catch {}
+    } catch {
+      // session 对象理论上可能 frozen 或 _baseSystemPrompt 带抛错 setter；
+      // 容错即可，下面 agent.state.systemPrompt 仍独立尝试写入。
+    }
     if (session?.agent?.state && typeof session.agent.state === "object") {
       session.agent.state.systemPrompt = finalSystemPrompt;
     }
@@ -2258,6 +2265,8 @@ export class SessionCoordinator {
         return;
       } catch (err) {
         if (attempt === 0) {
+          // 首次写失败可能因父目录缺失：best-effort 补建后由下一轮 attempt 重试 writeFile。
+          // mkdir 自身失败（如目录已存在）不影响重试，吞掉即可。
           try { await fsp.mkdir(path.dirname(metaPath), { recursive: true }); } catch {}
         } else {
           log.warn(`writeSessionMeta failed for ${sessKey}: ${err.message}`);
@@ -2371,6 +2380,7 @@ export class SessionCoordinator {
     const cleanupTempSession = () => {
       const sp = tempSessionMgr?.getSessionFile?.();
       if (sp) {
+        // 临时 session 文件清理 best-effort：删不掉（如已被删/权限）不应让 isolated 执行失败。
         try { fs.unlinkSync(sp); } catch {}
       }
     };
@@ -2505,7 +2515,7 @@ export class SessionCoordinator {
       const childSessionPath = session.sessionManager?.getSessionFile?.() || null;
 
       // 通知调用方 session 已就绪（subagent 用它来后补 streamKey）
-      try { opts.onSessionReady?.(childSessionPath); } catch {}
+      try { opts.onSessionReady?.(childSessionPath); } catch (err) { log.warn(`isolated onSessionReady callback failed: ${err?.message}`); }
 
       let replyText = "";
       let finalAssistantText = "";
@@ -2573,6 +2583,7 @@ export class SessionCoordinator {
       const completionError = isolatedCompletionError(finalStopReason, finalErrorMessage);
 
       if (!opts.persist && sessionPath) {
+        // 非 persist 的临时 session 文件清理 best-effort：删不掉不影响返回结果。
         try { fs.unlinkSync(sessionPath); } catch {}
         return {
           sessionPath: null,

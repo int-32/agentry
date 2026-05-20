@@ -19,6 +19,9 @@ import { t } from "../i18n.js";
 import { realPath, isSensitivePath } from "../utils/path-security.js";
 import { readAuthPrincipal } from "../http/capability-guard.js";
 import { isLocalOwnerPrincipal } from "../http/route-security.js";
+import { createModuleLogger } from "../../lib/debug-log.js";
+
+const log = createModuleLogger("desk");
 
 /** 安全路径校验：target 必须在 baseDir 内部（解析 symlink 后比较） */
 function isInsidePath(target, baseDir) {
@@ -132,7 +135,7 @@ async function listWorkspaceFiles(dir) {
           };
         } catch (err) {
           // ENOENT = 文件在 readdir 后被删除，正常跳过；其他错误也跳过单项不影响整体
-          if (err.code !== "ENOENT") console.warn(`[desk] stat failed for ${e.name}: ${err.message}`);
+          if (err.code !== "ENOENT") log.warn(`stat failed for ${e.name}: ${err.message}`);
           return null;
         }
       })
@@ -172,7 +175,7 @@ async function searchWorkspaceFiles(root, query, {
       entries = await fs.promises.readdir(dir, { withFileTypes: true });
     } catch (err) {
       if (err.code !== "ENOENT" && err.code !== "EACCES") {
-        console.warn(`[desk] search readdir failed for ${dir}: ${err.message}`);
+        log.warn(`search readdir failed for ${dir}: ${err.message}`);
       }
       return;
     }
@@ -199,7 +202,7 @@ async function searchWorkspaceFiles(root, query, {
             mtime: stat.mtime.toISOString(),
           });
         } catch (err) {
-          if (err.code !== "ENOENT") console.warn(`[desk] search stat failed for ${entry.name}: ${err.message}`);
+          if (err.code !== "ENOENT") log.warn(`search stat failed for ${entry.name}: ${err.message}`);
         }
       }
 

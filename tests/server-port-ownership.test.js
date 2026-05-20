@@ -26,7 +26,7 @@ describe("server transport ownership", () => {
     expect(source).toContain("code: \"PORT_IN_USE\"");
     expect(source).toContain("networkMode");
     expect(source).toContain("suggestions");
-    expect(source).toContain("[server] startup-error");
+    expect(source).toContain("startup-error");
   });
 
   it("exits on port conflict before first-run or engine initialization", async () => {
