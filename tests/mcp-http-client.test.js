@@ -170,6 +170,45 @@ describe("MCP HTTP clients", () => {
     expect(headerValue(listRequests.at(-1).init.headers, "MCP-Session-Id")).toBe("session-2");
   });
 
+  it("uses one initial Streamable HTTP protocol version source and then negotiated headers", async () => {
+    const requests = [];
+    const fetchImpl = vi.fn(async (url, init) => {
+      const body = requestBody(init);
+      requests.push({ url: String(url), init, body });
+      if (body?.method === "initialize") {
+        return jsonResponse({
+          jsonrpc: "2.0",
+          id: body.id,
+          result: { protocolVersion: "2026-01-01", capabilities: {} },
+        }, { headers: { "MCP-Session-Id": "session-a" } });
+      }
+      if (body?.method === "notifications/initialized") return emptyResponse();
+      if (body?.method === "tools/list") {
+        return jsonResponse({
+          jsonrpc: "2.0",
+          id: body.id,
+          result: { tools: [] },
+        });
+      }
+      throw new Error(`unexpected method ${body?.method}`);
+    });
+
+    const client = new McpStreamableHttpClient({
+      id: "versioned",
+      url: "https://mcp.example.com/mcp",
+      headers: {
+        "MCP-Protocol-Version": "2024-11-05",
+      },
+    }, { fetchImpl });
+
+    await client.start();
+    await client.listTools();
+
+    expect(requests[0].body.params.protocolVersion).toBe("2024-11-05");
+    expect(headerValue(requests[0].init.headers, "MCP-Protocol-Version")).toBe("2024-11-05");
+    expect(headerValue(requests[2].init.headers, "MCP-Protocol-Version")).toBe("2026-01-01");
+  });
+
   it("does not let a legacy SSE server ping with the same id satisfy a tool response", async () => {
     const encoder = new TextEncoder();
     let streamController;
