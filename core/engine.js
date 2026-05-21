@@ -93,7 +93,7 @@ import { SkillManager } from "./skill-manager.js";
 import { BridgeSessionManager } from "./bridge-session-manager.js";
 import { createSlashSystem } from "./slash-commands/index.js";
 import { AgentManager } from "./agent-manager.js";
-import { sanitizeMessagesForModel } from "./message-sanitizer.js";
+import { sanitizeMessagesForModel, stripHistoricalInlineMediaForReplay } from "./message-sanitizer.js";
 import { normalizeProviderContextMessages, normalizeProviderPayload } from "./provider-compat.js";
 import { VisionBridge } from "./vision-bridge.js";
 import { SessionCoordinator } from "./session-coordinator.js";
@@ -1152,8 +1152,9 @@ export class HanaEngine {
         pi.on("context", (event, ctx) => {
           const model = ctx?.model;
           if (!model) return;
-          const { messages, stripped, strippedImages, strippedVideos } = sanitizeMessagesForModel(event.messages, model);
-          if (stripped === 0) return;
+          const replaySafe = stripHistoricalInlineMediaForReplay(event.messages);
+          const { messages, stripped, strippedImages, strippedVideos } = sanitizeMessagesForModel(replaySafe.messages, model);
+          if (replaySafe.stripped === 0 && stripped === 0) return;
           const sessionPath = ctx?.sessionManager?.getSessionFile?.();
           if (sessionPath && strippedImages > 0 && !this._imageStripNotified.has(sessionPath)) {
             this._imageStripNotified.add(sessionPath);

@@ -18,6 +18,7 @@ export const TOOL_ARG_SUMMARY_KEYS = [
 ];
 
 const SESSION_TAIL_READ_THRESHOLD = 256 * 1024;
+const ATTACHED_IMAGE_MARKER_RE = /\[attached_image:\s*[^\]]+\]/g;
 
 /** 从文本中提取并剥离 <think>/<thinking> 标签 */
 export function stripThinkTags(raw) {
@@ -70,6 +71,14 @@ export function extractTextContent(content, { stripThink = false } = {}) {
       return { name: block.name, args: Object.keys(args).length ? args : undefined };
     });
   return { text, thinking, toolUses, images };
+}
+
+export function filterUnreferencedInlineImages(text, images) {
+  if (!Array.isArray(images) || images.length === 0) return [];
+  const markerCount = String(text || "").match(ATTACHED_IMAGE_MARKER_RE)?.length || 0;
+  if (markerCount <= 0) return images;
+  if (markerCount >= images.length) return [];
+  return images.slice(markerCount);
 }
 
 /**

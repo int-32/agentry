@@ -33,6 +33,7 @@ vi.mock("../lib/browser/browser-manager.js", () => ({
 
 vi.mock("../core/message-utils.js", () => ({
   extractTextContent: vi.fn(() => ({ text: "", images: [], thinking: "", toolUses: [] })),
+  filterUnreferencedInlineImages: vi.fn((_text, images) => images || []),
   loadSessionHistoryMessages: vi.fn(async () => []),
   loadLatestAssistantSummaryFromSessionFile: vi.fn(async () => null),
   isValidSessionPath: vi.fn(() => true),
@@ -649,6 +650,45 @@ describe("sessions route", () => {
         timestamp: "2026-05-07T05:43:00.000Z",
       },
     ]);
+  });
+
+  it("does not return path-backed inline image base64 in session history", async () => {
+    const { createSessionsRoute } = await import("../server/routes/sessions.js");
+    const msgUtils = await import("../core/message-utils.js");
+    const app = new Hono();
+
+    vi.mocked(msgUtils.extractTextContent)
+      .mockReturnValueOnce({
+        text: "[attached_image: /tmp/a.png]\nsee image",
+        images: [{ data: "BASE64_A", mimeType: "image/png" }],
+        thinking: "",
+        toolUses: [],
+      });
+    vi.mocked(msgUtils.filterUnreferencedInlineImages).mockReturnValueOnce([]);
+    vi.mocked(msgUtils.loadSessionHistoryMessages).mockResolvedValueOnce([
+      { role: "user", content: "image message" },
+    ]);
+
+    const engine = {
+      agentsDir: "/tmp/agents",
+      deferredResults: null,
+    };
+
+    app.route("/api", createSessionsRoute(engine));
+
+    const res = await app.request("/api/sessions/messages");
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(msgUtils.filterUnreferencedInlineImages).toHaveBeenCalledWith(
+      "[attached_image: /tmp/a.png]\nsee image",
+      [{ data: "BASE64_A", mimeType: "image/png" }],
+    );
+    expect(data.messages[0]).toEqual({
+      id: "0",
+      role: "user",
+      content: "[attached_image: /tmp/a.png]\nsee image",
+    });
   });
 
   it("refreshes session file lifecycle metadata when rebuilding history blocks", async () => {

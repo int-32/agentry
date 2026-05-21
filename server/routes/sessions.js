@@ -17,6 +17,7 @@ import {
 } from "../../lib/subagent-executor-metadata.js";
 import {
   extractTextContent,
+  filterUnreferencedInlineImages,
   loadSessionHistoryMessages,
   loadLatestAssistantSummaryFromSessionFile,
   isValidSessionPath,
@@ -439,13 +440,14 @@ export function createSessionsRoute(engine, hub = null) {
       for (const m of sourceMessages) {
         if (m.role === "user") {
           const { text, images } = extractTextContent(m.content);
-          if (text || images.length) {
+          const visibleImages = filterUnreferencedInlineImages(text, images);
+          if (text || visibleImages.length) {
             allMessages.push({
               id: String(globalIdx),
               ...(m.id ? { entryId: m.id } : {}),
               role: "user",
               content: text,
-              images: images.length ? images : undefined,
+              images: visibleImages.length ? visibleImages : undefined,
               ...(m.timestamp ? { timestamp: m.timestamp } : {}),
             });
             globalIdx++;

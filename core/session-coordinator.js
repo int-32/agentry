@@ -35,6 +35,7 @@ import { formatWorkspaceScopePrompt, normalizeWorkspaceScope } from "../shared/w
 import { getProviderPromptPatches } from "./provider-prompt-patches.js";
 import { prepareVisionInputForTextOnlyModel } from "./vision-prepare.js";
 import { prepareModelImageInputsForPrompt } from "./model-image-preprocess.js";
+import { pruneSessionInlineMediaHistory } from "./session-inline-media-prune.js";
 import { createVisionContextInjectionExtension } from "./vision-context-injector.js";
 import { modelSupportsDirectVideoInput, modelSupportsVideoInput } from "../shared/model-capabilities.js";
 import {
@@ -1002,6 +1003,7 @@ export class SessionCoordinator {
     try {
       await this._session.prompt(text, promptOpts);
     } finally {
+      pruneSessionInlineMediaHistory(this._session);
       if (sp) this._scheduleRuntimePressureCheck(sp, "prompt");
     }
     if (sp) {
@@ -1085,6 +1087,7 @@ export class SessionCoordinator {
     try {
       await entry.session.prompt(text, promptOpts);
     } finally {
+      pruneSessionInlineMediaHistory(entry.session);
       this._scheduleRuntimePressureCheck(sessionPath, "prompt_session");
     }
     const agent = this._d.getAgentById(entry.agentId) || this._d.getAgent();

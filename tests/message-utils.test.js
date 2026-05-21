@@ -15,6 +15,7 @@ import {
   extractTextContent,
   loadSessionHistoryMessages,
   loadLatestAssistantSummaryFromSessionFile,
+  filterUnreferencedInlineImages,
   isValidSessionPath,
   isActiveSessionPath,
   isActiveDesktopSessionPath,
@@ -137,6 +138,32 @@ describe("extractTextContent", () => {
     expect(result.images).toHaveLength(1);
     expect(result.images[0].data).toBe("base64data");
     expect(result.images[0].mimeType).toBe("image/jpeg");
+  });
+});
+
+describe("filterUnreferencedInlineImages", () => {
+  it("不把已有 attached_image 路径引用覆盖的图片 base64 返回给历史接口", () => {
+    const images = [
+      { data: "BASE64_A", mimeType: "image/png" },
+      { data: "BASE64_B", mimeType: "image/png" },
+    ];
+
+    expect(filterUnreferencedInlineImages(
+      "[attached_image: /tmp/a.png]\n[attached_image: /tmp/b.png]\ncompare",
+      images,
+    )).toEqual([]);
+  });
+
+  it("保留没有路径引用的 legacy inline 图片", () => {
+    const images = [
+      { data: "BASE64_A", mimeType: "image/png" },
+      { data: "BASE64_B", mimeType: "image/png" },
+    ];
+
+    expect(filterUnreferencedInlineImages(
+      "[attached_image: /tmp/a.png]\ncompare",
+      images,
+    )).toEqual([{ data: "BASE64_B", mimeType: "image/png" }]);
   });
 });
 

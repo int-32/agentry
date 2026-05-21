@@ -23,6 +23,7 @@ import { DmRouter } from "./dm-router.js";
 import { AgentPhoneActivityStore } from "../lib/conversations/agent-phone-activity.js";
 import {
   extractTextContent,
+  filterUnreferencedInlineImages,
   loadSessionHistoryMessages,
   isValidSessionPath,
 } from "../core/message-utils.js";
@@ -356,8 +357,9 @@ export class Hub {
       for (const m of sourceMessages) {
         if (m.role === "user") {
           const { text, images } = extractTextContent(m.content);
-          if (text || images.length) {
-            messages.push({ role: "user", content: text, images: images.length ? images : undefined });
+          const visibleImages = filterUnreferencedInlineImages(text, images);
+          if (text || visibleImages.length) {
+            messages.push({ role: "user", content: text, images: visibleImages.length ? visibleImages : undefined });
           }
         } else if (m.role === "assistant") {
           const { text, thinking, toolUses } = extractTextContent(m.content, { stripThink: true });
