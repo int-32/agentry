@@ -5,6 +5,7 @@ const classifyWin32Command = vi.fn();
 const prepareSandboxRuntime = vi.fn((runtimeInfo) => runtimeInfo);
 const existsSync = vi.fn(() => false);
 const spawnSync = vi.fn(() => ({ status: 1, stdout: "", stderr: "" }));
+const systemCmdExe = "C:\\Windows\\System32\\cmd.exe";
 
 vi.mock("../lib/sandbox/exec-helper.js", () => ({
   spawnAndStream,
@@ -53,7 +54,7 @@ describe("createWin32Exec", () => {
     });
 
     expect(spawnAndStream).toHaveBeenCalledWith(
-      "cmd.exe",
+      systemCmdExe,
       ["/d", "/s", "/c", "chcp 65001 >NUL & ipconfig /all"],
       expect.objectContaining({
         cwd: "C:\\work",
@@ -81,7 +82,7 @@ describe("createWin32Exec", () => {
     });
 
     expect(spawnAndStream).toHaveBeenCalledWith(
-      "cmd.exe",
+      systemCmdExe,
       ["/d", "/s", "/c", "chcp 65001 >NUL & type sample.txt"],
       expect.objectContaining({
         env: expect.objectContaining({
@@ -117,7 +118,7 @@ describe("createWin32Exec", () => {
     const helperArgs = spawnAndStream.mock.calls[0][1];
     expect(helperArgs).toEqual(expect.arrayContaining([
       "--",
-      "cmd.exe",
+      systemCmdExe,
       "/d",
       "/s",
       "/c",
@@ -138,6 +139,7 @@ describe("createWin32Exec", () => {
 
   it("routes explicit PowerShell commands directly without cmd wrapping", async () => {
     classifyWin32Command.mockReturnValue({ runner: "powershell", reason: "explicit-powershell-shell" });
+    const powerShellExe = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
     const createWin32Exec = await loadExecFactory();
     const exec = createWin32Exec();
 
@@ -145,11 +147,11 @@ describe("createWin32Exec", () => {
       onData: () => {},
       signal: undefined,
       timeout: 5,
-      env: { PATH: "C:\\Windows\\System32" },
+      env: { PATH: "C:\\Windows\\System32", SystemRoot: "C:\\Windows" },
     });
 
     expect(spawnAndStream).toHaveBeenCalledWith(
-      "powershell.exe",
+      powerShellExe,
       [
         "-NoLogo",
         "-NoProfile",
@@ -170,6 +172,7 @@ describe("createWin32Exec", () => {
 
   it("routes PowerShell script files through -File with argv", async () => {
     classifyWin32Command.mockReturnValue({ runner: "powershell-file", reason: "powershell-script-file" });
+    const powerShellExe = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
     const createWin32Exec = await loadExecFactory();
     const exec = createWin32Exec();
 
@@ -177,11 +180,11 @@ describe("createWin32Exec", () => {
       onData: () => {},
       signal: undefined,
       timeout: 5,
-      env: { PATH: "C:\\Windows\\System32" },
+      env: { PATH: "C:\\Windows\\System32", SystemRoot: "C:\\Windows" },
     });
 
     expect(spawnAndStream).toHaveBeenCalledWith(
-      "powershell.exe",
+      powerShellExe,
       [
         "-NoLogo",
         "-NoProfile",
@@ -191,6 +194,33 @@ describe("createWin32Exec", () => {
         "C:\\work\\run tests.ps1",
         "-Name",
         "Hana",
+      ],
+      expect.objectContaining({ cwd: "C:\\work" })
+    );
+  });
+
+  it("routes default Windows shell commands through PowerShell without falling back to bash", async () => {
+    classifyWin32Command.mockReturnValue({ runner: "powershell-command", reason: "default-powershell" });
+    const powerShellExe = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+    const createWin32Exec = await loadExecFactory();
+    const exec = createWin32Exec();
+
+    await exec("$PSVersionTable.PSVersion", "C:\\work", {
+      onData: () => {},
+      signal: undefined,
+      timeout: 5,
+      env: { PATH: "C:\\Windows\\System32", SystemRoot: "C:\\Windows" },
+    });
+
+    expect(spawnAndStream).toHaveBeenCalledWith(
+      powerShellExe,
+      [
+        "-NoLogo",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$PSVersionTable.PSVersion",
       ],
       expect.objectContaining({ cwd: "C:\\work" })
     );
@@ -209,8 +239,44 @@ describe("createWin32Exec", () => {
     });
 
     expect(spawnAndStream).toHaveBeenCalledWith(
-      "cmd.exe",
+      systemCmdExe,
       ["/d", "/s", "/c", 'chcp 65001 >NUL & call "C:\\work\\run-tests.bat" --fast'],
+      expect.objectContaining({ cwd: "C:\\work" })
+    );
+  });
+
+  it("routes sandboxed relative batch scripts through cmd call", async () => {
+    classifyWin32Command.mockReturnValue({ runner: "cmd-script", reason: "cmd-script-file" });
+    const helper = "C:\\Hanako\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
+    existsSync.mockImplementation((p) => p === helper);
+    const createWin32Exec = await loadExecFactory();
+    const exec = createWin32Exec({
+      sandbox: {
+        helperPath: helper,
+        grants: {
+          readPaths: [],
+          writePaths: ["C:\\work"],
+        },
+      },
+    });
+
+    await exec(".tmp\\sandbox-smoke\\test-bat.bat", "C:\\work", {
+      onData: () => {},
+      signal: undefined,
+      timeout: 5,
+      env: { PATH: "C:\\Windows\\System32", COMSPEC: "C:\\Windows\\System32\\cmd.exe" },
+    });
+
+    expect(spawnAndStream).toHaveBeenCalledWith(
+      helper,
+      expect.arrayContaining([
+        "--",
+        "C:\\Windows\\System32\\cmd.exe",
+        "/d",
+        "/s",
+        "/c",
+        'chcp 65001 >NUL & call ".tmp\\sandbox-smoke\\test-bat.bat"',
+      ]),
       expect.objectContaining({ cwd: "C:\\work" })
     );
   });
@@ -421,6 +487,48 @@ describe("createWin32Exec", () => {
     expect(helperArgs).not.toContain(pythonRoot);
   });
 
+  it("passes Python inline code as argv instead of routing it through bash", async () => {
+    classifyWin32Command.mockReturnValue({ runner: "python", reason: "python-command" });
+    const pythonExe = "C:\\Users\\Me\\AppData\\Local\\Programs\\Python\\Python311\\python.exe";
+    const helper = "C:\\Hanako\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
+    existsSync.mockImplementation((p) => p === pythonExe || p === helper);
+    spawnSync.mockImplementation((cmd, args) => {
+      if (cmd === "where" && args?.[0] === "python") {
+        return { status: 0, stdout: `${pythonExe}\r\n`, stderr: "" };
+      }
+      return { status: 1, stdout: "", stderr: "" };
+    });
+
+    const createWin32Exec = await loadExecFactory();
+    const exec = createWin32Exec({
+      sandbox: {
+        helperPath: helper,
+        grants: {
+          readPaths: [],
+          writePaths: ["C:\\work"],
+        },
+      },
+    });
+
+    await exec('python -c "import sys; print(sys.version)"', "C:\\work", {
+      onData: () => {},
+      signal: undefined,
+      timeout: 5,
+      env: { PATH: "C:\\Users\\Me\\AppData\\Local\\Programs\\Python\\Python311;C:\\Windows\\System32" },
+    });
+
+    expect(spawnAndStream).toHaveBeenCalledWith(
+      helper,
+      expect.arrayContaining([
+        "--",
+        pythonExe,
+        "-c",
+        "import sys; print(sys.version)",
+      ]),
+      expect.objectContaining({ cwd: "C:\\work" })
+    );
+  });
+
   it("routes sandboxed simple Node commands through the current Node runtime via the helper", async () => {
     classifyWin32Command.mockReturnValue({ runner: "node", reason: "node-command" });
     const nodeExe = "C:\\Hanako\\resources\\server\\hana-server.exe";
@@ -476,6 +584,62 @@ describe("createWin32Exec", () => {
     expect(helperArgs).not.toContain("--grant-read");
     expect(helperArgs).not.toContain("--grant-read-optional");
     expect(helperArgs).not.toContain(nodeRoot);
+  });
+
+  it("prefers PATH Node over the packaged Hana server runtime for user node commands", async () => {
+    classifyWin32Command.mockReturnValue({ runner: "node", reason: "node-command" });
+    const hanaNodeExe = "C:\\Hanako\\resources\\server\\hana-server.exe";
+    const pathNodeExe = "C:\\Program Files\\nodejs\\node.exe";
+    const helper = "C:\\Hanako\\resources\\sandbox\\windows\\hana-win-sandbox.exe";
+    existsSync.mockImplementation((p) => p === hanaNodeExe || p === pathNodeExe || p === helper);
+    spawnSync.mockImplementation((cmd, args) => {
+      if (cmd === "where" && args?.[0] === "node") {
+        return { status: 0, stdout: `${pathNodeExe}\r\n`, stderr: "" };
+      }
+      return { status: 1, stdout: "", stderr: "" };
+    });
+
+    const originalExecPath = process.execPath;
+    Object.defineProperty(process, "execPath", {
+      value: hanaNodeExe,
+      configurable: true,
+    });
+
+    const createWin32Exec = await loadExecFactory();
+    const exec = createWin32Exec({
+      sandbox: {
+        helperPath: helper,
+        grants: {
+          readPaths: [],
+          writePaths: ["C:\\work"],
+        },
+      },
+    });
+
+    try {
+      await exec("node --version", "C:\\work", {
+        onData: () => {},
+        signal: undefined,
+        timeout: 5,
+        env: { PATH: "C:\\Program Files\\nodejs;C:\\Windows\\System32" },
+      });
+    } finally {
+      Object.defineProperty(process, "execPath", {
+        value: originalExecPath,
+        configurable: true,
+      });
+    }
+
+    expect(spawnAndStream).toHaveBeenCalledWith(
+      helper,
+      expect.arrayContaining([
+        "--",
+        pathNodeExe,
+        "--version",
+      ]),
+      expect.objectContaining({ cwd: "C:\\work" })
+    );
+    expect(spawnAndStream.mock.calls[0][1]).not.toContain(hanaNodeExe);
   });
 
   it("rewrites sandboxed Node commands to the user-writable runtime cache", async () => {

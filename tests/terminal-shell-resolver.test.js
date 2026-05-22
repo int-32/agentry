@@ -24,7 +24,7 @@ describe("resolveTerminalShell", () => {
     });
 
     expect(resolved).toEqual({
-      file: "powershell.exe",
+      file: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
       args: ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass"],
       env: { ComSpec: "C:\\Windows\\System32\\cmd.exe" },
     });
@@ -40,7 +40,7 @@ describe("resolveTerminalShell", () => {
       resolveWin32ShellRuntime,
     });
 
-    expect(resolved.file).toBe("powershell.exe");
+    expect(resolved.file).toBe("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
     expect(resolved.args).toEqual([
       "-NoLogo",
       "-NoProfile",

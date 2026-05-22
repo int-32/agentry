@@ -3,7 +3,10 @@ import {
   baseNameForShellPath,
   envValue,
   isWin32PathLike,
+  normalizeBackslashEscapedDoubleQuotes,
   quoteCmdArg,
+  resolveWin32CmdExecutable,
+  resolveWin32PowerShellExecutable,
   splitShellLikeArgs,
 } from "../lib/shell/shell-utils.js";
 
@@ -24,6 +27,24 @@ describe("shell utils", () => {
       "-Command",
       'Write-Output "name"',
     ]);
+  });
+
+  it("normalizes delimiter-style escaped quotes without touching quoted inner strings", () => {
+    expect(normalizeBackslashEscapedDoubleQuotes('python -c \\"print(1)\\"')).toBe('python -c "print(1)"');
+    expect(normalizeBackslashEscapedDoubleQuotes('powershell -Command "Write-Output \\"name\\""')).toBe(
+      'powershell -Command "Write-Output \\"name\\""'
+    );
+  });
+
+  it("resolves Windows native shell executables from one shared policy", () => {
+    expect(resolveWin32CmdExecutable({ SystemRoot: "C:\\Windows" })).toBe("C:\\Windows\\System32\\cmd.exe");
+    expect(resolveWin32CmdExecutable({ COMSPEC: "D:\\Tools\\cmd.exe" })).toBe("D:\\Tools\\cmd.exe");
+    expect(resolveWin32PowerShellExecutable("powershell.exe", { SystemRoot: "C:\\Windows" })).toBe(
+      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+    );
+    expect(resolveWin32PowerShellExecutable("pwsh.exe", {}, { resolveOnPath: () => "D:\\PowerShell\\pwsh.exe" })).toBe(
+      "D:\\PowerShell\\pwsh.exe"
+    );
   });
 
   it("can reject unterminated quotes for execution parsers", () => {

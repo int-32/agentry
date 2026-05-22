@@ -25,7 +25,7 @@ describe("resolveShellProfile", () => {
     const profile = resolveShellProfile({ platform: "win32", env: { SystemRoot: "C:\\Windows" } });
     expect(profile.id).toBe("windows-powershell");
     expect(profile.family).toBe("powershell");
-    expect(profile.executable.toLowerCase()).toContain("powershell");
+    expect(profile.executable).toBe("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
     expect(profile.argsForCommand("Write-Output 1")).toEqual([
       "-NoLogo",
       "-NoProfile",
