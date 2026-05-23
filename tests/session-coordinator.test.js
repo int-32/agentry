@@ -21,6 +21,8 @@ vi.mock("../lib/pi-sdk/index.js", () => ({
   SettingsManager: {
     inMemory: vi.fn(() => ({})),
   },
+  resizeModelImageInput: vi.fn(async (image) => image),
+  formatModelImageDimensionNote: vi.fn(() => undefined),
 }));
 
 vi.mock("../lib/debug-log.js", () => ({
