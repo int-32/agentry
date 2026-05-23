@@ -21,9 +21,11 @@ const COMPLEX_MARKDOWN_PATTERNS = [
 ];
 const BACKTICK_SENSITIVE_MARKDOWN = /`/;
 const MAX_TAIL_FADE_COUNT = 6;
+const TYPEWRITER_MAX_SOURCE_CHARS = 4000;
 
 export function isTypewriterEligibleMarkdownSource(source: string): boolean {
   if (!source.trim()) return false;
+  if (source.length > TYPEWRITER_MAX_SOURCE_CHARS) return false;
   if (BACKTICK_SENSITIVE_MARKDOWN.test(source)) return false;
   return !COMPLEX_MARKDOWN_PATTERNS.some((pattern) => pattern.test(source));
 }
@@ -55,11 +57,16 @@ export const StreamingMarkdownContent = memo(function StreamingMarkdownContent({
     () => shouldType ? renderMarkdown(visibleSource) : html,
     [html, shouldType, visibleSource],
   );
+  const targetSource = source || '';
   const tailFadeCount = useMemo(
-    () => shouldType
-      ? countNewTailGraphemes(previousVisibleSourceRef.current, visibleSource)
-      : 0,
-    [shouldType, source, visibleSource],
+    () => {
+      // targetSource 变化但 visibleSource 还没追上时，也要清掉上一帧尾部动画。
+      void targetSource;
+      return shouldType
+        ? countNewTailGraphemes(previousVisibleSourceRef.current, visibleSource)
+        : 0;
+    },
+    [shouldType, targetSource, visibleSource],
   );
 
   useLayoutEffect(() => {

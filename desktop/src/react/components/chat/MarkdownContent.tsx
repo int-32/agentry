@@ -79,18 +79,22 @@ function applyTailFade(root: HTMLElement, count: number): void {
 
 export const MarkdownContent = memo(function MarkdownContent({ html, className, tailFadeCount = 0 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const hasTailFadeRef = useRef(false);
   const classes = className ? `md-content ${className}` : 'md-content';
 
   useLayoutEffect(() => {
     if (!ref.current) return;
+    if (tailFadeCount <= 0 && !hasTailFadeRef.current) return;
     applyTailFade(ref.current, tailFadeCount);
+    hasTailFadeRef.current = tailFadeCount > 0;
   }, [html, tailFadeCount]);
 
   useEffect(() => {
     if (!ref.current) return;
+    if (!html.includes('<pre')) return;
     injectCopyButtons(ref.current);
   }, [html]);
-  useMermaidDiagrams(ref, [html]);
+  useMermaidDiagrams(ref, [html.includes('mermaid-diagram') ? html : '']);
 
   return (
     <div

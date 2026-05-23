@@ -274,6 +274,140 @@ describe("openai adapter", () => {
   });
 });
 
+describe("openai-compatible image adapter", () => {
+  beforeEach(() => mockFetch.mockReset());
+
+  it("uses the selected provider credentials and OpenAI-compatible image endpoint", async () => {
+    const { openaiCompatibleImageAdapter } = await import("../plugins/image-gen/adapters/openai-compatible.js");
+
+    const fakeB64 = Buffer.from("compatible-image").toString("base64");
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: [{ b64_json: fakeB64 }] }),
+    });
+
+    const ctx = makeBusCtx("compatible-key", "https://api.example.com/v1", "custom-image");
+    const result = await openaiCompatibleImageAdapter.submit({
+      provider: "custom-image",
+      prompt: "a cat",
+      model: "custom-image-model",
+      ratio: "1:1",
+      format: "png",
+    }, ctx);
+
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toBe("https://api.example.com/v1/images/generations");
+    expect(opts.headers.Authorization).toBe("Bearer compatible-key");
+    const body = JSON.parse(opts.body);
+    expect(body.model).toBe("custom-image-model");
+    expect(body.prompt).toBe("a cat");
+    expect(body.size).toBe("1024x1024");
+    expect(body.response_format).toBe("b64_json");
+
+    expect(result.files).toHaveLength(1);
+  });
+
+  it("uses DashScope Wan2.7 multimodal endpoint for Alibaba Token Plan image models", async () => {
+    const { openaiCompatibleImageAdapter } = await import("../plugins/image-gen/adapters/openai-compatible.js");
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          output: {
+            choices: [
+              {
+                message: {
+                  content: [
+                    { type: "image", image: "https://dashscope-result.example.com/result.png" },
+                  ],
+                },
+              },
+            ],
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => "image/png" },
+        arrayBuffer: async () => Buffer.from("wan-image"),
+      });
+
+    const ctx = makeBusCtx("tp-key", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1", "dashscope");
+    ctx.config.get = vi.fn((key) => {
+      if (key === "providerDefaults") return { dashscope: { size: "4K", watermark: false } };
+      return null;
+    });
+
+    const result = await openaiCompatibleImageAdapter.submit({
+      provider: "dashscope",
+      prompt: "a cat",
+      model: "wan2.7-image-pro",
+      ratio: "16:9",
+    }, ctx);
+
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toBe("https://token-plan.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation");
+    expect(opts.headers.Authorization).toBe("Bearer tp-key");
+    const body = JSON.parse(opts.body);
+    expect(body).toMatchObject({
+      model: "wan2.7-image-pro",
+      input: {
+        messages: [
+          {
+            role: "user",
+            content: [{ text: "a cat" }],
+          },
+        ],
+      },
+      parameters: {
+        n: 1,
+        size: "4096*2304",
+        watermark: false,
+        thinking_mode: true,
+      },
+    });
+    expect(mockFetch.mock.calls[1][0]).toBe("https://dashscope-result.example.com/result.png");
+    expect(result.files).toHaveLength(1);
+  });
+
+  it("downgrades Wan2.7 standard model defaults from 4K to 2K", async () => {
+    const { openaiCompatibleImageAdapter } = await import("../plugins/image-gen/adapters/openai-compatible.js");
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          output: {
+            choices: [
+              { message: { content: [{ type: "image", image: "https://dashscope-result.example.com/result.png" }] } },
+            ],
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => "image/png" },
+        arrayBuffer: async () => Buffer.from("wan-image"),
+      });
+
+    const ctx = makeBusCtx("tp-key", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1", "dashscope");
+    ctx.config.get = vi.fn((key) => {
+      if (key === "providerDefaults") return { dashscope: { size: "4K" } };
+      return null;
+    });
+
+    await openaiCompatibleImageAdapter.submit({
+      provider: "dashscope",
+      prompt: "a cat",
+      model: "wan2.7-image",
+    }, ctx);
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.parameters.size).toBe("2K");
+  });
+});
+
 describe("openai codex oauth adapter", () => {
   beforeEach(() => mockFetch.mockReset());
 

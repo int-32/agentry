@@ -482,7 +482,12 @@ describe("model sync related routes", () => {
       ],
       currentModel: { id: "gpt-5.4", name: "Gpt 5.4" },
       config: {},
-      providerRegistry: { get: () => ({}) },
+      providerRegistry: {
+        get: (provider) => ({
+          "openai-codex": { displayName: "ChatGPT Plus/Pro" },
+          deepseek: { displayName: "研发 DeepSeek" },
+        }[provider] || null),
+      },
     };
 
     app.route("/api", createModelsRoute(engine));
@@ -492,6 +497,8 @@ describe("model sync related routes", () => {
     expect(allRes.status).toBe(200);
     expect(allData.models[0].id).toBe("gpt-5.4");
     expect(allData.models[0].name).toBe("Gpt 5.4");
+    expect(allData.models[0].providerDisplayName).toBe("ChatGPT Plus/Pro");
+    expect(allData.models[1].providerDisplayName).toBe("研发 DeepSeek");
     expect(allData.models[1].xhigh).toBe(true);
   });
 
@@ -842,6 +849,61 @@ describe("model sync related routes", () => {
     const data = await res.json();
     expect(data.models).toHaveLength(2);
     expect(data.models[0].id).toBe("MiniMax-M2.5");
+  });
+
+  it("marks discovered image-generation models so provider settings can persist them as media models", async () => {
+    const { createProvidersRoute } = await import("../server/routes/providers.js");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-test-model-cache-"));
+    try {
+      const app = new Hono();
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [
+            { id: "qwen3.6-plus", context_length: 1000000 },
+            { id: "wan2.7-image", name: "Wan 2.7 Image" },
+            { id: "custom-render", output_modalities: ["image"] },
+          ],
+        }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const engine = withResolveCreds({
+        getRegistryModelsForProvider: vi.fn().mockReturnValue([]),
+        providerRegistry: {
+          getCredentials: () => null,
+          getAuthJsonKey: (id) => id,
+          getDefaultModels: () => [],
+        },
+        agentryHome: tmpDir,
+      });
+
+      app.route("/api", createProvidersRoute(engine));
+
+      const res = await app.request("/api/providers/fetch-models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "dashscope",
+          base_url: "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+          api: "openai-completions",
+          api_key: "sk-test",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.models).toEqual([
+        expect.objectContaining({ id: "qwen3.6-plus" }),
+        expect.objectContaining({ id: "wan2.7-image", type: "image" }),
+        expect.objectContaining({ id: "custom-render", type: "image" }),
+      ]);
+
+      const cached = JSON.parse(fs.readFileSync(path.join(tmpDir, "models-cache.json"), "utf-8"));
+      expect(cached.dashscope.models.find(m => m.id === "wan2.7-image").type).toBe("image");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it("fetch-models does not expose the official DeepSeek provider id as a model", async () => {

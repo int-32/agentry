@@ -359,6 +359,16 @@ export function handleServerMessage(msg: any): void {
       break;
     }
 
+    case 'task_graph_update': {
+      if (msg.run) useStore.getState().applyTaskGraphUpdate(msg.run);
+      break;
+    }
+
+    case 'task_ledger_update': {
+      if (msg.task) useStore.getState().applyTaskLedgerUpdate(msg.task);
+      break;
+    }
+
     case 'activity_update':
       if (msg.activity) {
         useStore.setState({ activities: [msg.activity, ...state.activities.slice(0, 499)] });

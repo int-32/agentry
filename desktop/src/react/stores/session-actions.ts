@@ -17,7 +17,7 @@ import { loadModels } from '../utils/ui-helpers';
 import { updateKeyed } from './create-keyed-slice';
 import { snapshotStreamBuffer, type StreamBufferSnapshot } from './stream-invalidator';
 import { renderMarkdown } from '../utils/markdown';
-import type { ChatMessage, ContentBlock } from './chat-types';
+import type { ChatMessage, ContentBlock, SessionUserTurn } from './chat-types';
 import { readMessageLiveVersion } from './message-live-version';
 
 // ── 防竞争计数器 ──
@@ -182,6 +182,27 @@ export async function loadMessages(forPath?: string): Promise<void> {
   } catch (err) { console.error('[loadMessages] error:', err); }
 }
 
+export async function loadSessionUserTurns(forPath?: string): Promise<void> {
+  const targetPath = forPath || useStore.getState().currentSessionPath;
+  if (!targetPath) return;
+  const current = useStore.getState().sessionUserTurnsByPath[targetPath];
+  if (current?.loading || current?.loaded) return;
+
+  useStore.getState().setSessionUserTurnsLoading(targetPath, true);
+  try {
+    const res = await hanaFetch(`/api/sessions/user-turns?path=${encodeURIComponent(targetPath)}`);
+    const data = await res.json();
+    const turns = Array.isArray(data.turns) ? data.turns as SessionUserTurn[] : [];
+    useStore.getState().setSessionUserTurns(targetPath, turns);
+  } catch (err) {
+    console.error('[loadSessionUserTurns] error:', err);
+    useStore.getState().setSessionUserTurnsError(
+      targetPath,
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
 function buildInflightAssistantMessage(snap: StreamBufferSnapshot): ChatMessage {
   const blocks: ContentBlock[] = [];
   if (snap.thinking || snap.inThinking) {
@@ -198,7 +219,10 @@ function buildInflightAssistantMessage(snap: StreamBufferSnapshot): ChatMessage 
 }
 
 /** 上滑加载更早的消息（分页） */
-export async function loadMoreMessages(forPath?: string): Promise<void> {
+export async function loadMoreMessages(
+  forPath?: string,
+  options: { limit?: number } = {},
+): Promise<void> {
   const targetPath = forPath || useStore.getState().currentSessionPath;
   if (!targetPath) return;
   const session = useStore.getState().chatSessions[targetPath];
@@ -207,8 +231,11 @@ export async function loadMoreMessages(forPath?: string): Promise<void> {
   useStore.getState().setLoadingMore(targetPath, true);
   try {
     const before = session.oldestId ?? '';
+    const limit = options.limit
+      ? `&limit=${encodeURIComponent(String(Math.max(1, Math.min(options.limit, 200))))}`
+      : '';
     const res = await hanaFetch(
-      `/api/sessions/messages?path=${encodeURIComponent(targetPath)}&before=${encodeURIComponent(before)}`,
+      `/api/sessions/messages?path=${encodeURIComponent(targetPath)}&before=${encodeURIComponent(before)}${limit}`,
     );
     const data = await res.json();
     if (Array.isArray(data.sessionFiles)) {
@@ -224,6 +251,41 @@ export async function loadMoreMessages(forPath?: string): Promise<void> {
     console.error('[loadMoreMessages] error:', err);
     useStore.getState().setLoadingMore(targetPath, false);
   }
+}
+
+function hasLoadedMessage(path: string, messageId: string): boolean {
+  const session = useStore.getState().chatSessions[path];
+  if (!session) return false;
+  return session.items.some(item =>
+    item.type === 'message' &&
+    (item.data.id === messageId || item.data.sourceEntryId === messageId),
+  );
+}
+
+function loadLimitForTarget(oldestId: string | undefined, messageId: string): number {
+  const oldest = Number(oldestId);
+  const target = Number(messageId);
+  if (!Number.isFinite(oldest) || !Number.isFinite(target) || target >= oldest) return 50;
+  return Math.max(50, Math.min(200, oldest - target + 1));
+}
+
+export async function ensureMessageLoaded(forPath: string, messageId: string): Promise<boolean> {
+  const targetPath = forPath || useStore.getState().currentSessionPath;
+  if (!targetPath || !messageId) return false;
+  if (hasLoadedMessage(targetPath, messageId)) return true;
+
+  let guard = 0;
+  while (guard < 20) {
+    const session = useStore.getState().chatSessions[targetPath];
+    if (!session?.hasMore || session.loadingMore) break;
+    await loadMoreMessages(targetPath, {
+      limit: loadLimitForTarget(session.oldestId, messageId),
+    });
+    if (hasLoadedMessage(targetPath, messageId)) return true;
+    guard++;
+  }
+
+  return hasLoadedMessage(targetPath, messageId);
 }
 
 // ══════════════════════════════════════════════════════

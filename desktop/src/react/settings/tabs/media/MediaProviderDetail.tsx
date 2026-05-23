@@ -98,12 +98,8 @@ export function MediaProviderDetail({ providerId, provider, config, onSaveConfig
       </div>
 
       {/* Credential status */}
-      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span style={{
-          width: 6, height: 6, borderRadius: '50%',
-          background: provider.hasCredentials ? 'var(--success)' : 'var(--text-muted)',
-          display: 'inline-block',
-        }} />
+      <div className={styles['pv-credential-status']}>
+        <span className={`${styles['pv-status-dot']}${provider.hasCredentials ? ' ' + styles['on'] : ''}`} />
         {provider.hasCredentials ? t('settings.media.credentialOk') : t('settings.media.credentialMissing')}
       </div>
 
@@ -192,13 +188,13 @@ export function MediaProviderDetail({ providerId, provider, config, onSaveConfig
 
       {/* Provider-specific defaults */}
       {provider.models.length > 0 && (
-        <div style={{ marginTop: 'var(--space-md)', paddingTop: 'var(--space-md)', borderTop: '1px solid var(--overlay-light)' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '10px' }}>
+        <div className={styles['pv-provider-defaults']}>
+          <div className={styles['pv-provider-defaults-title']}>
             {t('settings.media.providerDefaults')}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <div className={styles['pv-provider-defaults-grid']}>
+            <div className={styles['pv-provider-default-field']}>
+              <span className={styles['pv-provider-default-label']}>
                 {t('settings.media.size')}
               </span>
               <SelectWidget
@@ -210,8 +206,8 @@ export function MediaProviderDetail({ providerId, provider, config, onSaveConfig
                 ]}
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div className={styles['pv-provider-default-field']}>
+              <span className={styles['pv-provider-default-label']}>
                 {t('settings.media.aspectRatio')}
               </span>
               <SelectWidget
@@ -230,8 +226,8 @@ export function MediaProviderDetail({ providerId, provider, config, onSaveConfig
                 ]}
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div className={styles['pv-provider-default-field']}>
+              <span className={styles['pv-provider-default-label']}>
                 {t('settings.media.format')}
               </span>
               <SelectWidget
@@ -245,8 +241,8 @@ export function MediaProviderDetail({ providerId, provider, config, onSaveConfig
                 ]}
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div className={styles['pv-provider-default-field']}>
+              <span className={styles['pv-provider-default-label']}>
                 {t('settings.media.quality')}
               </span>
               <SelectWidget

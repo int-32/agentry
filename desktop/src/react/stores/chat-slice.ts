@@ -2,7 +2,15 @@
  * chat-slice.ts — Per-session 消息数据 + 滚动位置
  */
 
-import type { ChatListItem, ChatMessage, SessionMessages, SessionModel, SessionRegistryFile } from './chat-types';
+import type {
+  ChatListItem,
+  ChatMessage,
+  SessionMessages,
+  SessionModel,
+  SessionRegistryFile,
+  SessionUserTurn,
+  SessionUserTurnIndex,
+} from './chat-types';
 import { invalidateSessionCache } from './selectors/file-refs';
 import { invalidateStreamBuffer } from './stream-invalidator';
 import { clearMessageLiveVersion } from './message-live-version';
@@ -10,6 +18,7 @@ import { clearMessageLiveVersion } from './message-live-version';
 export interface ChatSlice {
   chatSessions: Record<string, SessionMessages>;
   sessionRegistryFilesByPath: Record<string, SessionRegistryFile[]>;
+  sessionUserTurnsByPath: Record<string, SessionUserTurnIndex>;
   /**
    * Per-session 模型快照。与 chatSessions 解耦：模型可以独立于消息状态存在，
    * 避免 updateSessionModel 在 chatSessions 里写 stub 骗过 hasData 判据（issue #405）。
@@ -32,6 +41,9 @@ export interface ChatSlice {
   _pendingBlockPatches: Record<string, Record<string, any>>;
   setSessionRegistryFiles: (path: string, files: SessionRegistryFile[]) => void;
   upsertSessionRegistryFile: (path: string, file: SessionRegistryFile) => void;
+  setSessionUserTurnsLoading: (path: string, loading: boolean) => void;
+  setSessionUserTurns: (path: string, turns: SessionUserTurn[]) => void;
+  setSessionUserTurnsError: (path: string, error: string) => void;
 
   updateSessionModel: (path: string, model: SessionModel) => void;
   bumpLoadMessagesVersion: (path: string) => number;
@@ -48,6 +60,7 @@ export const createChatSlice = (
 ): ChatSlice => ({
   chatSessions: {},
   sessionRegistryFilesByPath: {},
+  sessionUserTurnsByPath: {},
   sessionModelsByPath: {},
   _loadMessagesVersion: {},
   scrollPositions: {},
@@ -221,6 +234,48 @@ export const createChatSlice = (
     };
   }),
 
+  setSessionUserTurnsLoading: (path, loading) => set((s) => {
+    const current = s.sessionUserTurnsByPath[path] || {
+      turns: [],
+      loading: false,
+      loaded: false,
+      error: null,
+    };
+    return {
+      sessionUserTurnsByPath: {
+        ...s.sessionUserTurnsByPath,
+        [path]: { ...current, loading, error: loading ? null : current.error },
+      },
+    };
+  }),
+
+  setSessionUserTurns: (path, turns) => set((s) => ({
+    sessionUserTurnsByPath: {
+      ...s.sessionUserTurnsByPath,
+      [path]: {
+        turns,
+        loading: false,
+        loaded: true,
+        error: null,
+      },
+    },
+  })),
+
+  setSessionUserTurnsError: (path, error) => set((s) => {
+    const current = s.sessionUserTurnsByPath[path] || {
+      turns: [],
+      loading: false,
+      loaded: false,
+      error: null,
+    };
+    return {
+      sessionUserTurnsByPath: {
+        ...s.sessionUserTurnsByPath,
+        [path]: { ...current, loading: false, error },
+      },
+    };
+  }),
+
   patchBlockByTaskId: (sessionPath, taskId, patch) => {
     const session = get().chatSessions[sessionPath];
     if (!session) {
@@ -297,6 +352,8 @@ export const createChatSlice = (
     delete sessions[path];
     const registryFiles = { ...s.sessionRegistryFilesByPath };
     delete registryFiles[path];
+    const userTurns = { ...s.sessionUserTurnsByPath };
+    delete userTurns[path];
     const models = { ...s.sessionModelsByPath };
     delete models[path];
     const versions = { ...s._loadMessagesVersion };
@@ -310,6 +367,7 @@ export const createChatSlice = (
     return {
       chatSessions: sessions,
       sessionRegistryFilesByPath: registryFiles,
+      sessionUserTurnsByPath: userTurns,
       sessionModelsByPath: models,
       _loadMessagesVersion: versions,
       scrollPositions,

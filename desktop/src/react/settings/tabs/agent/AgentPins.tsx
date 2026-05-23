@@ -3,7 +3,19 @@ import { useSettingsStore } from '../../store';
 import { t, savePins } from '../../helpers';
 import styles from '../../Settings.module.css';
 
-export function PinItem({ text, index, onDelete }: { text: string; index: number; onDelete: (i: number) => void }) {
+export function PinItem({
+  text,
+  index,
+  selected,
+  onSelectionChange,
+  onDelete,
+}: {
+  text: string;
+  index: number;
+  selected: boolean;
+  onSelectionChange: (index: number, selected: boolean) => void;
+  onDelete: (i: number) => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(text);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -18,17 +30,24 @@ export function PinItem({ text, index, onDelete }: { text: string; index: number
     if (val && val !== text) {
       pins[index] = val;
       useSettingsStore.setState({ currentPins: pins });
-      savePins();
+      savePins(pins, useSettingsStore.getState().getSettingsAgentId());
     } else if (!val) {
       pins.splice(index, 1);
       useSettingsStore.setState({ currentPins: pins });
-      savePins();
+      savePins(pins, useSettingsStore.getState().getSettingsAgentId());
     }
     setEditing(false);
   };
 
   return (
     <div className={styles['pin-item']}>
+      <input
+        type="checkbox"
+        className={styles['pin-item-checkbox']}
+        checked={selected}
+        onChange={(e) => onSelectionChange(index, e.target.checked)}
+        aria-label={t('settings.pins.selectItem', { text })}
+      />
       {editing ? (
         <input
           ref={inputRef}

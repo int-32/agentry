@@ -101,6 +101,7 @@ export function AgentTab() {
   const experienceEnabled = settingsConfig?.experience?.enabled === true;
   const hasAvailableToolsField = !!settingsConfig && Object.prototype.hasOwnProperty.call(settingsConfig, 'availableTools');
   const availableTools = hasAvailableToolsField ? settingsConfig?.availableTools : undefined;
+  const pluginTools = Array.isArray(settingsConfig?.pluginTools) ? settingsConfig.pluginTools : [];
 
   const saveAgent = async () => {
     try {
@@ -392,6 +393,7 @@ export function AgentTab() {
       <AgentToolsSection
         availableTools={availableTools}
         disabled={settingsConfig?.tools?.disabled ?? ["update_settings", "dm"]}
+        pluginTools={pluginTools}
       />
 
       {exportPlanningAgentId && createPortal((

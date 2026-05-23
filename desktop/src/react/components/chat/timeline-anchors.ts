@@ -1,12 +1,7 @@
-import type { ChatListItem, ChatMessage } from '../../stores/chat-types';
+import type { ChatListItem, ChatMessage, ChatTimelineAnchor, SessionUserTurn, UserAttachment } from '../../stores/chat-types';
+import { parseUserAttachments } from '../../utils/message-parser';
 
-export interface TimelineAnchor {
-  messageId: string;
-  timestamp: number | null;
-  label: string;
-  role: ChatMessage['role'];
-  markerWidthEm: number;
-}
+export type TimelineAnchor = ChatTimelineAnchor;
 
 interface TimelineAnchorOptions {
   now?: Date;
@@ -22,7 +17,7 @@ interface DateParts {
   minute: number;
 }
 
-function parseTimestamp(value: ChatMessage['timestamp']): number | null {
+function parseTimestamp(value: ChatMessage['timestamp'] | SessionUserTurn['timestamp']): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string') {
     const parsed = Date.parse(value);
@@ -31,17 +26,78 @@ function parseTimestamp(value: ChatMessage['timestamp']): number | null {
   return null;
 }
 
-function normalizedPreviewSource(message: ChatMessage): string {
-  const text = message.text?.replace(/\s+/g, ' ').trim();
-  if (text) return text;
+const PREVIEW_SCAN_LIMIT = 256;
+
+function normalizedPreviewInfo(message: ChatMessage): { source: string; lengthForWidth: number } {
+  if (message.text) {
+    const sampled = message.text.slice(0, PREVIEW_SCAN_LIMIT).replace(/\s+/g, ' ').trim();
+    if (sampled) {
+      return {
+        source: sampled,
+        lengthForWidth: message.text.length > PREVIEW_SCAN_LIMIT
+          ? PREVIEW_SCAN_LIMIT
+          : Array.from(sampled).length,
+      };
+    }
+  }
 
   const firstAttachment = message.attachments?.find(attachment => attachment.name?.trim());
-  if (firstAttachment?.name) return firstAttachment.name.trim();
+  if (firstAttachment?.name) {
+    const source = firstAttachment.name.trim();
+    return { source, lengthForWidth: Array.from(source).length };
+  }
 
-  return message.role === 'user' ? '用户消息' : '助手消息';
+  const source = message.role === 'user' ? '用户消息' : '助手消息';
+  return { source, lengthForWidth: Array.from(source).length };
 }
 
-export function formatTimelinePromptPreview(text: string, maxChars = 10): string {
+function attachmentsFromUserTurn(turn: SessionUserTurn): UserAttachment[] | undefined {
+  const parsed = parseUserAttachments(turn.content || '');
+  const attachments: UserAttachment[] = [
+    ...parsed.files.map(file => ({
+      path: file.path,
+      name: file.name,
+      isDir: file.isDirectory,
+    })),
+    ...parsed.attachedImages.map(image => ({
+      path: image.path,
+      name: image.name,
+      isDir: false,
+    })),
+    ...parsed.attachedVideos.map(video => ({
+      path: video.path,
+      name: video.name,
+      isDir: false,
+    })),
+  ];
+
+  if (turn.imageCount && turn.imageCount > attachments.length) {
+    for (let i = attachments.length; i < turn.imageCount; i++) {
+      attachments.push({
+        path: `image-${i}`,
+        name: `image-${i}`,
+        isDir: false,
+      });
+    }
+  }
+
+  return attachments.length ? attachments : undefined;
+}
+
+function userTurnToChatMessage(turn: SessionUserTurn): ChatMessage {
+  const parsed = parseUserAttachments(turn.content || '');
+  const timestamp = parseTimestamp(turn.timestamp);
+  return {
+    id: turn.id,
+    sourceEntryId: turn.entryId,
+    role: 'user',
+    text: parsed.text,
+    attachments: attachmentsFromUserTurn(turn),
+    timestamp: timestamp ?? undefined,
+  };
+}
+
+export function formatTimelinePromptPreview(text: string, maxChars = 48): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
   if (!normalized) return '';
 
@@ -122,14 +178,29 @@ export function buildTimelineAnchors(
   const source = userTurns.length > 0 ? userTurns : messages;
 
   return source.map((message) => {
-    const previewSource = normalizedPreviewSource(message);
-    const previewLength = Array.from(previewSource).length;
+    const { source: previewSource, lengthForWidth } = normalizedPreviewInfo(message);
     return {
       messageId: message.id,
+      sourceEntryId: message.sourceEntryId,
       timestamp: parseTimestamp(message.timestamp),
       role: message.role,
       label: formatTimelinePromptPreview(previewSource),
-      markerWidthEm: measureTimelineMarkerWidthEm(previewLength),
+      markerWidthEm: measureTimelineMarkerWidthEm(lengthForWidth),
+    };
+  });
+}
+
+export function buildTimelineAnchorsFromUserTurns(turns: SessionUserTurn[]): TimelineAnchor[] {
+  return turns.map((turn) => {
+    const message = userTurnToChatMessage(turn);
+    const { source: previewSource, lengthForWidth } = normalizedPreviewInfo(message);
+    return {
+      messageId: message.id,
+      sourceEntryId: message.sourceEntryId,
+      timestamp: parseTimestamp(message.timestamp),
+      role: 'user',
+      label: formatTimelinePromptPreview(previewSource),
+      markerWidthEm: measureTimelineMarkerWidthEm(lengthForWidth),
     };
   });
 }

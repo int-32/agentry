@@ -9,8 +9,8 @@
     "settingsTab": {
       "id": "mcp",
       "title": {
-        "zh": "连接器",
-        "zh-TW": "連接器",
+        "zh": "外部连接",
+        "zh-TW": "外部連接",
         "en": "Connectors",
         "ja": "Connectors",
         "ko": "Connectors"

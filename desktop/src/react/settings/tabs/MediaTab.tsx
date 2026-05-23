@@ -62,7 +62,13 @@ export function MediaTab() {
 
   const providerIds = Object.keys(providers);
   const allImageModels = providerIds.flatMap(pid =>
-    (providers[pid].models || []).map(m => ({ ...m, provider: pid }))
+    providers[pid]?.hasCredentials
+      ? (providers[pid].models || []).map(m => ({
+          ...m,
+          provider: pid,
+          providerLabel: providers[pid]?.displayName || pid,
+        }))
+      : []
   );
 
   const saveConfig = async (updates: Partial<MediaConfig>) => {
@@ -82,7 +88,7 @@ export function MediaTab() {
   };
 
   return (
-    <div className={`${styles['settings-tab-content']} ${styles['active']}`} data-tab="media">
+    <div className={`${styles['settings-tab-content']} ${styles['media-tab-content']} ${styles['active']}`} data-tab="media">
       {/* pv-layout：double-column variant 做外壳，内部 DOM 保留原样 */}
       <SettingsSection variant="double-column">
         <div className={styles['pv-layout']}>
@@ -164,15 +170,10 @@ export function MediaTab() {
               }}
               options={[
                 { value: '', label: '—' },
-                ...allImageModels.map(m => {
-                  const providerHasCredentials = providers[m.provider]?.hasCredentials === true;
-                  const label = `${m.provider} / ${m.name || m.id}`;
-                  return {
-                    value: `${m.provider}/${m.id}`,
-                    label: providerHasCredentials ? label : `${label} (${t('settings.media.credentialMissing')})`,
-                    disabled: !providerHasCredentials,
-                  };
-                }),
+                ...allImageModels.map(m => ({
+                  value: `${m.provider}/${m.id}`,
+                  label: `${m.providerLabel} / ${m.name || m.id}`,
+                })),
               ]}
             />
           }

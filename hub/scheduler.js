@@ -187,6 +187,7 @@ export class Scheduler {
       cronStore = new CronStore(
         path.join(deskDir, "cron-jobs.json"),
         path.join(deskDir, "cron-runs"),
+        { taskLedger: engine.taskLedger, agentId },
       );
     } catch { return; }
 

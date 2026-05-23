@@ -16,6 +16,7 @@ import { updateKeyed } from '../stores/create-keyed-slice';
 import type { Session, Agent } from '../types';
 import { AgentAvatar, resolveAgentDisplayInfo } from '../utils/agent-display';
 import { buildSessionSections } from './session-sections';
+import type { SessionSection, SessionViewMode } from './session-sections';
 import { ContextMenu, type ContextMenuItem } from '../ui/ContextMenu';
 import { renderMarkdown } from '../utils/markdown';
 import styles from './SessionList.module.css';
@@ -25,6 +26,18 @@ interface BrowserSessionState {
   running: boolean;
   resumable: boolean;
   unavailableReason: string | null;
+}
+
+const SESSION_GROUP_MODE_STORAGE_KEY = 'agentry-session-list-group-mode';
+
+function readSessionGroupMode(): SessionViewMode {
+  if (typeof window === 'undefined') return 'workspace';
+  try {
+    const value = window.localStorage.getItem(SESSION_GROUP_MODE_STORAGE_KEY);
+    return value === 'time' || value === 'workspace' ? value : 'workspace';
+  } catch {
+    return 'workspace';
+  }
 }
 
 function normalizeBrowserSessionStates(data: unknown): Record<string, BrowserSessionState> {
@@ -72,7 +85,17 @@ function SessionListInner() {
   const browserBySession = useStore(s => s.browserBySession);
 
   const [browserSessions, setBrowserSessions] = useState<Record<string, BrowserSessionState>>({});
+  const [groupMode, setGroupMode] = useState<SessionViewMode>(readSessionGroupMode);
   const closingBrowserSessionsRef = useRef(new Set<string>());
+
+  const chooseGroupMode = useCallback((mode: SessionViewMode) => {
+    setGroupMode(mode);
+    try {
+      window.localStorage.setItem(SESSION_GROUP_MODE_STORAGE_KEY, mode);
+    } catch {
+      // Ignore storage failures; the in-memory mode still updates immediately.
+    }
+  }, []);
 
   const setVisibleBrowserSessions = useCallback((data: unknown) => {
     const states = normalizeBrowserSessionStates(data);
@@ -129,11 +152,33 @@ function SessionListInner() {
     return <div className={styles.sessionEmpty}>{t('sidebar.empty')}</div>;
   }
 
-  const sections = buildSessionSections(sessions, { mode: 'time' });
+  const sections = buildSessionSections(sessions, { mode: groupMode });
   const activeSessionPath = pendingSessionSwitchPath || currentSessionPath;
+  const showWorkspaceInMeta = groupMode !== 'workspace';
+  const itemVariant = groupMode === 'workspace' ? 'workspace' : 'default';
 
   return (
     <>
+      <div className={styles.sessionGroupToolbar} role="group" aria-label={t('sidebar.groupBy')}>
+        <button
+          type="button"
+          className={`${styles.sessionGroupModeBtn}${groupMode === 'time' ? ` ${styles.sessionGroupModeBtnActive}` : ''}`}
+          aria-pressed={groupMode === 'time'}
+          title={t('sidebar.groupByTime')}
+          onClick={() => chooseGroupMode('time')}
+        >
+          {t('sidebar.groupTime')}
+        </button>
+        <button
+          type="button"
+          className={`${styles.sessionGroupModeBtn}${groupMode === 'workspace' ? ` ${styles.sessionGroupModeBtnActive}` : ''}`}
+          aria-pressed={groupMode === 'workspace'}
+          title={t('sidebar.groupByWorkspace')}
+          onClick={() => chooseGroupMode('workspace')}
+        >
+          {t('sidebar.groupWorkspace')}
+        </button>
+      </div>
       {sections.map(section => {
         const items = section.items.map(s => (
           <SessionItem
@@ -145,10 +190,13 @@ function SessionListInner() {
             agents={agents}
             browserState={browserSessions[s.path] || null}
             onCloseBrowser={handleCloseBrowserSession}
+            showWorkspaceInMeta={showWorkspaceInMeta}
+            variant={itemVariant}
           />
         ));
 
         if (section.kind === 'pinned') {
+          if (groupMode === 'workspace' && section.items.length === 0) return null;
           return (
             <section key={section.id} className={styles.pinnedSection}>
               <div className={`${styles.sessionSectionTitle} ${styles.pinnedSectionTitle}`}>
@@ -167,7 +215,7 @@ function SessionListInner() {
 
         return (
           <Fragment key={section.id}>
-            <div className={styles.sessionSectionTitle}>{t(section.titleKey)}</div>
+            <SessionSectionTitle section={section} />
             {items}
           </Fragment>
         );
@@ -178,7 +226,23 @@ function SessionListInner() {
 
 // ── Session Item ──
 
-const SessionItem = memo(function SessionItem({ session: s, isActive, isStreaming, isPinned, agents, browserState, onCloseBrowser }: {
+function SessionSectionTitle({ section }: { section: SessionSection }) {
+  const { t } = useI18n();
+  if (section.kind === 'workspace') {
+    const label = section.title || (section.titleKey ? t(section.titleKey) : '');
+    return (
+      <div className={`${styles.sessionSectionTitle} ${styles.workspaceSectionTitle}`} title={section.workspacePath || undefined}>
+        <svg className={styles.workspaceSectionIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h4l2 2.5h7A2.5 2.5 0 0 1 21 10v6.5A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z" />
+        </svg>
+        <span>{label}</span>
+      </div>
+    );
+  }
+  return <div className={styles.sessionSectionTitle}>{t(section.titleKey)}</div>;
+}
+
+const SessionItem = memo(function SessionItem({ session: s, isActive, isStreaming, isPinned, agents, browserState, onCloseBrowser, showWorkspaceInMeta, variant }: {
   session: Session;
   isActive: boolean;
   isStreaming: boolean;
@@ -186,6 +250,8 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
   agents: Agent[];
   browserState: BrowserSessionState | null;
   onCloseBrowser: (sessionPath: string) => void;
+  showWorkspaceInMeta: boolean;
+  variant: 'default' | 'workspace';
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(false);
@@ -255,7 +321,7 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
   // Meta line
   const parts: string[] = [];
   if (s.agentName || s.agentId) parts.push(s.agentName || s.agentId!);
-  if (s.cwd) {
+  if (showWorkspaceInMeta && s.cwd) {
     const dirName = s.cwd.split(/[/\\]/).filter(Boolean).pop();
     if (dirName) parts.push(dirName);
   }
@@ -267,6 +333,8 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
     browserState?.unavailableReason,
     t('browser.close'),
   ].filter(Boolean).join('\n');
+  const title = s.title || s.firstMessage || t('session.untitled');
+  const isWorkspaceVariant = variant === 'workspace';
 
   const handleBrowserClose = useCallback((e: React.MouseEvent | React.KeyboardEvent) => {
     e.preventDefault();
@@ -282,13 +350,23 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
   return (
     <>
       <button
-        className={`${styles.sessionItem}${isActive ? ` ${styles.sessionItemActive}` : ''}`}
+        className={`${styles.sessionItem}${isWorkspaceVariant ? ` ${styles.sessionWorkspaceItem}` : ''}${isActive ? ` ${styles.sessionItemActive}` : ''}`}
         data-session-path={s.path}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
       >
         <div className={styles.sessionItemHeader}>
-          {s.agentId && (
+          {isWorkspaceVariant && (
+            <span className={`${styles.sessionWorkspacePinSlot}${isPinned ? ` ${styles.sessionWorkspacePinSlotVisible}` : ''}`} aria-hidden="true">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 17v5" />
+                <path d="M5 17h14" />
+                <path d="M7 3h10l-2 9H9L7 3z" />
+                <path d="M9 12l-2 5h10l-2-5" />
+              </svg>
+            </span>
+          )}
+          {!isWorkspaceVariant && s.agentId && (
             <AgentBadge agentId={s.agentId} agentName={s.agentName} agents={agents} />
           )}
           {isStreaming && <span className={styles.sessionStreamingDot} />}
@@ -304,8 +382,11 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
             />
           ) : (
             <div className={styles.sessionItemTitle}>
-              {s.title || s.firstMessage || t('session.untitled')}
+              {title}
             </div>
+          )}
+          {isWorkspaceVariant && s.modified && (
+            <span className={styles.sessionWorkspaceTime}>{formatSessionDate(s.modified)}</span>
           )}
         </div>
 
@@ -336,11 +417,13 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
           </svg>
         </div>
 
-        <div className={styles.sessionItemMeta}>
-          {parts.join(' · ')}
-        </div>
+        {!isWorkspaceVariant && (
+          <div className={styles.sessionItemMeta}>
+            {parts.join(' · ')}
+          </div>
+        )}
 
-        {rcLabel && (
+        {!isWorkspaceVariant && rcLabel && (
           <div className={styles.sessionRcBadge}>
             {rcLabel}
           </div>
@@ -435,7 +518,7 @@ const SessionContextMenu = memo(function SessionContextMenu({
       danger: true,
       action: () => archiveSession(session.path),
     },
-  ], [isPinned, onRename, onShowSummary, position, session.path, t]);
+  ], [isPinned, onRename, onShowSummary, position, session.hasSummary, session.path, t]);
 
   return (
     <ContextMenu

@@ -24,6 +24,7 @@ description: 使用图片/视频生成工具时必读。包含工具参数、非
 - `ratio`：长宽比（1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3, 21:9）
 - `resolution`：分辨率（2k, 4k）
 - `quality`：画质（low, medium, high）
+- `model`：指定图片模型 ID（可选）。不指定时使用设置页的全局默认生图模型
 - `provider`：指定生图 provider（可选，默认自动选择）。可用 provider 来自 Agentry Provider Registry 的 `media.imageGeneration` capability，不从聊天模型列表推断
 
 ### image-gen_generate-video
@@ -45,10 +46,27 @@ description: 使用图片/视频生成工具时必读。包含工具参数、非
 | 图片变视频 | "让这张图动起来" | generate-video + image 参数 | prompt 描述运动和变化 |
 | 不是生成请求 | "这张图画的是什么" | 不调用 | 只是看图/聊天 |
 
+## 模型与接口路由
+
+Agent 不要手写 provider HTTP 接口，也不要根据模型名自行拼 URL。只调用 `image-gen_generate-image`，工具会根据参数和设置页的默认生图模型自动选择 adapter：
+
+1. 如果用户明确指定 provider/model，把它们作为 `provider`、`model` 参数传给工具
+2. 如果用户没有指定，省略 provider/model，工具会读取设置页的 `defaultImageModel`
+3. OpenAI、OpenAI Codex OAuth、火山 Seedream 等有专用 adapter 的 provider 会优先走专用 adapter
+4. 只有 provider 没有专用 adapter、但模型发现确认它有 `media.imageGeneration` 能力时，才走 OpenAI-compatible 图片 adapter
+5. 阿里 TP / DashScope 的 `wan2.7-image`、`wan2.7-image-pro` 在工具层会自动转到万相 2.7 的 DashScope AIGC 接口，不走 `/compatible-mode/v1/images/generations`
+
+阿里万相特殊规则由工具内部处理：
+
+- `wan2.7-image-pro` 文生图可用 4K
+- `wan2.7-image` 不支持 4K，工具会把 4K 自动降为 2K
+- 图生图/编辑场景按万相限制处理，不需要 Agent 改写请求体
+
 ## 注意
 
 - 生成消耗 provider 额度，大批量前建议提醒用户
 - 不同 provider 支持的参数不同，工具会按 provider 的媒体能力和 adapter 处理
 - Provider 可能来自内置 provider、插件贡献，或 CLI wrapper。不要假设它一定是聊天 provider
+- 不要因为模型 ID 看起来像 OpenAI-compatible 就绕过工具直接调用 HTTP；接口兼容和媒体生图能力是两套路由
 - 视频生成通常比图片慢（几十秒到几分钟），但同样不阻塞
 - 图中需要出现文字时，把文字内容放在**双引号**里

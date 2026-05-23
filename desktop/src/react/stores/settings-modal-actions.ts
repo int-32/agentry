@@ -1,6 +1,6 @@
 import { useStore } from './index';
 
-const DEFAULT_SETTINGS_TAB = 'agent';
+const DEFAULT_SETTINGS_TAB = 'me';
 
 export function openSettingsModal(tab?: string): void {
   const current = useStore.getState().settingsModal;

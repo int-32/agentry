@@ -138,4 +138,67 @@ describe('buildSessionSections', () => {
     ]);
     expect(earlierSection!.items.map(i => i.path)).toEqual(['/sessions/bad-date.jsonl']);
   });
+
+  it('groups regular sessions by workspace and keeps pinned sessions separate', () => {
+    const sections = buildSessionSections([
+      makeSession({
+        path: '/sessions/casepilot-old.jsonl',
+        firstMessage: 'case old',
+        cwd: '/Users/test/Workspace/casepilot',
+        modified: '2026-04-29T02:00:00.000Z',
+      }),
+      makeSession({
+        path: '/sessions/agentry.jsonl',
+        firstMessage: 'agentry',
+        cwd: '/Users/test/Workspace/agentry',
+        modified: '2026-04-29T09:00:00.000Z',
+      }),
+      makeSession({
+        path: '/sessions/no-workspace.jsonl',
+        firstMessage: 'no cwd',
+        cwd: null,
+        modified: '2026-04-29T10:00:00.000Z',
+      }),
+      makeSession({
+        path: '/sessions/casepilot-new.jsonl',
+        firstMessage: 'case new',
+        cwd: '/Users/test/Workspace/casepilot/',
+        modified: '2026-04-29T11:00:00.000Z',
+      }),
+      makeSession({
+        path: '/sessions/pinned.jsonl',
+        firstMessage: 'pin',
+        cwd: '/Users/test/Workspace/casepilot',
+        pinnedAt: '2026-04-29T08:00:00.000Z',
+      }),
+    ], { mode: 'workspace' });
+
+    expect(sections.map(section => section.kind)).toEqual([
+      'pinned',
+      'workspace',
+      'workspace',
+      'workspace',
+    ]);
+    expect(sections[0].items.map(item => item.path)).toEqual(['/sessions/pinned.jsonl']);
+    expect(sections[1]).toMatchObject({
+      kind: 'workspace',
+      title: 'casepilot',
+      workspacePath: '/Users/test/Workspace/casepilot',
+    });
+    expect(sections[1].items.map(item => item.path)).toEqual([
+      '/sessions/casepilot-new.jsonl',
+      '/sessions/casepilot-old.jsonl',
+    ]);
+    expect(sections[2]).toMatchObject({
+      kind: 'workspace',
+      title: 'agentry',
+      workspacePath: '/Users/test/Workspace/agentry',
+    });
+    expect(sections[3]).toMatchObject({
+      kind: 'workspace',
+      title: null,
+      titleKey: 'sidebar.noWorkspace',
+      workspacePath: null,
+    });
+  });
 });

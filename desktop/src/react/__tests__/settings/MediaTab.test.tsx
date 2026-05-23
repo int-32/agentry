@@ -172,4 +172,39 @@ describe('MediaTab image-gen config', () => {
 
     expect(await screen.findByTestId('media-provider-detail')).toHaveTextContent('volcengine');
   });
+
+  it('lists only usable global image models with provider display names', async () => {
+    mocks.hanaFetch.mockImplementation((path: string) => {
+      if (path === '/api/plugins/image-gen/providers') {
+        return Promise.resolve(jsonResponse({
+          providers: {
+            dashscope: {
+              providerId: 'dashscope',
+              displayName: '阿里TP',
+              hasCredentials: true,
+              models: [{ id: 'wan2.7-image-pro', name: 'Wan2.7 Image Pro' }],
+              availableModels: [],
+            },
+            openai: {
+              providerId: 'openai',
+              displayName: 'OpenAI',
+              hasCredentials: false,
+              models: [{ id: 'gpt-image-2', name: 'GPT Image 2' }],
+              availableModels: [],
+            },
+          },
+          config: { defaultImageModel: { provider: 'dashscope', id: 'wan2.7-image-pro' } },
+        }));
+      }
+      return Promise.resolve(jsonResponse({ values: {} }));
+    });
+
+    render(<MediaTab />);
+
+    const select = await screen.findByLabelText('settings.media.defaultModel');
+    expect(select).toHaveDisplayValue('阿里TP / Wan2.7 Image Pro');
+    expect(screen.getByRole('option', { name: '阿里TP / Wan2.7 Image Pro' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /dashscope/ })).toBeNull();
+    expect(screen.queryByRole('option', { name: /OpenAI/ })).toBeNull();
+  });
 });

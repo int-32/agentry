@@ -5,6 +5,8 @@
  */
 import path from "node:path";
 
+const OPENAI_COMPATIBLE_IMAGE_ADAPTER_ID = "openai-compatible-image";
+
 export const name = "generate-image";
 export const description =
   "根据文字描述生成图片。非阻塞：提交后立即返回，完成后自动通知。";
@@ -33,10 +35,40 @@ async function adapterIsAvailable(adapter, submitCtx) {
   }
 }
 
-export async function resolveImageAdapter(input, registry, submitCtx) {
-  if (input.provider) return registry.get(input.provider);
+async function hasDiscoveredImageProvider(providerId, submitCtx) {
+  if (!providerId) return false;
+  try {
+    const { providers } = await submitCtx.bus.request("provider:media-providers", { capability: "image_generation" });
+    const provider = providers?.[providerId];
+    if (!provider || provider.hasCredentials === false) return false;
+    return (provider.models?.length || 0) > 0 || (provider.availableModels?.length || 0) > 0;
+  } catch {
+    return false;
+  }
+}
 
-  const defaultProvider = submitCtx.config?.get?.("defaultImageModel")?.provider;
+async function resolveOpenAICompatibleAdapter(providerId, registry, submitCtx) {
+  const adapter = registry.get(OPENAI_COMPATIBLE_IMAGE_ADAPTER_ID);
+  if (!adapter) return null;
+  if (!await hasDiscoveredImageProvider(providerId, submitCtx)) return null;
+  return adapter;
+}
+
+export async function resolveImageAdapter(input, registry, submitCtx) {
+  const defaultImageModel = submitCtx.config?.get?.("defaultImageModel");
+  const requestedProvider = input.provider || defaultImageModel?.provider;
+
+  if (requestedProvider) {
+    const directAdapter = registry.get(requestedProvider);
+    if (directAdapter && await adapterIsAvailable(directAdapter, submitCtx)) return directAdapter;
+
+    const genericAdapter = await resolveOpenAICompatibleAdapter(requestedProvider, registry, submitCtx);
+    if (genericAdapter) return genericAdapter;
+
+    if (input.provider) return null;
+  }
+
+  const defaultProvider = defaultImageModel?.provider;
   if (defaultProvider) {
     const adapter = registry.get(defaultProvider);
     if (adapter && await adapterIsAvailable(adapter, submitCtx)) return adapter;
@@ -66,6 +98,17 @@ export async function execute(input, ctx) {
     return { content: [{ type: "text", text: "没有可用的图片生成 provider" }] };
   }
 
+  const defaultImageModel = ctx.config?.get?.("defaultImageModel");
+  const targetProvider = input.provider || defaultImageModel?.provider;
+  const targetModel = input.model || (
+    targetProvider && defaultImageModel?.provider === targetProvider
+      ? defaultImageModel.id
+      : undefined
+  );
+  const usesTargetProvider = targetProvider && (
+    adapter.id === targetProvider || adapter.id === OPENAI_COMPATIBLE_IMAGE_ADAPTER_ID
+  );
+
   const count = Math.min(Math.max(input.count || 1, 1), 9);
   const batchId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
@@ -74,7 +117,8 @@ export async function execute(input, ctx) {
     prompt: input.prompt,
     ...(input.ratio && { ratio: input.ratio }),
     ...(input.resolution && { resolution: input.resolution }),
-    ...(input.model && { model: input.model }),
+    ...(usesTargetProvider && targetProvider && { provider: targetProvider }),
+    ...((input.model || usesTargetProvider) && targetModel && { model: targetModel }),
     ...(input.image && { image: input.image }),
   };
 
@@ -146,6 +190,7 @@ export async function execute(input, ctx) {
     details: {
       card: {
         type: "iframe",
+        pluginId: ctx.pluginId || "image-gen",
         route: `/card?batch=${batchId}`,
         title: "图片生成",
         description: `${input.prompt.slice(0, 60)} (${succeeded.length}张)`,

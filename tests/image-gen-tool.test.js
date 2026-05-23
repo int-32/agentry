@@ -153,6 +153,42 @@ describe("generate-image tool — adapter resolution", () => {
     expect(codexAdapter.submit).not.toHaveBeenCalled();
     expect(result.details.card.type).toBe("iframe");
   });
+
+  it("uses the OpenAI-compatible adapter for a default provider that only comes from discovered media models", async () => {
+    const genericAdapter = makeAdapter({
+      id: "openai-compatible-image",
+      submit: vi.fn(async () => ({ taskId: "task-generic", files: ["img.png"] })),
+    });
+    const registry = {
+      get: vi.fn((id) => (id === "openai-compatible-image" ? genericAdapter : undefined)),
+      getDefault: vi.fn(),
+      getByType: vi.fn(() => [genericAdapter]),
+    };
+    const store = { add: vi.fn(), update: vi.fn() };
+    const poller = { add: vi.fn() };
+    const request = vi.fn(async (type) => {
+      if (type === "provider:media-providers") {
+        return {
+          providers: {
+            dashscope: {
+              models: [{ id: "wan2.7-image", name: "Wan2.7 Image" }],
+            },
+          },
+        };
+      }
+      if (type === "provider:credentials") return { apiKey: "tp-key" };
+      return {};
+    });
+    const ctx = makeCtx({ registry, store, poller }, { request });
+    ctx.config = { get: vi.fn((key) => key === "defaultImageModel" ? { provider: "dashscope", id: "wan2.7-image" } : undefined) };
+
+    await execute({ prompt: "a desk lamp" }, ctx);
+
+    expect(genericAdapter.submit).toHaveBeenCalledWith(expect.objectContaining({
+      provider: "dashscope",
+      model: "wan2.7-image",
+    }), expect.any(Object));
+  });
 });
 
 describe("generate-image tool — submit error", () => {
@@ -178,6 +214,7 @@ describe("generate-image tool — single submit returns card", () => {
 
     expect(result.content[0].text).toContain("已提交 1 张");
     expect(result.details.card.type).toBe("iframe");
+    expect(result.details.card.pluginId).toBe("image-gen");
     expect(result.details.card.route).toMatch(/^\/card\?batch=/);
     expect(result.details.card.title).toBe("图片生成");
     expect(result.details.card.description).toContain("a sunset");

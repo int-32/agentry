@@ -15,6 +15,23 @@ interface MockState extends Record<string, unknown> {
 
 const mockState: MockState = {};
 const mockHanaFetch = vi.fn();
+const TAB_LABELS: Record<string, string> = {
+  'settings.tabs.me': '个人资料',
+  'settings.tabs.agent': '助手角色',
+  'settings.tabs.providers': '模型供应',
+  'settings.tabs.media': '媒体模型',
+  'settings.tabs.work': '工作空间',
+  'settings.tabs.skills': '技能工具',
+  'settings.tabs.mcp': '外部连接',
+  'settings.tabs.bridge': '社交连接',
+  'settings.tabs.computer': '电脑控制',
+  'settings.tabs.plugins': '插件管理',
+  'settings.tabs.sharing': '分享导出',
+  'settings.tabs.security': '安全权限',
+  'settings.tabs.interface': '界面外观',
+  'settings.tabs.about': '关于应用',
+  'settings.plugins.marketplaceTitle': '插件市场',
+};
 
 vi.mock('../../settings/store', () => {
   const hook: any = (selector?: (s: MockState) => unknown) =>
@@ -39,6 +56,7 @@ vi.mock('../../settings/helpers', () => ({
   t: (key: string) => {
     if (key === 'settings.title') return '设置';
     if (key === 'settings.back') return '返回';
+    if (TAB_LABELS[key]) return TAB_LABELS[key];
     return key;
   },
 }));
@@ -78,9 +96,10 @@ vi.mock('../../settings/tabs/SharingTab', () => ({ SharingTab: () => <div data-t
 function resetState() {
   Object.keys(mockState).forEach(key => delete mockState[key]);
   Object.assign(mockState, {
-    activeTab: 'agent',
+    activeTab: 'me',
     ready: true,
     set: vi.fn((patch: Record<string, unknown>) => Object.assign(mockState, patch)),
+    pluginSettingsTabs: [],
   });
 }
 
@@ -115,8 +134,8 @@ describe('SettingsContent title placement', () => {
     const header = container.querySelector('.settings-header');
     expect(header).not.toBeNull();
     expect(within(header as HTMLElement).getByRole('heading', { name: '设置' })).toBeInTheDocument();
-    expect(within(header as HTMLElement).getByRole('heading', { name: '助手' })).toBeInTheDocument();
-    expect(screen.getAllByRole('heading', { name: '助手' })).toHaveLength(1);
+    expect(within(header as HTMLElement).getByRole('heading', { name: '个人资料' })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { name: '个人资料' })).toHaveLength(1);
   });
 
   it('keeps the tab title in the content area for the standalone settings window', async () => {
@@ -125,8 +144,41 @@ describe('SettingsContent title placement', () => {
 
     const header = container.querySelector('.settings-header');
     expect(header).not.toBeNull();
-    expect(within(header as HTMLElement).queryByRole('heading', { name: '助手' })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '助手' })).toBeInTheDocument();
+    expect(within(header as HTMLElement).queryByRole('heading', { name: '个人资料' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '个人资料' })).toBeInTheDocument();
+  });
+
+  it('orders visible settings tabs by setup workflow and keeps Chinese labels four characters', async () => {
+    mockState.pluginSettingsTabs = [{
+      pluginId: 'mcp',
+      id: 'mcp.settings',
+      title: { zh: '连接器', en: 'Connectors' },
+      nativeComponent: 'mcp.settings',
+    }];
+    const { SettingsContent } = await import('../../settings/SettingsContent');
+    const { container } = render(<SettingsContent variant="window" />);
+
+    const labels = Array.from(container.querySelectorAll<HTMLElement>('[data-tab]'))
+      .map(item => item.textContent?.trim())
+      .filter(Boolean);
+
+    expect(labels).toEqual([
+      '个人资料',
+      '助手角色',
+      '模型供应',
+      '媒体模型',
+      '工作空间',
+      '技能工具',
+      '外部连接',
+      '社交连接',
+      '电脑控制',
+      '插件管理',
+      '分享导出',
+      '安全权限',
+      '界面外观',
+      '关于应用',
+    ]);
+    expect(labels.every(label => Array.from(label || '').length === 4)).toBe(true);
   });
 
   it('notifies the modal shell when the active settings tab changes', async () => {
@@ -134,7 +186,7 @@ describe('SettingsContent title placement', () => {
     const { SettingsContent } = await import('../../settings/SettingsContent');
     render(<SettingsContent variant="modal" onClose={() => {}} onActiveTabChange={onActiveTabChange} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'settings.tabs.computer' }));
+    fireEvent.click(screen.getByRole('button', { name: '电脑控制' }));
 
     expect(onActiveTabChange).toHaveBeenCalledTimes(1);
     expect(onActiveTabChange).toHaveBeenCalledWith('computer');
@@ -180,8 +232,8 @@ describe('SettingsContent title placement', () => {
     const { SettingsContent } = await import('../../settings/SettingsContent');
     render(<SettingsContent variant="modal" onClose={() => {}} />);
 
-    expect(screen.queryByRole('button', { name: 'settings.tabs.computer' })).not.toBeInTheDocument();
-    expect(mockState.set).toHaveBeenCalledWith({ activeTab: 'agent' });
+    expect(screen.queryByRole('button', { name: '电脑控制' })).not.toBeInTheDocument();
+    expect(mockState.set).toHaveBeenCalledWith({ activeTab: 'me' });
   });
 
   it('keeps activeServerConnection in sync when the settings window hears server restart', async () => {

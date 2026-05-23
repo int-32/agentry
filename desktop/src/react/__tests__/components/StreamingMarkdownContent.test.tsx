@@ -109,6 +109,20 @@ describe('StreamingMarkdownContent', () => {
     expect(container.querySelector('[data-stream-tail-char="true"]')).toBeNull();
   });
 
+  it('does not typewriter very long prose while streaming', () => {
+    const source = '长文本'.repeat(1500);
+    const html = `<p>${source}</p>`;
+
+    expect(isTypewriterEligibleMarkdownSource(source)).toBe(false);
+
+    const { container } = render(
+      <StreamingMarkdownContent source={source} html={html} active />,
+    );
+
+    expect(container.textContent).toBe(source);
+    expect(container.querySelector('[data-stream-tail-char="true"]')).toBeNull();
+  });
+
   it('keeps tail fade characters on the text baseline without transform offsets', () => {
     const css = fs.readFileSync(
       path.join(process.cwd(), 'desktop/src/react/components/chat/Chat.module.css'),

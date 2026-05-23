@@ -271,6 +271,156 @@
     padding-right: 22px;
 }
 
+.sessionGroupToolbar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    padding: 4px 4px 5px;
+    margin: 0 0 2px;
+    background: var(--sidebar-bg, var(--bg));
+}
+
+.sessionGroupModeBtn {
+    height: 22px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.66rem;
+    line-height: 1;
+    transition: background var(--duration-fast), color var(--duration-fast);
+}
+
+.sessionGroupModeBtn:hover {
+    background: var(--accent-light);
+    color: var(--text);
+}
+
+.sessionGroupModeBtnActive {
+    background: var(--accent-light);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.workspaceSectionTitle {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 10px var(--space-sm) 6px;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    opacity: 0.82;
+}
+
+.workspaceSectionIcon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    opacity: 0.88;
+}
+
+.sessionWorkspaceItem {
+    display: block;
+    min-height: 38px;
+    padding: 0 8px;
+    margin-bottom: 1px;
+    border-radius: 8px;
+}
+
+.sessionWorkspaceItem .sessionItemHeader {
+    height: 38px;
+    gap: 0.5rem;
+    padding-right: 0;
+}
+
+.sessionWorkspaceItem .sessionItemTitle {
+    flex: 1;
+    font-size: 0.86rem;
+    line-height: 1.25;
+    color: var(--text);
+}
+
+.sessionWorkspaceItem.sessionItemActive .sessionItemTitle {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.sessionWorkspaceTime {
+    flex: 0 0 auto;
+    max-width: 46px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    line-height: 1;
+    opacity: 0.84;
+}
+
+.sessionWorkspaceItem:hover .sessionWorkspaceTime,
+.sessionWorkspaceItem.sessionItemActive .sessionWorkspaceTime {
+    opacity: 0;
+}
+
+.sessionWorkspacePinSlot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    color: var(--text-muted);
+    opacity: 0;
+}
+
+.sessionWorkspacePinSlotVisible {
+    opacity: 0.78;
+}
+
+.sessionWorkspaceItem:hover .sessionWorkspacePinSlot,
+.sessionWorkspaceItem.sessionItemActive .sessionWorkspacePinSlot {
+    opacity: 0.72;
+}
+
+.sessionWorkspaceItem .sessionPinBtn,
+.sessionWorkspaceItem .sessionRenameBtn,
+.sessionWorkspaceItem .sessionArchiveBtn {
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+}
+
+.sessionWorkspaceItem .sessionPinBtn {
+    right: 56px;
+}
+
+.sessionWorkspaceItem .sessionRenameBtn {
+    right: 32px;
+}
+
+.sessionWorkspaceItem .sessionArchiveBtn {
+    right: 8px;
+}
+
+.sessionWorkspaceItem.sessionItemActive .sessionArchiveBtn {
+    opacity: 0.58;
+}
+
+.sessionWorkspaceItem .sessionArchiveBtn:hover {
+    opacity: 1;
+}
+
+.sessionWorkspaceItem:hover .sessionItemTitle,
+.sessionWorkspaceItem.sessionItemActive .sessionItemTitle {
+    padding-right: 68px;
+}
+
 /* 分组标题 */
 .sessionSectionTitle {
     font-size: 0.65rem;

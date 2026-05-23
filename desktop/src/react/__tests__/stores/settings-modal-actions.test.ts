@@ -9,16 +9,16 @@ import {
 describe('settings modal actions', () => {
   beforeEach(() => {
     useStore.setState({
-      settingsModal: { open: false, activeTab: 'agent' },
+      settingsModal: { open: false, activeTab: 'me' },
     } as never);
   });
 
-  it('opens the settings modal on the agent tab by default', () => {
+  it('opens the settings modal on the profile tab by default', () => {
     openSettingsModal();
 
     expect(useStore.getState().settingsModal).toEqual({
       open: true,
-      activeTab: 'agent',
+      activeTab: 'me',
     });
   });
 

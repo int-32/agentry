@@ -2268,6 +2268,20 @@
     margin: 0;
 }
 
+.agent-plugin-tool-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-input, 4px);
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    line-height: 1;
+    white-space: nowrap;
+    background: var(--bg-card);
+}
+
 .mcp-empty-state {
     width: 100%;
     text-align: center;
@@ -3800,6 +3814,35 @@ a.about-link:hover {
 
 .pv-detail-inner { max-width: 560px; }
 
+.media-tab-content .pv-layout {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+}
+
+.media-tab-content .pv-list,
+.media-tab-content .pv-detail,
+.media-tab-content .pv-fav-list {
+    overflow: visible;
+}
+
+.media-tab-content .pv-fav-list {
+    max-height: none;
+}
+
+.media-tab-content .pv-detail {
+    padding: var(--space-lg);
+}
+
+.media-tab-content .pv-detail-inner {
+    width: 100%;
+    max-width: none;
+}
+
+.media-tab-content .pv-detail-header {
+    margin-bottom: var(--space-sm);
+}
+
 .pv-detail-header {
     display: flex;
     align-items: center;
@@ -4010,6 +4053,15 @@ a.about-link:hover {
     gap: var(--space-sm);
 }
 
+.pv-credential-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: var(--space-md);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+}
+
 /* ── 已收藏模型（紧凑列表） ── */
 .pv-fav-section {
     margin-bottom: var(--space-md);
@@ -4163,6 +4215,50 @@ a.about-link:hover {
 /* ── 模型列表区（折叠式） ── */
 .pv-models {
     margin-bottom: var(--space-md);
+}
+
+.pv-provider-defaults {
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--overlay-light);
+}
+
+.pv-provider-defaults-title {
+    margin-bottom: 10px;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.pv-provider-defaults-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.pv-provider-default-field {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pv-provider-default-label {
+    color: var(--text-muted);
+    font-size: 0.65rem;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.media-tab-content .pv-models,
+.media-tab-content .pv-fav-section {
+    margin-bottom: var(--space-sm);
+}
+
+@media (max-width: 1180px) {
+    .media-tab-content .pv-provider-defaults-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 /* ── 添加模型行 ── */
@@ -4564,6 +4660,43 @@ a.about-link:hover {
     font-size: 0.82rem;
 }
 
+.pin-bulk-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-xs);
+    margin: 0 0 var(--space-xs);
+}
+
+.pin-bulk-btn {
+    height: 28px;
+    padding: 0 var(--space-sm);
+    border-radius: var(--radius-input, 4px);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-out);
+}
+
+.pin-bulk-btn:hover:not(:disabled) {
+    color: var(--accent);
+    border-color: rgba(var(--accent-rgb), 0.35);
+    background: var(--accent-light);
+}
+
+.pin-bulk-btn.danger:hover:not(:disabled) {
+    color: var(--coral);
+    border-color: rgba(var(--coral-rgb), 0.35);
+    background: rgba(var(--coral-rgb), 0.08);
+}
+
+.pin-bulk-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .pin-item {
     display: flex;
     align-items: center;
@@ -4579,6 +4712,15 @@ a.about-link:hover {
 
 .pin-item:hover {
     background: var(--accent-light);
+}
+
+.pin-item-checkbox {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
 }
 
 .pin-item-text {

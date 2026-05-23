@@ -26,6 +26,12 @@ function resolveModelName(id, sdkName, overrides, provider) {
   return sdkName || id;
 }
 
+function resolveProviderDisplayName(provider, providerRegistry) {
+  if (!provider) return "";
+  const entry = providerRegistry?.get?.(provider);
+  return entry?.displayName || entry?.display_name || provider;
+}
+
 function parseHealthModelRef(body) {
   const parsed = parseModelRef(body?.model ?? body?.modelId);
   if (!parsed?.id) return { error: "modelId required" };
@@ -40,13 +46,14 @@ function parseHealthModelRef(body) {
   return { id: parsed.id, provider };
 }
 
-function serializeModelInfo(model, { current = null, overrides = null } = {}) {
+function serializeModelInfo(model, { current = null, overrides = null, providerRegistry = null } = {}) {
   if (!model) return null;
   const videoTransport = resolveModelVideoInputTransport(model);
   return {
     id: model.id,
     name: resolveModelName(model.id, model.name, overrides, model.provider),
     provider: model.provider,
+    providerDisplayName: resolveProviderDisplayName(model.provider, providerRegistry),
     ...(current !== null ? { isCurrent: modelRefEquals(model, current) } : {}),
     input: Array.isArray(model.input) ? model.input : ["text"],
     video: modelSupportsVideoInput(model),
@@ -68,7 +75,11 @@ export function createModelsRoute(engine) {
       const overrides = engine.config?.models?.overrides;
       const cur = engine.currentModel;
       const activeModel = engine.activeSessionModel;
-      const models = engine.availableModels.map(m => serializeModelInfo(m, { current: cur, overrides }));
+      const models = engine.availableModels.map(m => serializeModelInfo(m, {
+        current: cur,
+        overrides,
+        providerRegistry: engine.providerRegistry,
+      }));
       return c.json({
         models,
         current: cur?.id || null,
@@ -153,7 +164,10 @@ export function createModelsRoute(engine) {
       const session = engine.getSessionByPath(sessionPath);
       const sessionModel = session?.model;
       const overrides = engine.config?.models?.overrides;
-      const modelInfo = serializeModelInfo(sessionModel, { overrides });
+      const modelInfo = serializeModelInfo(sessionModel, {
+        overrides,
+        providerRegistry: engine.providerRegistry,
+      });
 
       return c.json({ ok: true, model: modelInfo, adaptations: result.adaptations, thinkingLevel: result.thinkingLevel });
     } catch (err) {

@@ -50,7 +50,7 @@ export async function refreshPluginUI(): Promise<void> {
       const prefs = prefsResult.value;
       if (Array.isArray(prefs.hiddenWidgets)) s.setHiddenWidgets(prefs.hiddenWidgets);
       if (Array.isArray(prefs.hiddenTabs)) s.setHiddenPluginTabs(prefs.hiddenTabs);
-      if (Array.isArray(prefs.tabOrder)) s.setTabOrder(prefs.tabOrder);
+      if (Array.isArray(prefs.tabOrder)) s.setTabOrder(prefs.tabOrder.map((tab: string) => tab === 'tasks' ? 'boards' : tab));
     }
 
     // If current tab is a removed plugin tab, switch to chat

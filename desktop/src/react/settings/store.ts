@@ -131,7 +131,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
   homeFolder: null,
 
   // ui
-  activeTab: 'agent',
+  activeTab: 'me',
   platformName: null,
   ready: false,
 

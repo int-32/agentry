@@ -45,6 +45,17 @@ describe("known-models dictionary", () => {
     });
   });
 
+  it("declares DashScope Wan image models as image-generation models", () => {
+    expect(lookupKnown("dashscope", "wan2.7-image")).toEqual({
+      name: "Wan2.7 Image",
+      type: "image",
+    });
+    expect(lookupKnown("dashscope", "wan2.7-image-pro")).toEqual({
+      name: "Wan2.7 Image Pro",
+      type: "image",
+    });
+  });
+
   it("declares recent frontier and agent model metadata by provider", () => {
     expect(lookupKnown("openai", "gpt-5.5")).toMatchObject({
       context: 1050000,

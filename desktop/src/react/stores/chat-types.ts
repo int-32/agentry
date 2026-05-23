@@ -148,6 +148,7 @@ export interface SessionModel {
   id: string;
   name: string;
   provider: string;
+  providerDisplayName?: string;
   /** 输入模态数组（Pi SDK 标准字段），镜像后端 /models, /models/switch 响应。 */
   input?: ("text" | "image" | "video")[];
   video?: boolean;
@@ -167,6 +168,30 @@ export interface SessionMessages {
   hasMore: boolean;
   loadingMore: boolean;
   oldestId?: string;
+}
+
+export interface SessionUserTurn {
+  id: string;
+  entryId?: string;
+  content: string;
+  imageCount?: number;
+  timestamp?: number | string | null;
+}
+
+export interface SessionUserTurnIndex {
+  turns: SessionUserTurn[];
+  loading: boolean;
+  loaded: boolean;
+  error?: string | null;
+}
+
+export interface ChatTimelineAnchor {
+  messageId: string;
+  sourceEntryId?: string;
+  timestamp: number | null;
+  label: string;
+  role: ChatMessage['role'];
+  markerWidthEm: number;
 }
 
 // ── 流式缓冲（不入 Zustand） ──

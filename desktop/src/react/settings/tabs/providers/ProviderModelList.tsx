@@ -13,6 +13,7 @@ interface DiscoveredModel {
   name?: string;
   context?: number | null;
   maxOutput?: number | null;
+  type?: string;
 }
 
 type CapabilityKind = 'image' | 'video' | 'reasoning';
@@ -69,6 +70,19 @@ export function ProviderModelList({ providerId, summary, onRefresh }: {
   /** 从混合数组条目提取 model ID */
   const modelId = (m: any): string => typeof m === 'object' ? m.id : m;
   const currentModelIds = rawModels.map(modelId);
+  const rawModelEntry = (mid: string) => rawModels.find((m: any) => modelId(m) === mid);
+  const discoveredModelEntry = (mid: string) => discoveredModels.find(model => model.id === mid);
+  const buildModelEntry = (mid: string): string | Record<string, any> => {
+    const discovered = discoveredModelEntry(mid);
+    const meta = lookupModelMeta(mid, providerId) || {};
+    const type = discovered?.type || meta.type;
+    const entry: Record<string, any> = { id: mid };
+    if (discovered?.name && discovered.name !== mid) entry.name = discovered.name;
+    if (discovered?.context != null) entry.context = discovered.context;
+    if (discovered?.maxOutput != null) entry.maxOutput = discovered.maxOutput;
+    if (type) entry.type = type;
+    return Object.keys(entry).length > 1 ? entry : mid;
+  };
   // Merge: discovered model IDs + custom_models, deduplicated, with currentModelIds included for display
   const discoveredIds = discoveredModels.map(m => m.id);
   const allModels = [...new Set([...currentModelIds, ...discoveredIds, ...(summary.custom_models || [])])];
@@ -81,7 +95,7 @@ export function ProviderModelList({ providerId, summary, onRefresh }: {
       await hanaFetch('/api/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ providers: { [providerId]: { models: [...rawModels, mid] } } }),
+        body: JSON.stringify({ providers: { [providerId]: { models: [...rawModels, buildModelEntry(mid)] } } }),
       });
       invalidateConfigCache();
       await onRefresh();
@@ -123,7 +137,7 @@ export function ProviderModelList({ providerId, summary, onRefresh }: {
         await hanaFetch('/api/config', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ providers: { [providerId]: { models: [...rawModels, id] } } }),
+          body: JSON.stringify({ providers: { [providerId]: { models: [...rawModels, buildModelEntry(id)] } } }),
         });
         invalidateConfigCache();
       }
@@ -196,12 +210,22 @@ export function ProviderModelList({ providerId, summary, onRefresh }: {
               const showModelId = displayName !== mid;
               return (
                 <div key={mid} className={styles['pv-fav-item']}>
+                  {(() => {
+                    const raw = rawModelEntry(mid);
+                    const modelMeta = typeof raw === 'object' && raw !== null
+                      ? { ...meta, ...raw }
+                      : meta;
+                    return (
+                      <>
                   <span className={styles['pv-fav-item-name']} title={String(displayName)}>{displayName}</span>
                   {showModelId && <span className={styles['pv-fav-item-id']} title={mid}>{mid}</span>}
-                  {meta.image === true && <CapabilityIcon kind="image" />}
-                  {meta.video === true && <CapabilityIcon kind="video" />}
-                  {meta.reasoning === true && <CapabilityIcon kind="reasoning" />}
-                  {meta.context && <span className={styles['pv-model-ctx']}>{formatContext(meta.context)}</span>}
+                  {(modelMeta.image === true || modelMeta.type === 'image') && <CapabilityIcon kind="image" />}
+                  {modelMeta.video === true && <CapabilityIcon kind="video" />}
+                  {modelMeta.reasoning === true && <CapabilityIcon kind="reasoning" />}
+                  {modelMeta.context && <span className={styles['pv-model-ctx']}>{formatContext(modelMeta.context)}</span>}
+                      </>
+                    );
+                  })()}
                   <div className={styles['pv-fav-item-actions']}>
                     <button
                       className={styles['pv-fav-item-edit']}

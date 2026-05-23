@@ -2382,9 +2382,16 @@ export class SessionCoordinator {
             : {}),
         })
         : targetAgent.tools;
+      const baseToolsSnapshot = Array.isArray(targetAgentToolsSnapshot) ? targetAgentToolsSnapshot : [];
+      const isolatedExtraTools = Array.isArray(opts.extraTools)
+        ? opts.extraTools.filter(tool => tool && typeof tool.name === "string" && typeof tool.execute === "function")
+        : [];
+      const isolatedToolsSnapshot = isolatedExtraTools.length
+        ? [...baseToolsSnapshot, ...isolatedExtraTools]
+        : baseToolsSnapshot;
       const { tools: allBuiltinTools, customTools: allCustomTools } = this._d.buildTools(
         execCwd,
-        targetAgentToolsSnapshot,
+        isolatedToolsSnapshot,
         {
           agentDir: targetAgent.agentDir,
           workspace: execCwd,

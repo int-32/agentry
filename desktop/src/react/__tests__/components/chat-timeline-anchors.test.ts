@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { ChatListItem } from '../../stores/chat-types';
+import type { ChatListItem, SessionUserTurn } from '../../stores/chat-types';
 import {
   buildTimelineAnchors,
+  buildTimelineAnchorsFromUserTurns,
   formatTimelineAnchorLabel,
   measureTimelineMarkerWidthEm,
 } from '../../components/chat/timeline-anchors';
@@ -31,7 +32,7 @@ describe('chat timeline anchors', () => {
     const anchors = buildTimelineAnchors(items);
 
     expect(anchors.map(anchor => anchor.messageId)).toEqual(['u1', 'u2']);
-    expect(anchors.map(anchor => anchor.label)).toEqual(['first prom...', '0123456789...']);
+    expect(anchors.map(anchor => anchor.label)).toEqual(['first prompt', '0123456789abcdef']);
   });
 
   it('keeps user turns even when legacy messages have no timestamp', () => {
@@ -43,7 +44,7 @@ describe('chat timeline anchors', () => {
     const anchors = buildTimelineAnchors(items);
 
     expect(anchors.map(anchor => anchor.messageId)).toEqual(['u1']);
-    expect(anchors[0].label).toBe('legacy use...');
+    expect(anchors[0].label).toBe('legacy user');
   });
 
   it('formats older anchors with compact date context', () => {
@@ -79,12 +80,41 @@ describe('chat timeline anchors', () => {
     expect(anchors[1].markerWidthEm).toBeLessThanOrEqual(1);
   });
 
-  it('keeps previews within ten visible characters before the ellipsis', () => {
+  it('keeps long previews bounded while leaving normal truncation to CSS', () => {
     const anchors = buildTimelineAnchors([
-      message('u1', 'user', undefined, '1234567890'),
-      message('u2', 'user', undefined, '12345678901'),
+      message('u1', 'user', undefined, '123456789012345678901234567890123456789012345678'),
+      message('u2', 'user', undefined, '1234567890123456789012345678901234567890123456789'),
     ]);
 
-    expect(anchors.map(anchor => anchor.label)).toEqual(['1234567890', '1234567890...']);
+    expect(anchors.map(anchor => anchor.label)).toEqual([
+      '123456789012345678901234567890123456789012345678',
+      '123456789012345678901234567890123456789012345678...',
+    ]);
+  });
+
+  it('builds anchors from the standalone user-turn index without chat items', () => {
+    const turns: SessionUserTurn[] = [
+      {
+        id: '2',
+        entryId: 'entry-user-2',
+        content: '[附件] /tmp/case.md\n继续分析资料清单生成逻辑',
+        timestamp: '2026-05-07T05:42:00.000Z',
+      },
+      {
+        id: '8',
+        content: '',
+        imageCount: 1,
+      },
+    ];
+
+    const anchors = buildTimelineAnchorsFromUserTurns(turns);
+
+    expect(anchors.map(anchor => anchor.messageId)).toEqual(['2', '8']);
+    expect(anchors[0]).toMatchObject({
+      sourceEntryId: 'entry-user-2',
+      label: '继续分析资料清单生成逻辑',
+      role: 'user',
+    });
+    expect(anchors[1].label).toBe('image-0');
   });
 });

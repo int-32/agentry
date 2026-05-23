@@ -106,7 +106,8 @@
 }
 
 .cleanupBtns button:hover,
-.rowActions button:hover {
+.rowActions button:hover,
+.dangerBtn:hover:not(:disabled) {
   background: var(--bg-hover, color-mix(in srgb, var(--bg-card, #fff) 92%, transparent));
   border-color: var(--overlay-light, rgba(0, 0, 0, 0.18));
 }
@@ -120,6 +121,56 @@
   border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
   border-radius: var(--radius-card, 10px);
   overflow: hidden;
+}
+
+.bulkBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 0.55rem var(--space-md);
+  border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  background: color-mix(in srgb, var(--bg-card, #fff) 94%, var(--bg, #fcfaf5) 6%);
+}
+
+.selectAllLabel,
+.rowSelect {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-muted, rgba(0, 0, 0, 0.6));
+  font-size: 0.76rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.selectAllLabel input,
+.rowSelect input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent, #3f7fa0);
+  cursor: pointer;
+}
+
+.rowSelect {
+  align-self: stretch;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bulkActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.selectedText {
+  font-size: 0.72rem;
+  color: var(--text-muted, rgba(0, 0, 0, 0.55));
+  white-space: nowrap;
 }
 
 .list {
@@ -192,6 +243,25 @@
   transition: background var(--duration-fast) ease, border-color var(--duration-fast) ease;
 }
 
+.dangerBtn {
+  background: color-mix(in srgb, var(--danger, #c85151) 8%, var(--bg-card, #fff) 92%);
+  border: 1px solid color-mix(in srgb, var(--danger, #c85151) 45%, transparent);
+  border-radius: var(--radius-input, 4px);
+  min-height: 32px;
+  padding: 0 var(--space-md);
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: var(--danger, #b54848);
+  font-family: inherit;
+  transition: background var(--duration-fast) ease, border-color var(--duration-fast) ease, opacity var(--duration-fast) ease;
+  white-space: nowrap;
+}
+
+.dangerBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 @media (max-width: 720px) {
   .overlay {
     padding: var(--space-md);
@@ -216,18 +286,25 @@
   }
 
   .summaryCard,
+  .bulkBar,
   .row {
     align-items: flex-start;
   }
 
   .summaryCard,
+  .bulkBar,
   .row {
     flex-direction: column;
   }
 
   .rowActions,
+  .bulkActions,
   .cleanupBtns {
     width: 100%;
     margin-left: 0;
+  }
+
+  .bulkActions {
+    justify-content: space-between;
   }
 }

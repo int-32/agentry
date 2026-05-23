@@ -937,7 +937,9 @@ export function ChannelAgentSettingsPanel() {
                     {providerKeys.map(provider => (
                       <div key={provider || '__none'}>
                         {hasMultipleProviders && (
-                          <div className={styles.agentModelGroupHeader}>{provider || '-'}</div>
+                          <div className={styles.agentModelGroupHeader}>
+                            {groupedModels[provider].find(model => model.providerDisplayName)?.providerDisplayName || provider || '-'}
+                          </div>
                         )}
                         {groupedModels[provider].map(model => (
                           <button

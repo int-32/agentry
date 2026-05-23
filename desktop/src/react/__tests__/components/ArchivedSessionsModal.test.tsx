@@ -200,4 +200,63 @@ describe('ArchivedSessionsModal', () => {
     fireEvent.click(screen.getByText('session.archived.deleteForever'));
     await waitFor(() => expect(deleteMock).toHaveBeenCalledWith('/x/a.jsonl'));
   });
+
+  it('deletes selected archived sessions with confirmation', async () => {
+    listMock
+      .mockResolvedValueOnce([
+        {
+          path: '/x/a.jsonl',
+          title: 'A',
+          archivedAt: new Date().toISOString(),
+          sizeBytes: 100,
+          agentId: 'a',
+          agentName: 'Agentry',
+        },
+        {
+          path: '/x/b.jsonl',
+          title: 'B',
+          archivedAt: new Date().toISOString(),
+          sizeBytes: 200,
+          agentId: 'b',
+          agentName: 'Yuan',
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    deleteMock.mockResolvedValue(true);
+    window.confirm = vi.fn(() => true);
+    render(<ArchivedSessionsModal open={true} onClose={() => {}} />);
+    await waitFor(() => screen.getByText('A'));
+
+    fireEvent.click(screen.getByLabelText('session.archived.selectItem[{"title":"A"}]'));
+    fireEvent.click(screen.getByLabelText('session.archived.selectItem[{"title":"B"}]'));
+    fireEvent.click(screen.getByRole('button', { name: /session\.archived\.deleteSelected/ }));
+
+    await waitFor(() => expect(deleteMock).toHaveBeenCalledTimes(2));
+    expect(deleteMock).toHaveBeenNthCalledWith(1, '/x/a.jsonl');
+    expect(deleteMock).toHaveBeenNthCalledWith(2, '/x/b.jsonl');
+    expect(toastMock).toHaveBeenCalledWith('session.archived.deleteSelectedDone[{"count":2}]');
+    expect(listMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not delete selected archives when confirmation is cancelled', async () => {
+    listMock.mockResolvedValue([
+      {
+        path: '/x/a.jsonl',
+        title: 'A',
+        archivedAt: new Date().toISOString(),
+        sizeBytes: 100,
+        agentId: 'a',
+        agentName: 'Agentry',
+      },
+    ]);
+    window.confirm = vi.fn(() => false);
+    render(<ArchivedSessionsModal open={true} onClose={() => {}} />);
+    await waitFor(() => screen.getByText('A'));
+
+    fireEvent.click(screen.getByLabelText('session.archived.selectItem[{"title":"A"}]'));
+    fireEvent.click(screen.getByRole('button', { name: /session\.archived\.deleteSelected/ }));
+
+    expect(deleteMock).not.toHaveBeenCalled();
+    expect(listMock).toHaveBeenCalledTimes(1);
+  });
 });

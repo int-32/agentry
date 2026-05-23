@@ -111,6 +111,7 @@ export async function execute(input, ctx) {
     details: {
       card: {
         type: "iframe",
+        pluginId: ctx.pluginId || "image-gen",
         route: `/card?batch=${batchId}`,
         title: "视频生成",
         description: input.prompt.slice(0, 60),

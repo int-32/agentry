@@ -157,10 +157,11 @@ export function ModelSelector({ models, sessionModel, isStreaming = false }: {
         <div className={styles['model-dropdown']}>
           {groupKeys.map(provider => {
             const items = grouped[provider];
+            const providerLabel = items.find(item => item.providerDisplayName)?.providerDisplayName || provider || '—';
             return (
               <div key={provider || '__none'}>
                 {hasMultipleProviders && (
-                  <div className={styles['model-group-header']}>{provider || '—'}</div>
+                  <div className={styles['model-group-header']}>{providerLabel}</div>
                 )}
                 {items.map(m => (
                   <button

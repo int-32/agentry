@@ -540,6 +540,51 @@ describe("sessions route", () => {
     ]);
   });
 
+  it("returns a lightweight index of all displayable user turns", async () => {
+    const { createSessionsRoute } = await import("../server/routes/sessions.js");
+    const msgUtils = await import("../core/message-utils.js");
+    const app = new Hono();
+    const sessionPath = "/tmp/agents/hana/sessions/main.jsonl";
+
+    vi.mocked(msgUtils.extractTextContent)
+      .mockReturnValueOnce({ text: "first prompt", images: [], thinking: "", toolUses: [] })
+      .mockReturnValueOnce({ text: "assistant reply", images: [], thinking: "", toolUses: [] })
+      .mockReturnValueOnce({ text: "<hana-deferred-tasks>internal</hana-deferred-tasks>", images: [], thinking: "", toolUses: [] })
+      .mockReturnValueOnce({ text: "", images: [{ data: "abc", mimeType: "image/png" }], thinking: "", toolUses: [] });
+    vi.mocked(msgUtils.loadSessionHistoryMessages).mockResolvedValueOnce([
+      { id: "entry-user-1", role: "user", content: "first prompt", timestamp: "2026-05-07T05:42:00.000Z" },
+      { role: "assistant", content: "assistant reply" },
+      { id: "entry-internal", role: "user", content: "internal" },
+      { role: "user", content: [{ type: "image", data: "abc", mimeType: "image/png" }] },
+    ]);
+
+    const engine = {
+      agentsDir: "/tmp/agents",
+      deferredResults: null,
+    };
+
+    app.route("/api", createSessionsRoute(engine));
+
+    const res = await app.request(`/api/sessions/user-turns?path=${encodeURIComponent(sessionPath)}`);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.turns).toEqual([
+      {
+        id: "0",
+        entryId: "entry-user-1",
+        content: "first prompt",
+        imageCount: 0,
+        timestamp: "2026-05-07T05:42:00.000Z",
+      },
+      {
+        id: "3",
+        content: "",
+        imageCount: 1,
+      },
+    ]);
+  });
+
   it("refreshes session file lifecycle metadata when rebuilding history blocks", async () => {
     const { createSessionsRoute } = await import("../server/routes/sessions.js");
     const msgUtils = await import("../core/message-utils.js");

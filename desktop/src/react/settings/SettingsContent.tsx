@@ -51,26 +51,26 @@ const TAB_COMPONENTS: Record<string, React.ComponentType> = {
   about: AboutTab,
 };
 
-/** Tab 顶部大标题（对应左栏导航 label），所有 tab 都会显示 */
-const TAB_TITLES: Record<string, string> = {
-  agent: '助手',
-  me: '我',
-  interface: '界面',
-  work: '工作空间',
-  computer: '使用电脑',
-  skills: '技能',
-  bridge: '社交平台',
-  providers: '供应商',
-  media: '多媒体',
-  sharing: '分享',
-  plugins: '插件',
-  'plugin-marketplace': '插件市场',
-  security: '安全',
-  about: '关于',
+/** Tab 顶部大标题与左栏导航共用文案来源，避免标题和菜单漂移。 */
+const TAB_TITLE_KEYS: Record<string, string> = {
+  agent: 'settings.tabs.agent',
+  me: 'settings.tabs.me',
+  interface: 'settings.tabs.interface',
+  work: 'settings.tabs.work',
+  computer: 'settings.tabs.computer',
+  skills: 'settings.tabs.skills',
+  bridge: 'settings.tabs.bridge',
+  providers: 'settings.tabs.providers',
+  media: 'settings.tabs.media',
+  sharing: 'settings.tabs.sharing',
+  plugins: 'settings.tabs.plugins',
+  'plugin-marketplace': 'settings.plugins.marketplaceTitle',
+  security: 'settings.tabs.security',
+  about: 'settings.tabs.about',
 };
 
 function normalizeNativeTabForPlatform(tab: string, platformName: string | null | undefined): string {
-  return platformName === 'linux' && tab === 'computer' ? 'agent' : tab;
+  return platformName === 'linux' && tab === 'computer' ? 'me' : tab;
 }
 
 function titleToLabel(title: string | Record<string, string> | undefined): string {
@@ -78,6 +78,11 @@ function titleToLabel(title: string | Record<string, string> | undefined): strin
   if (typeof title === 'string') return title;
   const locale = window.i18n?.locale || 'zh-CN';
   return title[locale] || title[locale.split('-')[0]] || title.zh || title.en || Object.values(title)[0] || '';
+}
+
+function dynamicTabTitle(tab: { nativeComponent: string; title: string | Record<string, string> } | undefined): string {
+  if (!tab) return '';
+  return tab.nativeComponent === 'mcp.settings' ? t('settings.tabs.mcp') : titleToLabel(tab.title);
 }
 
 interface SettingsContentProps {
@@ -150,7 +155,8 @@ export function SettingsContent({
     || (dynamicTab ? getNativeSettingsTabComponent(dynamicTab.nativeComponent) : null)
     || AgentTab;
   const isModal = variant === 'modal';
-  const activeTabTitle = TAB_TITLES[effectiveActiveTab] || titleToLabel(dynamicTab?.title);
+  const titleKey = TAB_TITLE_KEYS[effectiveActiveTab];
+  const activeTabTitle = titleKey ? t(titleKey) : dynamicTabTitle(dynamicTab);
   const isWideTab = effectiveActiveTab === 'plugin-marketplace';
 
   const reportActiveTabChange = useCallback((tab: string) => {

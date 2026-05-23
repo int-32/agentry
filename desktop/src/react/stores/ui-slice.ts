@@ -69,7 +69,7 @@ export const createUiSlice = (
   locale: '',
   skillViewerData: null,
   mediaViewer: null,
-  settingsModal: { open: false, activeTab: 'agent' },
+  settingsModal: { open: false, activeTab: 'me' },
   channelCreateOverlayVisible: false,
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setSidebarAutoCollapsed: (collapsed) => set({ sidebarAutoCollapsed: collapsed }),

@@ -13,21 +13,56 @@ export function MemorySection({ hasUtilityModel, memoryEnabled, isViewingOther, 
   currentPins: string[];
 }) {
   const [pinInput, setPinInput] = useState('');
+  const [selectedPinIndexes, setSelectedPinIndexes] = useState<Set<number>>(() => new Set());
+
+  useEffect(() => {
+    setSelectedPinIndexes(new Set());
+  }, [currentPins]);
+
+  const savePinList = (pins: string[]) => {
+    const agentId = useSettingsStore.getState().getSettingsAgentId();
+    useSettingsStore.setState({ currentPins: pins });
+    savePins(pins, agentId);
+  };
 
   const addPin = () => {
     const val = pinInput.trim();
     if (!val) return;
     const newPins = [...currentPins, val];
-    useSettingsStore.setState({ currentPins: newPins });
     setPinInput('');
-    savePins();
+    savePinList(newPins);
   };
 
   const deletePin = (index: number) => {
-    const newPins = [...currentPins];
-    newPins.splice(index, 1);
-    useSettingsStore.setState({ currentPins: newPins });
-    savePins();
+    const newPins = currentPins.filter((_, i) => i !== index);
+    savePinList(newPins);
+  };
+
+  const togglePinSelection = (index: number, selected: boolean) => {
+    setSelectedPinIndexes((current) => {
+      const next = new Set(current);
+      if (selected) next.add(index);
+      else next.delete(index);
+      return next;
+    });
+  };
+
+  const selectedPinCount = selectedPinIndexes.size;
+  const allPinsSelected = currentPins.length > 0 && selectedPinCount === currentPins.length;
+
+  const toggleAllPins = () => {
+    setSelectedPinIndexes(
+      allPinsSelected
+        ? new Set()
+        : new Set(currentPins.map((_, index) => index)),
+    );
+  };
+
+  const deleteSelectedPins = () => {
+    if (selectedPinCount === 0) return;
+    const newPins = currentPins.filter((_, index) => !selectedPinIndexes.has(index));
+    setSelectedPinIndexes(new Set());
+    savePinList(newPins);
   };
 
   /* 记忆开关作为 section title 右侧 context（和 WorkTab 的 AgentSelect 作 context 同构）
@@ -54,12 +89,33 @@ export function MemorySection({ hasUtilityModel, memoryEnabled, isViewingOther, 
               <h3 className={styles['settings-subsection-title']}>{t('settings.pins.title')}</h3>
               <span className={styles['settings-subsection-hint']}>{t('settings.pins.hint')}</span>
             </div>
+            {currentPins.length > 0 && (
+              <div className={styles['pin-bulk-row']}>
+                <button className={styles['pin-bulk-btn']} onClick={toggleAllPins}>
+                  {t(allPinsSelected ? 'settings.pins.clearSelection' : 'settings.pins.selectAll')}
+                </button>
+                <button
+                  className={`${styles['pin-bulk-btn']} ${styles['danger']}`}
+                  onClick={deleteSelectedPins}
+                  disabled={selectedPinCount === 0}
+                >
+                  {t('settings.pins.deleteSelected', { count: selectedPinCount })}
+                </button>
+              </div>
+            )}
             <div className={styles['pin-list']}>
               {currentPins.length === 0 ? (
                 <div className={styles['pin-empty']}>{t('settings.pins.empty')}</div>
               ) : (
                 currentPins.map((pin, i) => (
-                  <PinItem key={pin} text={pin} index={i} onDelete={deletePin} />
+                  <PinItem
+                    key={`${i}:${pin}`}
+                    text={pin}
+                    index={i}
+                    selected={selectedPinIndexes.has(i)}
+                    onSelectionChange={togglePinSelection}
+                    onDelete={deletePin}
+                  />
                 ))
               )}
             </div>

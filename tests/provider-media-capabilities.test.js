@@ -63,6 +63,40 @@ describe("ProviderRegistry media capabilities", () => {
     });
   });
 
+  it("exposes image models selected from model discovery even when the provider has no declared media catalog", () => {
+    fs.writeFileSync(path.join(tmpHome, "added-models.yaml"), YAML.dump({
+      providers: {
+        dashscope: {
+          api_key: "dashscope-key",
+          base_url: "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+          api: "openai-completions",
+          models: [
+            "qwen3.6-plus",
+            "wan2.7-image",
+          ],
+        },
+      },
+    }), "utf-8");
+
+    const registry = new ProviderRegistry(tmpHome);
+    registry.reload();
+
+    const dashscope = registry.getMediaProviders("image_generation")
+      .find((provider) => provider.providerId === "dashscope");
+
+    expect(dashscope).toMatchObject({
+      providerId: "dashscope",
+      displayName: "阿里云百炼 (DashScope)",
+    });
+    expect(dashscope.models).toEqual([
+      expect.objectContaining({
+        id: "wan2.7-image",
+        displayName: "Wan2.7 Image",
+      }),
+    ]);
+    expect(registry.getChatModelIds("dashscope")).toEqual(["qwen3.6-plus"]);
+  });
+
   it("normalizes plugin-contributed CLI media providers into the same registry", () => {
     const registry = new ProviderRegistry(tmpHome);
     registry.registerProviderContribution({

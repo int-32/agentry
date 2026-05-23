@@ -101,7 +101,12 @@ export const volcengineImageAdapter = {
     const { apiKey, baseUrl } = creds;
 
     // 2. Resolve model — short names ("5.0") resolved via shared catalog
-    const rawModel = params.model || ctx.config?.get?.("defaultImageModel")?.id;
+    const defaultImageModel = ctx.config?.get?.("defaultImageModel");
+    const rawModel = params.model || (
+      defaultImageModel?.provider === "volcengine" || defaultImageModel?.provider === "volcengine-coding"
+        ? defaultImageModel.id
+        : undefined
+    );
     const modelId = resolveModelId("volcengine", rawModel);
 
     // 3. Get provider defaults

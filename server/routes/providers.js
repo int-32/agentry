@@ -10,6 +10,7 @@ import { safeJson } from "../hono-helpers.js";
 import { buildProviderAuthHeaders, probeProvider } from "../../lib/llm/provider-client.js";
 import { filterDiscoveredProviderModels } from "../../shared/provider-model-validation.js";
 import { clearConfigCache } from "../../lib/memory/config-loader.js";
+import { lookupKnown } from "../../shared/known-models.js";
 
 // ── Models-cache helpers ──
 
@@ -195,43 +196,102 @@ export function createProvidersRoute(engine) {
 
   // ── Fetch / Test ──
 
-  function normalizeRegistryModels(models) {
+  function stringList(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.flatMap(stringList);
+    if (typeof value === "string") return [value];
+    return [];
+  }
+
+  function hasImageOutputSignal(raw) {
+    const capabilityStrings = [
+      ...stringList(raw?.output),
+      ...stringList(raw?.outputs),
+      ...stringList(raw?.output_modalities),
+      ...stringList(raw?.outputModalities),
+      ...stringList(raw?.modalities?.output),
+      ...stringList(raw?.capabilities?.output),
+      ...stringList(raw?.capabilities?.outputs),
+      ...stringList(raw?.capabilities?.output_modalities),
+      ...stringList(raw?.capabilities?.outputModalities),
+    ].map(v => v.toLowerCase());
+    if (capabilityStrings.includes("image")) return true;
+    return raw?.supports_image_generation === true
+      || raw?.supportsImageGeneration === true
+      || raw?.image_generation === true
+      || raw?.imageGeneration === true
+      || raw?.capabilities?.image_generation === true
+      || raw?.capabilities?.imageGeneration === true;
+  }
+
+  function looksLikeImageGenerationId(id = "") {
+    const value = String(id).toLowerCase();
+    return value.includes("gpt-image")
+      || value.includes("dall-e")
+      || value.includes("seedream")
+      || value.includes("imagen")
+      || value.includes("stable-diffusion")
+      || value.includes("sdxl")
+      || value.includes("flux")
+      || value.includes("kolors")
+      || value.includes("jimeng")
+      || (/wan[\w.-]*image/.test(value));
+  }
+
+  function inferDiscoveredModelType(providerName, raw) {
+    const id = typeof raw === "object" && raw !== null ? raw.id : raw;
+    const explicitType = String(raw?.type || raw?.model_type || raw?.modelType || "").toLowerCase();
+    if (["image", "image_generation", "image-generation", "text-to-image", "image-generation-model"].includes(explicitType)) {
+      return "image";
+    }
+    if (lookupKnown(providerName, id)?.type === "image") return "image";
+    if (hasImageOutputSignal(raw)) return "image";
+    if (looksLikeImageGenerationId(id)) return "image";
+    return undefined;
+  }
+
+  function withDiscoveredModelType(providerName, model, raw = model) {
+    const type = inferDiscoveredModelType(providerName, raw);
+    return type ? { ...model, type } : model;
+  }
+
+  function normalizeRegistryModels(providerName, models) {
     return models.map((model) => ({
       id: model.id,
       name: model.name || model.id,
       context: model.contextWindow ?? model.context ?? null,
       maxOutput: model.maxOutputTokens ?? model.maxOutput ?? null,
-    }));
+    })).map((model, index) => withDiscoveredModelType(providerName, model, models[index]));
   }
 
-  function normalizeRemoteModels(data, api) {
+  function normalizeRemoteModels(data, api, providerName) {
     if (api === "anthropic-messages") {
-      return (data.data || []).map(m => ({
+      return (data.data || []).map(m => withDiscoveredModelType(providerName, {
         id: m.id,
         name: m.display_name || m.id,
         context: m.max_input_tokens ?? null,
         maxOutput: m.max_tokens ?? null,
-      }));
+      }, m));
     }
 
     if (api === "google-generative-ai") {
       return (data.models || []).map(m => {
         const id = m.baseModelId || String(m.name || "").replace(/^models\//, "");
-        return {
+        return withDiscoveredModelType(providerName, {
           id,
           name: m.displayName || id,
           context: m.inputTokenLimit ?? null,
           maxOutput: m.outputTokenLimit ?? null,
-        };
+        }, m);
       }).filter(m => m.id);
     }
 
-    return (data.data || []).map(m => ({
+    return (data.data || []).map(m => withDiscoveredModelType(providerName, {
       id: m.id,
-      name: m.id,
+      name: m.display_name || m.name || m.id,
       context: m.context_length || m.context_window || m.max_context_length || null,
       maxOutput: m.max_completion_tokens || m.max_output_tokens || null,
-    }));
+    }, m));
   }
 
   function filterProviderModels(name, models, baseUrl = "") {
@@ -256,7 +316,7 @@ export function createProvidersRoute(engine) {
     // 尝试 Pi SDK registry（含内置 OAuth 模型 + models.json 模型，不经过 availableModels 白名单）
     const registryModels = engine.getRegistryModelsForProvider(name);
     if (registryModels.length > 0) {
-      const normalized = normalizeRegistryModels(registryModels);
+      const normalized = normalizeRegistryModels(name, registryModels);
       const payload = filterProviderModels(name, normalized);
       if (payload.models.length === 0 && payload.ignoredModels?.length > 0) {
         return {
@@ -334,7 +394,7 @@ export function createProvidersRoute(engine) {
 
         if (res.ok) {
           const data = await res.json();
-          const remoteModels = normalizeRemoteModels(data, effectiveApi);
+          const remoteModels = normalizeRemoteModels(data, effectiveApi, name);
           const { models, ignoredModels } = filterDiscoveredProviderModels(name, remoteModels, {
             baseUrl: effectiveBaseUrl,
           });

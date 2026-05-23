@@ -220,7 +220,11 @@ function normalizeUserMediaModels(providerId, userConfig, capabilityName, declar
   const seen = new Set();
   for (const raw of rawModels) {
     const id = getModelId(raw);
-    const fallback = declaredById.get(id) || { protocolId: runtime?.protocolId };
+    const known = lookupKnown(providerId, id);
+    const fallback = declaredById.get(id) || {
+      ...(known?.name ? { displayName: known.name, name: known.name } : {}),
+      protocolId: runtime?.protocolId,
+    };
     const model = normalizeMediaModel(raw, fallback);
     if (!model || seen.has(model.id)) continue;
     seen.add(model.id);

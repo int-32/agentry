@@ -72,6 +72,33 @@ describe('ModelSelector', () => {
     expect(hanaFetch).not.toHaveBeenCalled();
   });
 
+  it('uses provider display names for grouped model headers', () => {
+    render(
+      <ModelSelector
+        models={[
+          {
+            id: 'qwen-plus',
+            name: 'Qwen Plus',
+            provider: 'dashscope',
+            providerDisplayName: '阿里TP',
+          },
+          {
+            id: 'gpt-5.4',
+            name: 'GPT-5.4',
+            provider: 'openai-codex',
+            providerDisplayName: 'ChatGPT Plus/Pro',
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /model.notSelected/ }));
+
+    expect(screen.getByText('阿里TP')).toBeTruthy();
+    expect(screen.getByText('ChatGPT Plus/Pro')).toBeTruthy();
+    expect(screen.queryByText('dashscope')).toBeNull();
+  });
+
   it('marks the session model unavailable when its provider/id is no longer in the model list', () => {
     render(
       <ModelSelector

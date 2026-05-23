@@ -24,6 +24,7 @@ vi.mock("../lib/local-cli/detector.js", () => ({
 import {
   createLocalCliRoute,
   LOCAL_CLI_SCAN_CACHE_FILE,
+  LOCAL_CLI_SCAN_CACHE_SCHEMA_VERSION,
 } from "../server/routes/local-cli.js";
 
 describe("local cli route", () => {
@@ -55,7 +56,7 @@ describe("local cli route", () => {
 
   function writeCache(entry) {
     fs.writeFileSync(cachePath(), JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: LOCAL_CLI_SCAN_CACHE_SCHEMA_VERSION,
       ...entry,
     }, null, 2) + "\n", "utf-8");
   }
@@ -113,6 +114,43 @@ describe("local cli route", () => {
     expect(res.status).toBe(200);
     expect(data.cached).toBe(true);
     expect(mocks.scanAllAgentCliS).not.toHaveBeenCalled();
+  });
+
+  it("ignores scan cache entries from older detector schemas", async () => {
+    fs.writeFileSync(cachePath(), JSON.stringify({
+      schemaVersion: LOCAL_CLI_SCAN_CACHE_SCHEMA_VERSION - 1,
+      scannedAt: new Date().toISOString(),
+      clis: [
+        {
+          id: "codex",
+          binary: "codex",
+          displayName: "Codex CLI",
+          installed: false,
+          binaryPath: null,
+          version: null,
+          modelsCount: 0,
+        },
+      ],
+    }, null, 2) + "\n", "utf-8");
+    mocks.scanAllAgentCliS.mockResolvedValue([
+      {
+        id: "codex",
+        binary: "codex",
+        displayName: "Codex CLI",
+        installed: true,
+        binaryPath: "/opt/homebrew/bin/codex",
+        version: "2.0.0",
+        modelsCount: 3,
+      },
+    ]);
+
+    const res = await buildApp().request("/api/local-cli/scan");
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.cached).toBe(false);
+    expect(data.clis[0].installed).toBe(true);
+    expect(mocks.scanAllAgentCliS).toHaveBeenCalledTimes(1);
   });
 
   it("force refreshes and persists scan results", async () => {

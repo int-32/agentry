@@ -14,6 +14,7 @@ import path from "node:path";
 import { scanAllAgentCliS, getModelsForCli, KNOWN_AGENT_CLIS } from "../../lib/local-cli/detector.js";
 
 export const LOCAL_CLI_SCAN_CACHE_FILE = "local-cli-scan-cache.json";
+export const LOCAL_CLI_SCAN_CACHE_SCHEMA_VERSION = 2;
 export const DEFAULT_LOCAL_CLI_SCAN_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
 
 function boolQuery(value) {
@@ -30,6 +31,7 @@ function readLocalCliScanCache(agentryHome) {
   if (!cachePath) return null;
   try {
     const raw = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
+    if (raw?.schemaVersion !== LOCAL_CLI_SCAN_CACHE_SCHEMA_VERSION) return null;
     if (!Array.isArray(raw?.clis)) return null;
     return {
       scannedAt: typeof raw.scannedAt === "string" ? raw.scannedAt : null,
@@ -50,7 +52,7 @@ function writeLocalCliScanCache(agentryHome, clis, scannedAt) {
     fs.mkdirSync(path.dirname(cachePath), { recursive: true });
     const tmp = `${cachePath}.${process.pid}.${Date.now()}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: LOCAL_CLI_SCAN_CACHE_SCHEMA_VERSION,
       scannedAt,
       clis,
     }, null, 2) + os.EOL, "utf-8");

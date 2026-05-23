@@ -441,6 +441,18 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
         patch: event.patch,
         sessionPath,
       });
+    } else if (event.type === "task_ledger_update") {
+      broadcast({
+        type: "task_ledger_update",
+        task: event.task,
+        sessionPath,
+      });
+    } else if (event.type === "task_graph_update") {
+      broadcast({
+        type: "task_graph_update",
+        run: event.run,
+        sessionPath,
+      });
     } else if (event.type === "todo_update") {
       broadcast({
         type: "todo_update",

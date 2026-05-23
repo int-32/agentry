@@ -543,6 +543,14 @@
         "outputFormat": "qwen",
         "groundingMode": "native"
       }
+    },
+    "wan2.7-image": {
+      "name": "Wan2.7 Image",
+      "type": "image"
+    },
+    "wan2.7-image-pro": {
+      "name": "Wan2.7 Image Pro",
+      "type": "image"
     }
   },
   "dashscope-coding": {

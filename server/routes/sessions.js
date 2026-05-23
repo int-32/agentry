@@ -71,6 +71,17 @@ function getWritableSessionManager(engine, sessionPath) {
   return SessionManager.open(sessionPath, path.dirname(sessionPath));
 }
 
+function normalizeTimelineUserContent(text) {
+  return String(text || "")
+    .replace(/^（插话，无需 MOOD）\n?/, "")
+    .replace(/^<t>[^<]*<\/t>\s*/, "")
+    .trim();
+}
+
+function isInternalUserContent(text) {
+  return /<hana-background-result\s/.test(text) || /<hana-deferred-tasks>/.test(text);
+}
+
 const TODO_COMPLETE_MESSAGE =
   "[Agentry Todo] The user marked the current todo list as completed and removed it from the session UI. Treat every item in that list as completed. Create a new todo list only if new work needs tracking.";
 
@@ -270,6 +281,47 @@ export function createSessionsRoute(engine) {
       }
       const pinnedAt = await engine.setSessionPinned(sessionPath, pinned);
       return c.json({ ok: true, pinnedAt });
+    } catch (err) {
+      return c.json({ error: err.message }, 500);
+    }
+  });
+
+  // 获取当前 session 的全部用户输入索引。只返回轻量文本/图片计数，不影响左侧消息分页。
+  route.get("/sessions/user-turns", async (c) => {
+    try {
+      const queryPath = c.req.query("path") || null;
+      if (queryPath && !isValidSessionPath(queryPath, engine.agentsDir)) {
+        return c.json({ error: "Invalid session path" }, 403);
+      }
+
+      const sourceMessages = await loadSessionHistoryMessages(engine, queryPath);
+      const turns = [];
+      let globalIdx = 0;
+
+      for (const m of sourceMessages) {
+        if (m.role === "user") {
+          const { text, images } = extractTextContent(m.content);
+          if (text || images.length) {
+            const id = String(globalIdx);
+            globalIdx++;
+            const content = normalizeTimelineUserContent(text);
+            if (!isInternalUserContent(content)) {
+              turns.push({
+                id,
+                ...(m.id ? { entryId: m.id } : {}),
+                content,
+                imageCount: images.length,
+                ...(m.timestamp ? { timestamp: m.timestamp } : {}),
+              });
+            }
+          }
+        } else if (m.role === "assistant") {
+          const { text, toolUses } = extractTextContent(m.content, { stripThink: true });
+          if (text || toolUses.length) globalIdx++;
+        }
+      }
+
+      return c.json({ turns });
     } catch (err) {
       return c.json({ error: err.message }, 500);
     }

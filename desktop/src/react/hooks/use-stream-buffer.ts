@@ -22,6 +22,8 @@ import { bumpMessageLiveVersion } from '../stores/message-live-version';
 /* eslint-disable @typescript-eslint/no-explicit-any -- 流式消息 handle(msg) 接收动态 JSON */
 
 const FLUSH_INTERVAL = 200;
+const LIVE_MARKDOWN_RENDER_LIMIT = 4000;
+const LONG_MARKDOWN_REFRESH_INTERVAL = 1200;
 
 interface Buffer {
   sessionPath: string;
@@ -36,6 +38,9 @@ interface Buffer {
   cardDescAcc: string;
   lastFlushTime: number;
   flushTimer: ReturnType<typeof setTimeout> | null;
+  renderedText: string;
+  renderedHtml: string;
+  lastMarkdownRenderTime: number;
   /** 当前 turn 绑定的 assistant message id */
   messageId: string | null;
 }
@@ -54,8 +59,15 @@ function createBuffer(sessionPath: string): Buffer {
     cardDescAcc: '',
     lastFlushTime: 0,
     flushTimer: null,
+    renderedText: '',
+    renderedHtml: '',
+    lastMarkdownRenderTime: 0,
     messageId: null,
   };
+}
+
+function liveMarkdownRefreshInterval(textLength: number): number {
+  return textLength > LIVE_MARKDOWN_RENDER_LIMIT ? LONG_MARKDOWN_REFRESH_INTERVAL : 0;
 }
 
 function resolveSessionYuan(sessionPath: string): string {
@@ -105,12 +117,15 @@ class StreamBufferManager {
     buf.inCard = false;
     buf.cardAttrs = null;
     buf.cardDescAcc = '';
+    buf.renderedText = '';
+    buf.renderedHtml = '';
+    buf.lastMarkdownRenderTime = 0;
     buf.messageId = null;
   }
 
   private finishBufferTurn(buf: Buffer): void {
     if (this.hasTurnState(buf)) {
-      this.flush(buf);
+      this.flush(buf, { final: true });
     } else if (buf.flushTimer) {
       clearTimeout(buf.flushTimer);
       buf.flushTimer = null;
@@ -165,8 +180,25 @@ class StreamBufferManager {
     }
   }
 
+  private renderTextHtml(buf: Buffer, displayText: string, final: boolean): string {
+    const now = Date.now();
+    const refreshInterval = final ? 0 : liveMarkdownRefreshInterval(displayText.length);
+    const canReuseRenderedHtml = refreshInterval > 0 &&
+      !!buf.renderedHtml &&
+      displayText.startsWith(buf.renderedText) &&
+      now - buf.lastMarkdownRenderTime < refreshInterval;
+
+    if (canReuseRenderedHtml) return buf.renderedHtml;
+
+    const html = renderMarkdown(displayText);
+    buf.renderedText = displayText;
+    buf.renderedHtml = html;
+    buf.lastMarkdownRenderTime = now;
+    return html;
+  }
+
   /** 把 buffer 中累积的内容一次性 flush 到 Zustand */
-  private flush(buf: Buffer): void {
+  private flush(buf: Buffer, options: { final?: boolean } = {}): void {
     buf.lastFlushTime = Date.now();
     if (buf.flushTimer) {
       clearTimeout(buf.flushTimer);
@@ -207,7 +239,7 @@ class StreamBufferManager {
       // ── Text ──
       if (buf.textAcc) {
         const displayText = buf.textAcc.replace(/<tool_code>[\s\S]*?<\/tool_code>\s*/g, '');
-        const html = renderMarkdown(displayText);
+        const html = this.renderTextHtml(buf, displayText, !!options.final);
         const idx = blocks.findIndex(b => b.type === 'text');
         if (idx >= 0) {
           blocks[idx] = { type: 'text', html, source: displayText };
@@ -287,7 +319,7 @@ class StreamBufferManager {
       case 'card_end': {
         buf.inCard = false;
         if (buf.cardAttrs) {
-          this.flush(buf); // flush pending text first
+          this.flush(buf, { final: true }); // flush pending text first
           const card = {
             type: buf.cardAttrs.type || 'iframe',
             pluginId: buf.cardAttrs.plugin || '',
@@ -308,7 +340,7 @@ class StreamBufferManager {
       case 'tool_start':
         this.ensureMessage(buf);
         // 工具事件频率低，直接写 store
-        this.flush(buf); // 先 flush 文本
+        this.flush(buf, { final: true }); // 先 flush 文本
         this.updateTargetMessage(buf, (m) => {
           const blocks = [...(m.blocks || [])];
           // 找最后一个 tool_group 或创建新的
@@ -357,7 +389,7 @@ class StreamBufferManager {
 
       case 'content_block': {
         this.ensureMessage(buf);
-        this.flush(buf);
+        this.flush(buf, { final: true });
         let block = msg.block;
         // Apply cached patches (block_update 可能先于 content_block 到达)
         if (block.taskId) {

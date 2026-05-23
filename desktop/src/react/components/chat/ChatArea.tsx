@@ -1,24 +1,73 @@
 /**
  * ChatArea — 聊天消息列表（干净重写版）
  *
- * 原理：每个 session 一个原生滚动 div，visibility:hidden 保持 scrollTop。
- * 不用 Virtuoso，不用 Activity，不用快照，不用任何花活。
+ * 原理：只挂载当前 session 的原生滚动 div，滚动位置写入 store。
+ * 避免多个长会话同时留在 DOM 里拖慢布局/绘制。
  */
 
-import { memo, useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { memo, useRef, useEffect, useState, useCallback, useMemo, useLayoutEffect } from 'react';
 import { useStore } from '../../stores';
-import { loadMoreMessages } from '../../stores/session-actions';
+import { ensureMessageLoaded, loadMoreMessages, loadSessionUserTurns } from '../../stores/session-actions';
 import { useContinuousBottomScroll } from '../../hooks/use-continuous-bottom-scroll';
 
 const EMPTY_ITEMS: ChatListItem[] = [];
-import type { ChatListItem } from '../../stores/chat-types';
+import type { ChatListItem, SessionUserTurn } from '../../stores/chat-types';
 import { ChatTranscript } from './ChatTranscript';
 import { ChatTimelineNavigator } from './ChatTimelineNavigator';
-import { buildTimelineAnchors } from './timeline-anchors';
+import { buildTimelineAnchors, buildTimelineAnchorsFromUserTurns } from './timeline-anchors';
+import type { TimelineAnchor } from './timeline-anchors';
 import styles from './Chat.module.css';
 
-const MAX_ALIVE = 5;
 const LOAD_MORE_THRESHOLD = 200; // 距顶部多少 px 触发加载
+const SCROLL_POSITION_SAVE_INTERVAL = 250;
+const EMPTY_TIMELINE_ANCHORS: TimelineAnchor[] = [];
+
+function buildTimelineAnchorSignature(items: ChatListItem[]): string {
+  const userParts: string[] = [];
+  const fallbackParts: string[] = [];
+
+  for (const item of items) {
+    if (item.type !== 'message') continue;
+    const message = item.data;
+    const timestamp = message.timestamp ?? '';
+    if (message.role === 'user') {
+      const textSeed = message.text?.slice(0, 256).replace(/\s+/g, ' ').trim().slice(0, 32);
+      const previewSeed = textSeed ||
+        message.attachments?.find(attachment => attachment.name?.trim())?.name?.trim().slice(0, 32) ||
+        '';
+      userParts.push(`${message.id}:${timestamp}:${previewSeed}`);
+    } else {
+      fallbackParts.push(`${message.id}:${timestamp}:${message.role}`);
+    }
+  }
+
+  return userParts.length > 0
+    ? `u|${userParts.join('|')}`
+    : `m|${fallbackParts.join('|')}`;
+}
+
+function buildUserTurnSignature(turns: SessionUserTurn[]): string {
+  return turns
+    .map(turn => `${turn.id}:${turn.timestamp ?? ''}:${turn.content.slice(0, 32)}:${turn.imageCount ?? 0}`)
+    .join('|');
+}
+
+function timelineAnchorSortKey(anchor: TimelineAnchor): number {
+  const messageIndex = Number(anchor.messageId);
+  if (Number.isFinite(messageIndex)) return messageIndex;
+  return anchor.timestamp ?? 0;
+}
+
+function mergeTimelineAnchors(indexedAnchors: TimelineAnchor[], loadedAnchors: TimelineAnchor[]): TimelineAnchor[] {
+  if (indexedAnchors.length === 0) return loadedAnchors;
+
+  const seen = new Set(indexedAnchors.map(anchor => anchor.messageId));
+  const merged = [
+    ...indexedAnchors,
+    ...loadedAnchors.filter(anchor => !seen.has(anchor.messageId)),
+  ];
+  return merged.sort((a, b) => timelineAnchorSortKey(a) - timelineAnchorSortKey(b));
+}
 
 // ── 入口 ──
 
@@ -31,40 +80,16 @@ export function ChatArea() {
   );
 }
 
-// ── PanelHost：管理 alive 列表 ──
+// ── PanelHost：只挂当前会话 ──
 
 function PanelHost() {
   const currentPath = useStore(s => s.currentSessionPath);
   const currentHasItems = useStore(s => !!(currentPath && s.chatSessions[currentPath]?.items?.length));
   const welcomeVisible = useStore(s => s.welcomeVisible);
-  const [alive, setAlive] = useState<string[]>([]);
 
-  // 加入 alive 列表（不重排已有位置，避免 React 移动 DOM 节点导致 scrollTop 丢失）
-  useEffect(() => {
-    if (!currentPath || !currentHasItems) return;
-    setAlive(prev => {
-      if (prev.includes(currentPath)) return prev; // 已存在，不动
-      if (prev.length >= MAX_ALIVE) {
-        // 淘汰第一个非当前的
-        const evictIdx = prev.findIndex(p => p !== currentPath);
-        const next = [...prev];
-        next.splice(evictIdx, 1);
-        next.push(currentPath);
-        return next;
-      }
-      return [...prev, currentPath];
-    });
-  }, [currentPath, currentHasItems]);
+  if (welcomeVisible || !currentPath || !currentHasItems) return null;
 
-  if (welcomeVisible || !currentPath) return null;
-
-  return (
-    <>
-      {alive.map(path => (
-        <Panel key={path} path={path} active={path === currentPath} />
-      ))}
-    </>
-  );
+  return <Panel key={currentPath} path={currentPath} active />;
 }
 
 // ── Panel：一个 session 的原生滚动容器 ──
@@ -75,18 +100,43 @@ const Panel = memo(function Panel({ path, active }: { path: string; active: bool
   const items = useStore(s => s.chatSessions[path]?.items || EMPTY_ITEMS);
   const hasMore = useStore(s => s.chatSessions[path]?.hasMore ?? false);
   const loadingMore = useStore(s => s.chatSessions[path]?.loadingMore ?? false);
+  const timelineIndex = useStore(s => s.sessionUserTurnsByPath[path]);
   const isSessionStreaming = useStore(s => s.streamingSessions.includes(path));
   const sessionAgentId = useStore(s => s.sessions.find(se => se.path === path)?.agentId ?? null);
+  const saveScrollPosition = useStore(s => s.saveScrollPosition);
   const ref = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const messageElementsRef = useRef(new Map<string, HTMLDivElement>());
+  const scrollSaveTimerRef = useRef<number | null>(null);
+  const pendingScrollTopRef = useRef<number | null>(null);
+  const restoredPathRef = useRef<string | null>(null);
+  const initialSavedScrollTopRef = useRef(useStore.getState().scrollPositions[path]);
   const bottomScroll = useContinuousBottomScroll({
     scrollRef: ref,
     contentRef,
     active,
     stickyThreshold: SCROLL_THRESHOLD,
   });
-  const timelineAnchors = useMemo(() => buildTimelineAnchors(items), [items]);
+  const loadedTimelineAnchors = useMemo(
+    () => {
+      if (!active) return EMPTY_TIMELINE_ANCHORS;
+      return buildTimelineAnchors(items);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- assistant streaming updates do not change timeline anchors.
+    [active, buildTimelineAnchorSignature(items)],
+  );
+  const indexedTimelineAnchors = useMemo(
+    () => {
+      if (!active || !timelineIndex?.turns?.length) return EMPTY_TIMELINE_ANCHORS;
+      return buildTimelineAnchorsFromUserTurns(timelineIndex.turns);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only lightweight user-turn fields affect the navigator.
+    [active, buildUserTurnSignature(timelineIndex?.turns ?? [])],
+  );
+  const timelineAnchors = useMemo(
+    () => mergeTimelineAnchors(indexedTimelineAnchors, loadedTimelineAnchors),
+    [indexedTimelineAnchors, loadedTimelineAnchors],
+  );
   const registerMessageElement = useCallback((messageId: string, element: HTMLDivElement | null) => {
     if (element) {
       messageElementsRef.current.set(messageId, element);
@@ -95,6 +145,39 @@ const Panel = memo(function Panel({ path, active }: { path: string; active: bool
     }
   }, []);
 
+  const handleTimelineAnchorLoad = useCallback((anchor: TimelineAnchor) => {
+    return ensureMessageLoaded(path, anchor.messageId);
+  }, [path]);
+
+  useEffect(() => {
+    if (!active) return;
+    if (timelineIndex?.loading || timelineIndex?.loaded) return;
+    loadSessionUserTurns(path);
+  }, [active, path, timelineIndex?.loaded, timelineIndex?.loading]);
+
+  const flushScrollPosition = useCallback(() => {
+    if (scrollSaveTimerRef.current != null) {
+      window.clearTimeout(scrollSaveTimerRef.current);
+      scrollSaveTimerRef.current = null;
+    }
+    const top = pendingScrollTopRef.current;
+    if (top == null) return;
+    pendingScrollTopRef.current = null;
+    saveScrollPosition(path, top);
+  }, [path, saveScrollPosition]);
+
+  const scheduleScrollPositionSave = useCallback((scrollTop: number) => {
+    pendingScrollTopRef.current = scrollTop;
+    if (scrollSaveTimerRef.current != null) return;
+    scrollSaveTimerRef.current = window.setTimeout(() => {
+      scrollSaveTimerRef.current = null;
+      const top = pendingScrollTopRef.current;
+      if (top == null) return;
+      pendingScrollTopRef.current = null;
+      saveScrollPosition(path, top);
+    }, SCROLL_POSITION_SAVE_INTERVAL);
+  }, [path, saveScrollPosition]);
+
   // scroll 事件维护 sticky 标志 + 上滑加载更多 + 滚动中显现 scrollbar
   useEffect(() => {
     const el = ref.current;
@@ -102,6 +185,7 @@ const Panel = memo(function Panel({ path, active }: { path: string; active: bool
     let hideTimer: ReturnType<typeof setTimeout> | null = null;
     const onScroll = () => {
       const sticky = bottomScroll.checkSticky();
+      if (active) scheduleScrollPositionSave(el.scrollTop);
       if (active) setScrollButton(el, !sticky, () => {
         bottomScroll.scrollToBottom({ mode: 'follow', forceSticky: true });
       });
@@ -128,9 +212,13 @@ const Panel = memo(function Panel({ path, active }: { path: string; active: bool
     return () => {
       el.removeEventListener('scroll', onScroll);
       if (hideTimer) clearTimeout(hideTimer);
+      if (active) {
+        pendingScrollTopRef.current = el.scrollTop;
+        flushScrollPosition();
+      }
       if (_scrollBtn.el === el) setScrollButton(null, false, null);
     };
-  }, [active, bottomScroll, path]);
+  }, [active, bottomScroll, flushScrollPosition, path, scheduleScrollPositionSave]);
 
   // prepend 后保持滚动位置：监听 items 变化，如果头部变了就修正 scrollTop
   const prevFirstId = useRef<string | undefined>(undefined);
@@ -155,15 +243,19 @@ const Panel = memo(function Panel({ path, active }: { path: string; active: bool
     }
   }, [loadingMore]);
 
-  // 首次有内容 → 滚到底
-  const scrolledOnce = useRef(false);
-  useEffect(() => {
-    if (scrolledOnce.current) return;
-    if (items.length > 0) {
+  // 首次挂载当前会话：优先恢复历史 scrollTop，没有保存值才滚到底。
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !active || items.length === 0 || restoredPathRef.current === path) return;
+    const savedScrollTop = initialSavedScrollTopRef.current;
+    if (typeof savedScrollTop === 'number' && Number.isFinite(savedScrollTop)) {
+      el.scrollTop = savedScrollTop;
+      bottomScroll.checkSticky();
+    } else {
       bottomScroll.scrollToBottom({ mode: 'instant', forceSticky: true });
-      scrolledOnce.current = true;
     }
-  }, [bottomScroll, items.length]);
+    restoredPathRef.current = path;
+  }, [active, bottomScroll, items.length, path]);
 
   // 只有用户自己发出新消息时才恢复 sticky；assistant/tool 流式追加必须尊重用户上滑。
   const prevLen = useRef(items.length);
@@ -190,8 +282,8 @@ const Panel = memo(function Panel({ path, active }: { path: string; active: bool
         pointerEvents: active ? 'auto' : 'none',
       }}
     >
-      <div ref={ref} className={styles.sessionPanel}>
-        <div ref={contentRef} className={styles.sessionMessages}>
+      <div ref={ref} className={styles.sessionPanel} data-chat-scroll-panel="">
+        <div ref={contentRef} className={styles.sessionMessages} data-chat-content-column="">
           {hasMore && (
             <div className={styles.loadMoreHint}>
               {loadingMore ? '...' : ''}
@@ -209,13 +301,16 @@ const Panel = memo(function Panel({ path, active }: { path: string; active: bool
           <div className={styles.sessionFooter} />
         </div>
       </div>
-      <ChatTimelineNavigator
-        anchors={timelineAnchors}
-        scrollRef={ref}
-        contentRef={contentRef}
-        messageElementsRef={messageElementsRef}
-        active={active}
-      />
+      {active && (
+        <ChatTimelineNavigator
+          anchors={timelineAnchors}
+          scrollRef={ref}
+          contentRef={contentRef}
+          messageElementsRef={messageElementsRef}
+          active={active}
+          onRequestAnchorLoad={handleTimelineAnchorLoad}
+        />
+      )}
     </div>
   );
 });

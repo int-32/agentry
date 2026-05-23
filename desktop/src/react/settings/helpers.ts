@@ -124,17 +124,28 @@ export async function autoSaveGlobalModels(
   }
 }
 
-let _savePinsTimer: ReturnType<typeof setTimeout> | null = null;
-export function savePins() {
-  if (_savePinsTimer) clearTimeout(_savePinsTimer);
-  _savePinsTimer = setTimeout(async () => {
+const _savePinsTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+export function savePins(nextPins?: string[], targetAgentId?: string | null) {
+  const initialStore = useSettingsStore.getState();
+  const agentId = targetAgentId || initialStore.getSettingsAgentId();
+  if (!agentId) {
+    initialStore.showToast(t('settings.saveFailed') + ': agent not found', 'error');
+    return;
+  }
+
+  const pinsSnapshot = [...(nextPins ?? initialStore.currentPins)];
+  const existingTimer = _savePinsTimers.get(agentId);
+  if (existingTimer) clearTimeout(existingTimer);
+
+  const timer = setTimeout(async () => {
     const store = useSettingsStore.getState();
+    _savePinsTimers.delete(agentId);
     try {
-      const agentId = store.getSettingsAgentId();
-      const res = await hanaFetch(`/api/agents/${agentId}/pinned`, {
+      const res = await hanaFetch(`/api/agents/${encodeURIComponent(agentId)}/pinned`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pins: store.currentPins }),
+        body: JSON.stringify({ pins: pinsSnapshot }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -143,6 +154,8 @@ export function savePins() {
       store.showToast(t('settings.saveFailed') + ': ' + err.message, 'error');
     }
   }, 300);
+
+  _savePinsTimers.set(agentId, timer);
 }
 
 export const PROVIDER_PRESETS = API_PROVIDER_PRESETS.map(preset => ({

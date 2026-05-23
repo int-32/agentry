@@ -10,6 +10,7 @@ interface ModelInfo {
   id: string;
   name: string;
   provider: string;
+  providerDisplayName?: string;
   contextWindow?: number | null;
   input?: string[];
 }
@@ -129,7 +130,11 @@ export function ModelWidget({
         <div className={styles['mdw-options']}>
           {Object.entries(grouped).map(([provider, items]) => (
             <div key={provider || '__none'}>
-              {provider && <div className={styles['mdw-group-header']}>{provider}</div>}
+              {provider && (
+                <div className={styles['mdw-group-header']}>
+                  {items.find(model => model.providerDisplayName)?.providerDisplayName || provider}
+                </div>
+              )}
               {items.map(m => (
                 <button
                   key={`${m.provider}/${m.id}`}
