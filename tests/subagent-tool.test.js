@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createSubagentTool } from "../lib/tools/subagent-tool.js";
+import { TaskLedger } from "../lib/task-ledger.js";
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -157,6 +158,26 @@ describe("subagent-tool (executeIsolated 原子模式)", () => {
   });
 
   // 2. deferred store resolves on success
+  it("mirrors subagent lifecycle into TaskLedger", async () => {
+    const ledger = new TaskLedger();
+    const tool = createSubagentTool(makeDeps({
+      getDeferredStore: () => mockStore,
+      getTaskLedger: () => ledger,
+    }));
+
+    const result = await tool.execute("call_1", { task: "任务：调研看板\n\n输出摘要" }, null, null, mockCtx());
+    expect(result.details.ledgerTaskId).toBeTruthy();
+    expect(ledger.getTask(result.details.ledgerTaskId)).toMatchObject({
+      title: "任务：调研看板",
+      source: { type: "subagent", subagentTaskId: result.details.taskId },
+    });
+
+    await vi.waitFor(() => {
+      expect(ledger.getTask(result.details.ledgerTaskId).status).toBe("done");
+    });
+    expect(ledger.getTask(result.details.ledgerTaskId).comments.at(-1).body).toBe("done");
+  });
+
   it("resolves deferred store on success", async () => {
     const tool = createSubagentTool(deps);
     await tool.execute("call_1", { task: "成功的任务" }, null, null, mockCtx());

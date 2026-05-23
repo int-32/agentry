@@ -81,7 +81,13 @@
     "bridge": "接入社交平台",
     "toggle": "侧边栏",
     "bridgeShort": "接入社交平台",
-    "pinned": "置顶"
+    "pinned": "置顶",
+    "groupBy": "对话分组",
+    "groupTime": "时间",
+    "groupWorkspace": "工作空间",
+    "groupByTime": "按时间分组",
+    "groupByWorkspace": "按工作空间分组",
+    "noWorkspace": "未设置工作空间"
   },
   "session": {
     "untitled": "新对话",
@@ -112,6 +118,14 @@
       "cleanupConfirm": "将永久删除 {count} 条归档（共 {size}），无法撤销。继续？",
       "cleanupDone": "已清理 {count} 条归档",
       "cleanupNoMatch": "没有符合条件的归档",
+      "selectAll": "全选",
+      "selectItem": "选择 {title}",
+      "selectedStats": "已选 {count} 条 · {size}",
+      "deleteSelected": "删除已选 ({count})",
+      "deleteSelectedConfirm": "将永久删除已选 {count} 条归档（共 {size}），无法撤销。继续？",
+      "deleteSelectedDone": "已删除 {count} 条归档",
+      "deleteSelectedPartial": "已删除 {deleted} 条，{failed} 条失败",
+      "deleteSelectedFailed": "{count} 条归档删除失败",
       "restore": "恢复",
       "restoreConfirm": "将此对话恢复到原位置？",
       "restoreConflict": "原位置已被占用，无法恢复",
@@ -607,22 +621,22 @@
     "noChanges": "没有需要保存的更改",
     "autoSaved": "已自动保存 ✿",
     "tabs": {
-      "interface": "界面",
-      "agent": "助手",
-      "me": "我",
-      "providers": "供应商",
-      "media": "多媒体",
-      "models": "模型",
-      "memory": "记忆",
+      "interface": "界面外观",
+      "agent": "助手角色",
+      "me": "个人资料",
+      "providers": "模型供应",
+      "media": "媒体模型",
+      "models": "模型配置",
+      "memory": "记忆管理",
       "work": "工作空间",
-      "computer": "使用电脑",
-      "skills": "技能",
-      "mcp": "连接器",
-      "bridge": "社交平台",
-      "sharing": "分享",
-      "plugins": "插件",
-      "about": "关于",
-      "security": "安全"
+      "computer": "电脑控制",
+      "skills": "技能工具",
+      "mcp": "外部连接",
+      "bridge": "社交连接",
+      "sharing": "分享导出",
+      "plugins": "插件管理",
+      "about": "关于应用",
+      "security": "安全权限"
     },
     "appearance": {
       "title": "外观",
@@ -756,7 +770,90 @@
       "tools": {
         "title": "工具",
         "description": "这些工具开关会在重启对话或新建对话后生效。当前进行中的会话继续使用创建时的工具集。",
+        "pluginDescription": "系统插件工具会随插件自动加载，这里只展示实际已注入的工具，不在此处单独开关。",
+        "pluginBadge": "系统插件",
+        "pluginSource": "来源",
         "items": {
+          "web_fetch": {
+            "label": "网页读取",
+            "summary": "读取指定 URL 的网页内容"
+          },
+          "todo_write": {
+            "label": "任务清单",
+            "summary": "让 Agent 拆分和追踪当前工作步骤"
+          },
+          "create_artifact": {
+            "label": "旧版产物",
+            "summary": "创建旧版可视化或文件产物"
+          },
+          "notify": {
+            "label": "通知",
+            "summary": "向你发送桌面或 Bridge 通知"
+          },
+          "stage_files": {
+            "label": "交付文件",
+            "summary": "把生成或整理好的文件交付到当前会话"
+          },
+          "subagent": {
+            "label": "子 agent",
+            "summary": "把独立任务派给自己或其他 Agent 后台执行"
+          },
+          "channel": {
+            "label": "频道",
+            "summary": "在团队频道中发言或传递信息"
+          },
+          "record_experience": {
+            "label": "记录经验",
+            "summary": "把本次工作学到的经验写入经验库"
+          },
+          "recall_experience": {
+            "label": "检索经验",
+            "summary": "在开始工作前查找相关经验"
+          },
+          "check_pending_tasks": {
+            "label": "检查后台任务",
+            "summary": "查看尚未完成的后台子任务"
+          },
+          "current_status": {
+            "label": "当前状态",
+            "summary": "读取当前时间、模型、界面上下文和会话文件"
+          },
+          "wait": {
+            "label": "等待",
+            "summary": "在当前回合中等待后台结果"
+          },
+          "stop_task": {
+            "label": "终止任务",
+            "summary": "停止正在运行的后台任务"
+          },
+          "terminal": {
+            "label": "终端",
+            "summary": "使用可持续读取输出的本地终端会话"
+          },
+          "task_create": {
+            "label": "创建看板任务",
+            "summary": "从对话中创建项目看板任务，并默认启动真实执行"
+          },
+          "task_orchestrate": {
+            "label": "任务编排",
+            "summary": "创建多 agent 并发执行的结构化任务图"
+          },
+          "task_complete": {
+            "label": "完成看板任务",
+            "summary": "worker 写入结构化完成结果"
+          },
+          "task_block": {
+            "label": "阻塞看板任务",
+            "summary": "worker 写入需要人工处理的阻塞原因"
+          },
+          "task_heartbeat": {
+            "label": "任务心跳",
+            "summary": "worker 写入执行进度并延长 claim"
+          },
+          "task_comment": {
+            "label": "任务评论",
+            "summary": "worker 向任务详情追加中间结论或交接说明"
+          },
           "browser": {
             "label": "浏览器",
             "summary": "控制无头浏览器浏览网页"
@@ -1075,6 +1172,10 @@
       "hint": "你主动告诉助手一定要记住的东西，也可以手动编辑与添加",
       "empty": "还没有置顶记忆",
       "delete": "删除",
+      "selectItem": "选择置顶记忆：{text}",
+      "selectAll": "全选",
+      "clearSelection": "取消选择",
+      "deleteSelected": "删除所选（{count}）",
       "addPlaceholder": "添加一条置顶记忆..."
     },
     "experience": {

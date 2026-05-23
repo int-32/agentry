@@ -40,4 +40,25 @@ describe('MainContent app file drag attachments', () => {
     }]);
     expect(useStore.getState().attachedFilesBySession['/sessions/main.jsonl']).toEqual(useStore.getState().attachedFiles);
   });
+
+  it('does not treat task-card drags as chat attachment drags', async () => {
+    const { isMainContentAttachmentDrag } = await import('../../MainContent');
+    const { TASK_DRAG_MIME } = await import('../../utils/task-drag');
+
+    expect(isMainContentAttachmentDrag({
+      types: [TASK_DRAG_MIME],
+    } as unknown as DataTransfer)).toBe(false);
+  });
+
+  it('still treats native files and app files as chat attachment drags', async () => {
+    const { isMainContentAttachmentDrag } = await import('../../MainContent');
+    const { APP_FILE_DRAG_MIME } = await import('../../utils/app-file-drag');
+
+    expect(isMainContentAttachmentDrag({
+      types: ['Files'],
+    } as unknown as DataTransfer)).toBe(true);
+    expect(isMainContentAttachmentDrag({
+      types: [APP_FILE_DRAG_MIME],
+    } as unknown as DataTransfer)).toBe(true);
+  });
 });

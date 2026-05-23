@@ -22,6 +22,8 @@ describe('InputArea layout', () => {
     const inputAreaBlock = cssBlock(globalCss, String.raw`\.input-area > \*`);
     const welcomeInputAreaBlock = cssBlock(globalCss, String.raw`\.main-content\.welcome-mode \.input-area > \*`);
     const sessionMessagesBlock = cssBlock(chatCss, String.raw`\.sessionMessages`);
+    const timelineNavBlock = cssBlock(chatCss, String.raw`\.timelineNav`);
+    const timelineNavSideBlock = cssBlock(chatCss, String.raw`\.timelineNavSide`);
 
     expect(globalCss).toMatch(/--chat-column-width:\s*45rem/);
     expect(globalCss).toMatch(/--chat-input-column-extra:\s*1\.25rem/);
@@ -30,6 +32,12 @@ describe('InputArea layout', () => {
     expect(inputAreaBlock).toMatch(/max-width:\s*var\(--chat-input-column-width\)/);
     expect(welcomeInputAreaBlock).toMatch(/max-width:\s*var\(--welcome-chat-input-column-width\)/);
     expect(sessionMessagesBlock).toMatch(/max-width:\s*var\(--chat-column-width\)/);
+    expect(timelineNavBlock).toMatch(/right:\s*max\(0px,\s*calc\(\(100% - var\(--chat-input-column-width\)\) \/ 2\)\)/);
+    expect(timelineNavBlock).toMatch(/width:\s*var\(--timeline-trigger-width\)/);
+    expect(timelineNavBlock).toMatch(/--timeline-trigger-width:\s*42px/);
+    expect(timelineNavSideBlock).toMatch(/position:\s*fixed/);
+    expect(timelineNavSideBlock).toMatch(/right:\s*auto/);
+    expect(timelineNavSideBlock).toMatch(/--timeline-card-width:\s*100%/);
     expect(floatingCss).not.toMatch(/--chat-column-width:\s*var\(--bridge-chat-column-width\)/);
   });
 

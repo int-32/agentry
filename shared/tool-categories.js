@@ -8,9 +8,9 @@
 // boot with an error pointing here.
 //
 // Categories:
-//   CORE     — Removing breaks the model. Never user-toggleable, never in UI.
-//   STANDARD — Always-on built-in. Not in UI. Move to OPTIONAL to expose a toggle.
-//   OPTIONAL — User-toggleable in AgentTab → Tools section. Some may default off.
+//   CORE     — Removing breaks core model operation. Never user-toggleable, never in UI.
+//   STANDARD — Default-on built-in agent tools. User-toggleable per agent.
+//   OPTIONAL — User-toggleable per-agent tools that may default off.
 //   GLOBAL   — Built-in, but governed by a global high-permission setting page
 //              rather than per-agent tool toggles.
 //
@@ -38,6 +38,12 @@ export const STANDARD_TOOL_NAMES = [
   "wait",
   "stop_task",
   "terminal",
+  "task_create",
+  "task_orchestrate",
+  "task_complete",
+  "task_block",
+  "task_heartbeat",
+  "task_comment",
 ];
 
 export const GLOBAL_TOOL_NAMES = [
@@ -52,14 +58,19 @@ export const OPTIONAL_TOOL_NAMES = [
   "update_settings",
 ];
 
-const OPTIONAL_TOOL_NAMES_SET = new Set(OPTIONAL_TOOL_NAMES);
+export const CONFIGURABLE_TOOL_NAMES = [
+  ...STANDARD_TOOL_NAMES,
+  ...OPTIONAL_TOOL_NAMES,
+];
+
+const CONFIGURABLE_TOOL_NAMES_SET = new Set(CONFIGURABLE_TOOL_NAMES);
 
 /**
- * Default-off subset of OPTIONAL_TOOL_NAMES. Applied when agent config has no
+ * Default-off subset of CONFIGURABLE_TOOL_NAMES. Applied when agent config has no
  * `tools.disabled` field (i.e., user has never touched tool settings). Both
  * fresh agents and agents upgrading from a pre-feature version hit this path.
  *
- * Must be a subset of OPTIONAL_TOOL_NAMES. The frontend AgentTab keeps a local
+ * Must be a subset of CONFIGURABLE_TOOL_NAMES. The frontend AgentTab keeps a local
  * copy for display defaults; tests/optional-tool-names-drift.test.js guards the
  * two from drifting.
  *
@@ -112,9 +123,9 @@ export function assertAllToolsCategorized(actualToolNames) {
 /**
  * Compute the final tool name list for a newly created session.
  *
- * Rule: remove from allNames any name that is BOTH in the disabled list AND
- * in OPTIONAL_TOOL_NAMES. Core/standard tools are untouchable even if the
- * disabled list has been tampered with (runtime second-line defense).
+ * Rule: remove from allNames any name that is BOTH in the disabled list AND in
+ * CONFIGURABLE_TOOL_NAMES. Core/global tools are untouchable here even if the
+ * disabled list has been tampered with.
  *
  * @param {string[]} allNames
  * @param {string[]} disabled
@@ -123,7 +134,7 @@ export function assertAllToolsCategorized(actualToolNames) {
  */
 export function computeToolSnapshot(allNames, disabled, options = {}) {
   const effectivelyDisabled = new Set(
-    (disabled || []).filter((n) => OPTIONAL_TOOL_NAMES_SET.has(n))
+    (disabled || []).filter((n) => CONFIGURABLE_TOOL_NAMES_SET.has(n))
   );
   const extraDisabled = new Set(
     (options.extraDisabled || []).filter((n) => typeof n === "string" && n)

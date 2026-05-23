@@ -12,6 +12,7 @@ import { WelcomeScreen } from '../WelcomeScreen';
 import { ChatArea } from '../chat/ChatArea';
 import { ChannelMessages, ChannelMembers, ChannelInput, ChannelReadonly, ChannelAgentActivityPanel, ChannelAgentSettingsPanel } from '../ChannelsPanel';
 import { ChannelHeader } from '../channels/ChannelHeader';
+import { TaskPage } from '../tasks/TaskPage';
 import { MainContent } from '../../MainContent';
 import { RegionalErrorBoundary } from '../RegionalErrorBoundary';
 
@@ -161,18 +162,22 @@ function PluginPage({ pluginId }: { pluginId: string }) {
 
 export function WorkspaceCompanionRail() {
   const jianOpen = useStore(s => s.jianOpen);
+  const currentTab = useStore(s => s.currentTab);
+  const isBoardTab = currentTab === 'boards';
 
   return (
     <>
       <WorkspaceFileWatchBridge />
-      <aside className={`jian-sidebar${jianOpen ? '' : ' collapsed'}`} id="jianSidebar">
-        <div className="resize-handle resize-handle-left" id="jianResizeHandle"></div>
-        <div className="jian-sidebar-inner">
-          <RegionalErrorBoundary region="right-workspace">
-            <RightWorkspacePanel />
-          </RegionalErrorBoundary>
-        </div>
-      </aside>
+      {!isBoardTab && (
+        <aside className={`jian-sidebar${jianOpen ? '' : ' collapsed'}`} id="jianSidebar">
+          <div className="resize-handle resize-handle-left" id="jianResizeHandle"></div>
+          <div className="jian-sidebar-inner">
+            <RegionalErrorBoundary region="right-workspace">
+              <RightWorkspacePanel />
+            </RegionalErrorBoundary>
+          </div>
+        </aside>
+      )}
     </>
   );
 }
@@ -186,6 +191,7 @@ export function AppPages() {
       <MainContent>
         {currentTab === 'chat' && <ChatPage />}
         {currentTab === 'channels' && <ChannelPage />}
+        {currentTab === 'boards' && <TaskPage />}
         {isPluginTab && <PluginPage pluginId={currentTab.slice(7)} />}
         <ActivityPanel />
         <AutomationPanel />

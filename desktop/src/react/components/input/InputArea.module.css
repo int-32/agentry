@@ -517,6 +517,19 @@
     align-self: flex-end;
 }
 
+.todo-bar-side {
+    position: fixed;
+    left: var(--todo-side-left);
+    top: var(--todo-side-top);
+    z-index: 12;
+    width: var(--todo-side-width);
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: auto;
+}
+
 .todo-bar-trigger {
     display: inline-flex;
     align-items: center;
@@ -531,6 +544,14 @@
     cursor: pointer;
     transition: opacity var(--duration-fast);
     -webkit-app-region: no-drag;
+}
+
+.todo-bar-side .todo-bar-trigger {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0.42rem 0.65rem;
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 22px rgba(var(--accent-rgb), 0.18);
 }
 
 .todo-bar-trigger:hover {
@@ -550,6 +571,13 @@
     white-space: nowrap;
     font-size: 0.72rem;
     max-width: 180px;
+}
+
+.todo-bar-side .todo-bar-preview {
+    flex: 1;
+    max-width: none;
+    min-width: 0;
+    text-align: left;
 }
 
 .todo-bar-count {
@@ -578,6 +606,15 @@
     color: var(--text);
     animation: hana-fade-up var(--duration-fast) var(--ease-out);
     z-index: 10;
+}
+
+.todo-bar-side .todo-bar-list {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    max-height: min(320px, var(--todo-side-list-max-height, calc(100vh - var(--todo-side-top) - 56px)));
+    box-sizing: border-box;
 }
 
 .todo-bar-item {

@@ -80,7 +80,13 @@
     "bridge": "소셜 플랫폼",
     "toggle": "사이드바",
     "bridgeShort": "연결",
-    "pinned": "고정"
+    "pinned": "고정",
+    "groupBy": "대화 그룹",
+    "groupTime": "시간",
+    "groupWorkspace": "작업공간",
+    "groupByTime": "시간별 그룹",
+    "groupByWorkspace": "작업공간별 그룹",
+    "noWorkspace": "작업공간 없음"
   },
   "session": {
     "untitled": "새 대화",
@@ -111,6 +117,14 @@
       "cleanupConfirm": "{count}개의 보관 항목({size})을 영구 삭제합니다. 되돌릴 수 없습니다. 계속할까요?",
       "cleanupDone": "{count}개 보관 항목을 정리했습니다",
       "cleanupNoMatch": "조건에 맞는 보관 항목이 없습니다",
+      "selectAll": "전체 선택",
+      "selectItem": "{title} 선택",
+      "selectedStats": "{count}개 선택됨 · {size}",
+      "deleteSelected": "선택 삭제 ({count})",
+      "deleteSelectedConfirm": "선택한 보관 항목 {count}개({size})를 영구 삭제합니다. 되돌릴 수 없습니다. 계속할까요?",
+      "deleteSelectedDone": "보관 항목 {count}개를 삭제했습니다",
+      "deleteSelectedPartial": "{deleted}개 삭제됨, {failed}개 실패",
+      "deleteSelectedFailed": "보관 항목 {count}개 삭제 실패",
       "restore": "복원",
       "restoreConfirm": "이 대화를 원래 위치로 복원할까요?",
       "restoreConflict": "원래 위치가 점유되어 복원할 수 없습니다",
@@ -746,7 +760,90 @@
       "tools": {
         "title": "도구",
         "description": "도구 스위치는 대화를 다시 시작하거나 새 대화를 시작한 뒤 적용돼요. 진행 중인 대화는 시작할 때의 도구 집합을 계속 사용해요.",
+        "pluginDescription": "시스템 플러그인 도구는 플러그인이 자동으로 로드합니다. 여기에는 실제로 주입된 도구만 표시하며, 개별 전환은 여기서 하지 않습니다.",
+        "pluginBadge": "시스템 플러그인",
+        "pluginSource": "출처",
         "items": {
+          "web_fetch": {
+            "label": "웹 읽기",
+            "summary": "지정한 URL의 웹 페이지 내용을 읽습니다"
+          },
+          "todo_write": {
+            "label": "작업 목록",
+            "summary": "현재 작업 단계를 나누고 추적합니다"
+          },
+          "create_artifact": {
+            "label": "레거시 산출물",
+            "summary": "기존 형식의 시각화 또는 파일 산출물을 만듭니다"
+          },
+          "notify": {
+            "label": "알림",
+            "summary": "데스크톱 또는 Bridge 알림을 보냅니다"
+          },
+          "stage_files": {
+            "label": "파일 전달",
+            "summary": "생성하거나 준비한 파일을 현재 세션에 첨부합니다"
+          },
+          "subagent": {
+            "label": "하위 agent",
+            "summary": "독립 작업을 자신 또는 다른 Agent에게 백그라운드로 맡깁니다"
+          },
+          "channel": {
+            "label": "채널",
+            "summary": "팀 채널에서 발언하거나 정보를 전달합니다"
+          },
+          "record_experience": {
+            "label": "경험 기록",
+            "summary": "이번 작업에서 배운 내용을 경험 라이브러리에 저장합니다"
+          },
+          "recall_experience": {
+            "label": "경험 검색",
+            "summary": "작업 시작 전에 관련 경험을 찾아봅니다"
+          },
+          "check_pending_tasks": {
+            "label": "백그라운드 작업 확인",
+            "summary": "아직 끝나지 않은 하위 agent 작업을 확인합니다"
+          },
+          "current_status": {
+            "label": "현재 상태",
+            "summary": "현재 시간, 모델, UI 컨텍스트, 세션 파일을 읽습니다"
+          },
+          "wait": {
+            "label": "대기",
+            "summary": "현재 턴에서 백그라운드 결과를 기다립니다"
+          },
+          "stop_task": {
+            "label": "작업 중지",
+            "summary": "실행 중인 백그라운드 작업을 중지합니다"
+          },
+          "terminal": {
+            "label": "터미널",
+            "summary": "출력을 계속 읽을 수 있는 로컬 터미널 세션을 사용합니다"
+          },
+          "task_create": {
+            "label": "칸반 작업 만들기",
+            "summary": "대화에서 프로젝트 칸반 작업을 만들고 기본적으로 실제 실행을 시작합니다"
+          },
+          "task_orchestrate": {
+            "label": "작업 오케스트레이션",
+            "summary": "여러 agent가 실행하는 구조화된 작업 그래프를 만듭니다"
+          },
+          "task_complete": {
+            "label": "칸반 작업 완료",
+            "summary": "worker가 구조화된 완료 결과를 기록합니다"
+          },
+          "task_block": {
+            "label": "칸반 작업 차단",
+            "summary": "worker가 사람이 처리해야 할 차단 이유를 기록합니다"
+          },
+          "task_heartbeat": {
+            "label": "작업 하트비트",
+            "summary": "worker가 진행 상황을 기록하고 claim을 연장합니다"
+          },
+          "task_comment": {
+            "label": "작업 댓글",
+            "summary": "worker가 중간 결론이나 인수인계 메모를 추가합니다"
+          },
           "browser": {
             "label": "브라우저",
             "summary": "헤드리스 브라우저로 웹 페이지를 탐색"
@@ -1044,6 +1141,10 @@
       "hint": "항상 대화에 주입되며 감쇠하지 않아요",
       "empty": "아직 고정 기억이 없어요",
       "delete": "삭제",
+      "selectItem": "고정 기억 선택: {text}",
+      "selectAll": "전체 선택",
+      "clearSelection": "선택 해제",
+      "deleteSelected": "선택 삭제 ({count})",
       "addPlaceholder": "고정 기억 추가..."
     },
     "experience": {

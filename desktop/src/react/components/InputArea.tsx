@@ -148,6 +148,16 @@ function editorHasInlineNode(editor: Editor | null, nodeType: string): boolean {
   return found;
 }
 
+function plainTextDoc(text: string) {
+  return {
+    type: 'doc' as const,
+    content: text.split('\n').map(line => ({
+      type: 'paragraph' as const,
+      content: line ? [{ type: 'text' as const, text: line }] : [],
+    })),
+  };
+}
+
 export type { SlashItem };
 
 // ── 主组件 ──
@@ -583,14 +593,7 @@ function InputAreaInner() {
       if (!draft) {
         editor.commands.setContent('', { emitUpdate: false });
       } else {
-        const doc = {
-          type: 'doc' as const,
-          content: draft.split('\n').map(line => ({
-            type: 'paragraph' as const,
-            content: line ? [{ type: 'text' as const, text: line }] : [],
-          })),
-        };
-        editor.commands.setContent(doc, { emitUpdate: false });
+        editor.commands.setContent(plainTextDoc(draft), { emitUpdate: false });
       }
     }
   }, [editor, currentSessionPath]);
@@ -1048,7 +1051,7 @@ function InputAreaInner() {
   }, [addToast, completingTodos, currentSessionPath, sessionTodos.length]);
 
   return (
-    <div className={styles['input-surface']} ref={inputSurfaceRef}>
+    <div className={styles['input-surface']} ref={inputSurfaceRef} data-input-surface="">
       <InputStatusBars
         slashBusy={slashBusy}
         slashBusyLabel={slashCommands.find(c => c.name === slashBusy)?.busyLabel || t('common.executing')}
@@ -1099,7 +1102,7 @@ function InputAreaInner() {
             exiting={sessionConfirmationExiting}
           />
         )}
-        <div className={styles['input-wrapper']} ref={inputCardRef}>
+        <div className={styles['input-wrapper']} ref={inputCardRef} data-input-wrapper="">
           <div
             onKeyDown={(event) => {
               if (!event.defaultPrevented) handleEditorKeyDown(event);

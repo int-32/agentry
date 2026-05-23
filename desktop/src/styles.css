@@ -2557,7 +2557,8 @@ body.resizing .channel-inspector-rail {
    频道 — 侧边栏内容切换
    ======================================== */
 .sidebar-chat-content,
-.sidebar-channel-content {
+.sidebar-channel-content,
+.sidebar-board-content {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -2565,7 +2566,8 @@ body.resizing .channel-inspector-rail {
 }
 
 .sidebar-chat-content.hidden,
-.sidebar-channel-content.hidden {
+.sidebar-channel-content.hidden,
+.sidebar-board-content.hidden {
     display: none;
 }
 

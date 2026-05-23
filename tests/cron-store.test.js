@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CronStore } from "../lib/desk/cron-store.js";
+import { TaskLedger } from "../lib/task-ledger.js";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -590,6 +591,29 @@ describe("cron 解析器边界", () => {
 // ════════════════════════════════════════════
 //  logRun 日志修剪
 // ════════════════════════════════════════════
+
+describe("CronStore TaskLedger bridge", () => {
+  it("mirrors cron jobs and run results into TaskLedger", () => {
+    const { jobsPath, runsDir } = makeTmpPaths();
+    const ledger = new TaskLedger();
+    const store = new CronStore(jobsPath, runsDir, { taskLedger: ledger, agentId: "hana" });
+
+    const job = store.addJob({ type: "every", schedule: 60_000, prompt: "巡检一下", label: "巡检" });
+    expect(job.taskLedgerId).toBeTruthy();
+    expect(ledger.getTask(job.taskLedgerId)).toMatchObject({
+      title: "巡检",
+      status: "ready",
+      source: { type: "cron", cronJobId: job.id, cronType: "every", agentId: "hana" },
+    });
+
+    store.logRun(job.id, { status: "error", startedAt: "2026-01-01T00:00:00.000Z", finishedAt: "2026-01-01T00:00:01.000Z", error: "boom" });
+    expect(ledger.getTask(job.taskLedgerId)).toMatchObject({ status: "failed" });
+    expect(ledger.getTask(job.taskLedgerId).comments.at(-1)).toMatchObject({ author: "cron", body: "boom" });
+
+    store.markRun(job.id, { success: true });
+    expect(ledger.getTask(job.taskLedgerId).status).toBe("ready");
+  });
+});
 
 describe("CronStore logRun 日志修剪", () => {
   it("logRun 超过 500 行时修剪到 300 行", () => {

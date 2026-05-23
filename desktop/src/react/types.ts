@@ -51,6 +51,7 @@ export interface Agent {
   isPrimary: boolean;
   hasAvatar?: boolean;
   memoryMasterEnabled?: boolean;
+  chatModel?: { id?: string; provider?: string } | null;
 }
 
 export interface SessionStream {
@@ -62,6 +63,7 @@ export interface Model {
   id: string;
   name: string;
   provider: string;
+  providerDisplayName?: string;
   isCurrent?: boolean;
   reasoning?: boolean;
   xhigh?: boolean;
@@ -175,7 +177,8 @@ export interface TodoItem {
 
 // ── 浮动面板类型 ──
 export type ActivePanel = 'activity' | 'automation' | 'bridge' | null;
-export type TabType = 'chat' | 'channels' | `plugin:${string}`;
+export type TabType = 'chat' | 'channels' | 'boards' | `plugin:${string}`;
+export type LegacyTabType = TabType | 'tasks';
 export type RightWorkspaceTab = 'session-files' | 'workspace' | `plugin-widget:${string}`;
 
 export interface FileVersion {

@@ -109,6 +109,7 @@ import { wrapWithCheckpoint } from "../lib/checkpoint-wrapper.js";
 import { wrapWithSessionPermission } from "../lib/tools/session-permission-wrapper.js";
 import { filterToolObjectsByAvailability } from "./tool-availability.js";
 import { TaskRegistry } from "../lib/task-registry.js";
+import { TaskLedger } from "../lib/task-ledger.js";
 import { TerminalSessionManager } from "../lib/terminal/terminal-session-manager.js";
 import { PluginInstallRecords } from "../lib/plugin-install-records.js";
 import { ComputerHost } from "./computer-use/computer-host.js";
@@ -122,6 +123,7 @@ import {
 } from "./computer-use/platform-support.js";
 import { SessionFileRegistry } from "../lib/session-files/session-file-registry.js";
 import { NotificationService } from "../lib/notifications/notification-service.js";
+import { TaskOrchestrator } from "../lib/task-orchestration/task-orchestrator.js";
 import {
   getSkillNameTranslationCachePath,
   translateSkillNamesWithCache,
@@ -135,6 +137,10 @@ export class AgentryEngine {
    * @param {string} [dirs.agentId]
    */
   constructor({ agentryHome, productDir, agentId }) {
+    // Some managers can emit during construction while restoring persisted state.
+    this._listeners = new Set();
+    this._eventBus = null;
+
     this.agentryHome = agentryHome;
     this.productDir = productDir;
     this.appVersion = "0.0.0";
@@ -266,9 +272,14 @@ export class AgentryEngine {
     // hub 尚未注入，dispatcher 的 hub 字段先为 null；setHubCallbacks 时通过 setHub() 补齐
     this._slashSystem = createSlashSystem({ engine: this, hub: null });
 
+    this._taskLedger = new TaskLedger({
+      persistencePath: path.join(this.agentryHome, ".ephemeral", "task-ledger.json"),
+      emitEvent: (event, sessionPath) => this._emitEvent(event, sessionPath),
+    });
     // 任务注册表（外部 abort 用）；handler 是运行时函数，任务元数据持久化供插件重启恢复和诊断使用。
     this._taskRegistry = new TaskRegistry({
       persistencePath: path.join(this.agentryHome, ".ephemeral", "plugin-tasks.json"),
+      taskLedger: this._taskLedger,
     });
 
     // subagent AbortController 存储（engine 级别，跨 agent 共享）
@@ -278,6 +289,16 @@ export class AgentryEngine {
         const ctrl = this._subagentControllers.get(taskId);
         if (ctrl) ctrl.abort();
       },
+    });
+    this._taskOrchestrator = new TaskOrchestrator({
+      persistencePath: path.join(this.agentryHome, ".ephemeral", "task-runs.json"),
+      listAgents: () => this.listAgents(),
+      getAgentById: (id) => this._agentMgr.getAgent(id),
+      executeIsolated: (prompt, opts) => this.executeIsolated(prompt, opts),
+      getCwd: () => this.cwd,
+      getCurrentSessionPath: () => this.currentSessionPath,
+      emitEvent: (event, sessionPath) => this._emitEvent(event, sessionPath),
+      getTaskLedger: () => this._taskLedger,
     });
 
     this._terminalSessions = new TerminalSessionManager({
@@ -307,10 +328,6 @@ export class AgentryEngine {
 
     // Hub 回调（由 Hub 构造后通过 setHubCallbacks 注入，替代旧的 engine._hub 双向引用）
     this._hubCallbacks = null;
-
-    // 事件系统
-    this._listeners = new Set();
-    this._eventBus = null;
 
     // 首次剥媒体通知去重：sessionPath → 已通知。由 context extension handler 维护，
     // 避免每一轮对话都重复广播 stripped_notice 事件。
@@ -369,9 +386,14 @@ export class AgentryEngine {
     return this._taskRegistry;
   }
 
+  get taskLedger() {
+    return this._taskLedger;
+  }
+
   get terminalSessions() {
     return this._terminalSessions;
   }
+  get taskOrchestrator() { return this._taskOrchestrator; }
 
   registerSessionFile(entry) { return this._sessionFiles.registerFile(entry); }
   getSessionFile(fileId, options) { return this._sessionFiles.get(fileId, options); }
@@ -1438,6 +1460,7 @@ export class AgentryEngine {
 
   subscribe(listener) {
     if (this._eventBus) return this._eventBus.subscribe(listener);
+    if (!(this._listeners instanceof Set)) this._listeners = new Set();
     this._listeners.add(listener);
     return () => this._listeners.delete(listener);
   }
@@ -1446,6 +1469,7 @@ export class AgentryEngine {
     if (this._eventBus) {
       this._eventBus.emit(event, sessionPath);
     } else {
+      if (!(this._listeners instanceof Set)) this._listeners = new Set();
       for (const fn of this._listeners) {
         try { fn(event, sessionPath); } catch {}
       }

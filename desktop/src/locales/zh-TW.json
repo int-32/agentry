@@ -80,7 +80,13 @@
     "bridge": "接入社群平台",
     "toggle": "側邊欄",
     "bridgeShort": "接入",
-    "pinned": "置頂"
+    "pinned": "置頂",
+    "groupBy": "對話分組",
+    "groupTime": "時間",
+    "groupWorkspace": "工作空間",
+    "groupByTime": "依時間分組",
+    "groupByWorkspace": "依工作空間分組",
+    "noWorkspace": "未設定工作空間"
   },
   "session": {
     "untitled": "新對話",
@@ -111,6 +117,14 @@
       "cleanupConfirm": "將永久刪除 {count} 條封存（共 {size}），無法復原。繼續？",
       "cleanupDone": "已清理 {count} 條封存",
       "cleanupNoMatch": "沒有符合條件的封存",
+      "selectAll": "全選",
+      "selectItem": "選擇 {title}",
+      "selectedStats": "已選 {count} 條 · {size}",
+      "deleteSelected": "刪除已選 ({count})",
+      "deleteSelectedConfirm": "將永久刪除已選 {count} 條封存（共 {size}），無法復原。繼續？",
+      "deleteSelectedDone": "已刪除 {count} 條封存",
+      "deleteSelectedPartial": "已刪除 {deleted} 條，{failed} 條失敗",
+      "deleteSelectedFailed": "{count} 條封存刪除失敗",
       "restore": "還原",
       "restoreConfirm": "將此對話還原至原位置？",
       "restoreConflict": "原位置已被佔用，無法還原",
@@ -600,21 +614,22 @@
     "noChanges": "沒有需要儲存的變更",
     "autoSaved": "已自動儲存 ✿",
     "tabs": {
-      "interface": "介面",
-      "agent": "助手",
-      "me": "我",
-      "providers": "供應商",
-      "models": "模型",
-      "memory": "記憶",
+      "interface": "介面外觀",
+      "agent": "助手角色",
+      "me": "個人資料",
+      "providers": "模型供應",
+      "media": "媒體模型",
+      "models": "模型配置",
+      "memory": "記憶管理",
       "work": "工作空間",
-      "computer": "使用電腦",
-      "skills": "技能",
-      "mcp": "連接器",
-      "bridge": "社群平台",
-      "sharing": "分享",
-      "plugins": "插件",
-      "about": "關於",
-      "security": "安全"
+      "computer": "電腦控制",
+      "skills": "技能工具",
+      "mcp": "外部連接",
+      "bridge": "社群連接",
+      "sharing": "分享匯出",
+      "plugins": "插件管理",
+      "about": "關於應用",
+      "security": "安全權限"
     },
     "computerUse": {
       "title": "電腦控制",
@@ -746,7 +761,90 @@
       "tools": {
         "title": "工具",
         "description": "這些工具開關會在重啟對話或建立新對話後生效。目前進行中的會話會繼續使用建立時的工具集。",
+        "pluginDescription": "系統外掛工具會隨外掛自動載入，這裡只展示實際已注入的工具，不在此處單獨開關。",
+        "pluginBadge": "系統外掛",
+        "pluginSource": "來源",
         "items": {
+          "web_fetch": {
+            "label": "網頁讀取",
+            "summary": "讀取指定 URL 的網頁內容"
+          },
+          "todo_write": {
+            "label": "任務清單",
+            "summary": "讓 Agent 拆分和追蹤目前工作步驟"
+          },
+          "create_artifact": {
+            "label": "舊版產物",
+            "summary": "建立舊版視覺化或檔案產物"
+          },
+          "notify": {
+            "label": "通知",
+            "summary": "向你傳送桌面或 Bridge 通知"
+          },
+          "stage_files": {
+            "label": "交付檔案",
+            "summary": "把產生或整理好的檔案交付到目前會話"
+          },
+          "subagent": {
+            "label": "子 agent",
+            "summary": "把獨立任務派給自己或其他 Agent 後台執行"
+          },
+          "channel": {
+            "label": "頻道",
+            "summary": "在團隊頻道中發言或傳遞資訊"
+          },
+          "record_experience": {
+            "label": "記錄經驗",
+            "summary": "把本次工作學到的經驗寫入經驗庫"
+          },
+          "recall_experience": {
+            "label": "檢索經驗",
+            "summary": "在開始工作前查找相關經驗"
+          },
+          "check_pending_tasks": {
+            "label": "檢查後台任務",
+            "summary": "查看尚未完成的後台子任務"
+          },
+          "current_status": {
+            "label": "目前狀態",
+            "summary": "讀取目前時間、模型、介面上下文和會話檔案"
+          },
+          "wait": {
+            "label": "等待",
+            "summary": "在目前回合中等待後台結果"
+          },
+          "stop_task": {
+            "label": "終止任務",
+            "summary": "停止正在執行的後台任務"
+          },
+          "terminal": {
+            "label": "終端",
+            "summary": "使用可持續讀取輸出的本地終端會話"
+          },
+          "task_create": {
+            "label": "建立看板任務",
+            "summary": "從對話中建立專案看板任務，並預設啟動真實執行"
+          },
+          "task_orchestrate": {
+            "label": "任務編排",
+            "summary": "建立多 agent 並發執行的結構化任務圖"
+          },
+          "task_complete": {
+            "label": "完成看板任務",
+            "summary": "worker 寫入結構化完成結果"
+          },
+          "task_block": {
+            "label": "阻塞看板任務",
+            "summary": "worker 寫入需要人工處理的阻塞原因"
+          },
+          "task_heartbeat": {
+            "label": "任務心跳",
+            "summary": "worker 寫入執行進度並延長 claim"
+          },
+          "task_comment": {
+            "label": "任務評論",
+            "summary": "worker 向任務詳情追加中間結論或交接說明"
+          },
           "browser": {
             "label": "瀏覽器",
             "summary": "控制無頭瀏覽器瀏覽網頁"
@@ -1044,6 +1142,10 @@
       "hint": "你主動告訴助手一定要記住的東西，也可以手動編輯與新增",
       "empty": "還沒有置頂記憶",
       "delete": "刪除",
+      "selectItem": "選擇置頂記憶：{text}",
+      "selectAll": "全選",
+      "clearSelection": "取消選擇",
+      "deleteSelected": "刪除所選（{count}）",
       "addPlaceholder": "新增一條置頂記憶..."
     },
     "experience": {

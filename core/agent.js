@@ -31,6 +31,8 @@ import { createNotifyTool } from "../lib/tools/notify-tool.js";
 import { createUpdateSettingsTool } from "../lib/tools/update-settings-tool.js";
 import { createSubagentTool } from "../lib/tools/subagent-tool.js";
 import { writeSubagentSessionMeta } from "../lib/subagent-executor-metadata.js";
+import { createTaskCreateTool } from "../lib/tools/task-create-tool.js";
+import { createTaskOrchestrateTool } from "../lib/tools/task-orchestrate-tool.js";
 import { createCheckDeferredTool } from "../lib/tools/check-deferred-tool.js";
 import { createWaitTool } from "../lib/tools/wait-tool.js";
 import { createStopTaskTool } from "../lib/tools/stop-task-tool.js";
@@ -111,6 +113,8 @@ export class Agent {
     this._stopTaskTool = null;
     this._currentStatusTool = null;
     this._terminalTool = null;
+    this._taskCreateTool = null;
+    this._taskOrchestrateTool = null;
 
     /**
      * 外部回调注入（由 AgentManager._createAgentInstance 填充）。
@@ -299,6 +303,7 @@ export class Agent {
     this._cronStore = new CronStore(
       path.join(this.deskDir, "cron-jobs.json"),
       path.join(this.deskDir, "cron-runs"),
+      { taskLedger: this._cb?.getTaskLedger?.(), agentId: this.id },
     );
     this._cronTool = createCronTool(this._cronStore, {
       getAutoApprove: () => this._config?.desk?.cron_auto_approve !== false,
@@ -451,6 +456,7 @@ export class Agent {
       resolveUtilityModel: () => this._cb?.getCurrentModelId?.() || null,
       getDeferredStore: () => this._cb?.getDeferredResults?.(),
       getTaskRegistry: () => this._cb?.getTaskRegistry?.(),
+      getTaskLedger: () => this._cb?.getTaskLedger?.(),
       setSubagentController: (id, ctrl) => this._cb?.setSubagentController?.(id, ctrl),
       removeSubagentController: (id) => this._cb?.removeSubagentController?.(id),
       getSessionPath: () => this._cb?.getCurrentSessionPath?.(),
@@ -462,6 +468,21 @@ export class Agent {
       agentDir: this.agentDir,
       emitEvent: (event, sp) => this._cb?.emitEvent?.(event, sp),
       persistSubagentSessionMeta: (sessionPath, meta) => writeSubagentSessionMeta(sessionPath, meta),
+    });
+
+    this._taskOrchestrateTool = createTaskOrchestrateTool({
+      getTaskOrchestrator: () => this._cb?.getTaskOrchestrator?.(),
+      getCurrentSessionPath: () => this._cb?.getCurrentSessionPath?.() || null,
+      getParentCwd: () => this._cb?.getCwd?.() || null,
+      currentAgentId: this.id,
+    });
+    this._taskCreateTool = createTaskCreateTool({
+      getTaskLedger: () => this._cb?.getTaskLedger?.(),
+      getTaskOrchestrator: () => this._cb?.getTaskOrchestrator?.(),
+      getCurrentSessionPath: () => this._cb?.getCurrentSessionPath?.() || null,
+      getParentCwd: () => this._cb?.getCwd?.() || null,
+      listAgents: () => this._cb?.listAgents?.() || [],
+      currentAgentId: this.id,
     });
 
     // 12. 组装 system prompt（按 master 构建，与 per-session 开关解耦）
@@ -609,6 +630,8 @@ export class Agent {
       this._stopTaskTool,
       this._updateSettingsTool,
       this._subagentTool,
+      this._taskCreateTool,
+      this._taskOrchestrateTool,
       this._checkDeferredTool,
       this._currentStatusTool,
       this._terminalTool,
@@ -1131,6 +1154,19 @@ export class Agent {
             `Judge whether you're the best fit for the job before deciding to delegate. Pass \`agent="?"\` if unsure who to ask.`
         );
       }
+    }
+
+    if ((this._taskCreateTool || this._taskOrchestrateTool) && !forSubagent) {
+      parts.push(isZh
+        ? "\n## 项目看板任务\n\n" +
+          "当用户要求在看板中创建、记录或开始一个具体任务时，使用 task_create 创建看板任务。task_create 默认会启动真实 agent 执行，不要只用文本承诺或 todo_write 代替。\n" +
+          "当用户明确确认要开始一个需要多个 agent 并发完成的任务时，使用 task_orchestrate 创建结构化任务图。任务图里的每个 node 是一个独立工作包，agentId 必须使用团队列表中的真实 id；没有依赖的节点会并发执行，有依赖的节点等待前置节点完成。\n" +
+          "不要用私信或频道消息模拟可靠派工；私信适合讨论，task_create/task_orchestrate 才是执行型任务入口。"
+        : "\n## Project Kanban Tasks\n\n" +
+          "When the user asks to create, record, or start a concrete task on the kanban board, use task_create. task_create starts real agent execution by default; do not substitute a textual promise or todo_write.\n" +
+          "When the user explicitly confirms starting work that should run across multiple agents in parallel, use task_orchestrate to create a structured task graph. Each node is an independent work package, agentId must be a real id from the team list, nodes without dependencies run in parallel, and dependent nodes wait.\n" +
+          "Do not use DM or channel messages to simulate reliable dispatch; DM is for discussion, task_create/task_orchestrate are execution task entry points."
+      );
     }
 
     // ── cache 分界线 ──

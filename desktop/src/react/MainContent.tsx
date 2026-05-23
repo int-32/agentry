@@ -12,10 +12,12 @@ import { useStore } from './stores';
 import { hanaFetch } from './hooks/use-hana-fetch';
 import { toSlash, baseName } from './utils/format';
 import {
+  APP_FILE_DRAG_MIME,
   clearAppFileDragPayload,
   readAppFileDragPayload,
   type AppFileDragPayload,
 } from './utils/app-file-drag';
+import { hasTaskDrag } from './utils/task-drag';
 import { BrowserCard } from './components/BrowserCard';
 import { ComputerUseOverlay } from './components/ComputerUseOverlay';
 
@@ -24,6 +26,12 @@ declare function t(key: string, vars?: Record<string, string | number>): string;
 /* eslint-disable @typescript-eslint/no-explicit-any -- deskFiles item typing */
 
 // ── 拖拽附件 drop handler（从 bridge.ts appInput shim 迁移） ──
+
+export function isMainContentAttachmentDrag(dataTransfer?: DataTransfer | null): boolean {
+  if (!dataTransfer || hasTaskDrag(dataTransfer)) return false;
+  const types = Array.from(dataTransfer.types || []);
+  return types.includes(APP_FILE_DRAG_MIME) || types.includes('Files');
+}
 
 async function installSkillFile(filePath: string, sessionPath?: string | null): Promise<void> {
   try {
@@ -161,6 +169,8 @@ export async function attachAppFileDragPayloadToInput(payload: AppFileDragPayloa
 }
 
 async function handleDrop(e: React.DragEvent): Promise<void> {
+  if (hasTaskDrag(e.dataTransfer)) return;
+
   const appPayload = readAppFileDragPayload(e.dataTransfer);
   if (appPayload) {
     clearAppFileDragPayload(appPayload.dragId);
@@ -200,17 +210,23 @@ export function MainContent({ children }: { children: React.ReactNode }) {
   const welcomeMode = welcomeVisible && currentTab === 'chat';
 
   const onDragEnter = useCallback((e: React.DragEvent) => {
+    if (!isMainContentAttachmentDrag(e.dataTransfer)) return;
     e.preventDefault();
     dragCounter.current++;
     if (dragCounter.current === 1) setDragActive(true);
   }, []);
   const onDragLeave = useCallback((e: React.DragEvent) => {
+    if (!isMainContentAttachmentDrag(e.dataTransfer)) return;
     e.preventDefault();
-    dragCounter.current--;
+    dragCounter.current = Math.max(0, dragCounter.current - 1);
     if (dragCounter.current === 0) setDragActive(false);
   }, []);
-  const onDragOver = useCallback((e: React.DragEvent) => e.preventDefault(), []);
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (!isMainContentAttachmentDrag(e.dataTransfer)) return;
+    e.preventDefault();
+  }, []);
   const onDrop = useCallback((e: React.DragEvent) => {
+    if (!isMainContentAttachmentDrag(e.dataTransfer)) return;
     e.preventDefault();
     dragCounter.current = 0;
     setDragActive(false);

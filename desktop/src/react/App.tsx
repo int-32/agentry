@@ -19,6 +19,7 @@ import { ChannelTabBar } from './components/channels/ChannelTabBar';
 import { WidgetButtons } from './components/plugin/WidgetButtons';
 import { ChannelListSidebar } from './components/channels/ChannelList';
 import { ChannelCreateOverlay } from './components/channels/ChannelCreateOverlay';
+import { TaskSidebar } from './components/tasks/TaskPage';
 import { SidebarLayout, toggleSidebar } from './components/SidebarLayout';
 import { FloatPreviewCard, useFloatCard } from './components/FloatPreviewCard';
 import { useSidebarResize } from './hooks/use-sidebar-resize';
@@ -210,6 +211,11 @@ function App() {
             {/* 频道 tab 内容 */}
             <div className={`sidebar-channel-content${currentTab === 'channels' ? '' : ' hidden'}`}>
               <ChannelListSidebar />
+            </div>
+
+            {/* 看板 tab 内容 */}
+            <div className={`sidebar-board-content${currentTab === 'boards' ? '' : ' hidden'}`}>
+              <TaskSidebar />
             </div>
           </div>
           <div className="resize-handle resize-handle-right" id="sidebarResizeHandle"></div>

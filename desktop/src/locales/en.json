@@ -81,7 +81,13 @@
     "bridge": "Social Platforms",
     "toggle": "Sidebar",
     "bridgeShort": "Bridge",
-    "pinned": "Pinned"
+    "pinned": "Pinned",
+    "groupBy": "Chat grouping",
+    "groupTime": "Time",
+    "groupWorkspace": "Workspace",
+    "groupByTime": "Group by time",
+    "groupByWorkspace": "Group by workspace",
+    "noWorkspace": "No workspace"
   },
   "session": {
     "untitled": "New Chat",
@@ -112,6 +118,14 @@
       "cleanupConfirm": "Permanently delete {count} archives ({size} total)? This cannot be undone.",
       "cleanupDone": "Cleaned up {count} archives",
       "cleanupNoMatch": "No archives match the criteria",
+      "selectAll": "Select all",
+      "selectItem": "Select {title}",
+      "selectedStats": "{count} selected · {size}",
+      "deleteSelected": "Delete selected ({count})",
+      "deleteSelectedConfirm": "Permanently delete {count} selected archives ({size} total)? This cannot be undone.",
+      "deleteSelectedDone": "Deleted {count} archives",
+      "deleteSelectedPartial": "Deleted {deleted}; {failed} failed",
+      "deleteSelectedFailed": "Failed to delete {count} archives",
       "restore": "Restore",
       "restoreConfirm": "Restore this conversation to its original location?",
       "restoreConflict": "Original location is occupied; cannot restore",
@@ -751,7 +765,90 @@
       "tools": {
         "title": "Tools",
         "description": "Tool switches take effect after restarting or starting a conversation. Active conversations keep using the tool set they started with.",
+        "pluginDescription": "System plugin tools are loaded automatically by plugins. This list only shows tools that are actually injected; they are not toggled here.",
+        "pluginBadge": "System Plugin",
+        "pluginSource": "Source",
         "items": {
+          "web_fetch": {
+            "label": "Web Fetch",
+            "summary": "Read webpage content from a specific URL"
+          },
+          "todo_write": {
+            "label": "Task List",
+            "summary": "Let the agent break down and track current work steps"
+          },
+          "create_artifact": {
+            "label": "Legacy Artifact",
+            "summary": "Create legacy visual or file artifacts"
+          },
+          "notify": {
+            "label": "Notify",
+            "summary": "Send desktop or Bridge notifications to you"
+          },
+          "stage_files": {
+            "label": "Deliver Files",
+            "summary": "Attach generated or prepared files to the current session"
+          },
+          "subagent": {
+            "label": "Sub-agent",
+            "summary": "Dispatch independent work to self or another agent in the background"
+          },
+          "channel": {
+            "label": "Channel",
+            "summary": "Post or pass information in team channels"
+          },
+          "record_experience": {
+            "label": "Record Experience",
+            "summary": "Write lessons from this work into the experience library"
+          },
+          "recall_experience": {
+            "label": "Recall Experience",
+            "summary": "Look up relevant experience before starting work"
+          },
+          "check_pending_tasks": {
+            "label": "Check Background Tasks",
+            "summary": "Check unfinished background sub-agent tasks"
+          },
+          "current_status": {
+            "label": "Current Status",
+            "summary": "Read current time, model, UI context, and session files"
+          },
+          "wait": {
+            "label": "Wait",
+            "summary": "Wait inside the current turn for background results"
+          },
+          "stop_task": {
+            "label": "Stop Task",
+            "summary": "Stop a running background task"
+          },
+          "terminal": {
+            "label": "Terminal",
+            "summary": "Use a persistent local terminal session with readable output"
+          },
+          "task_create": {
+            "label": "Create Kanban Task",
+            "summary": "Create a project kanban task from chat and start real execution by default"
+          },
+          "task_orchestrate": {
+            "label": "Task Orchestration",
+            "summary": "Create a structured multi-agent task graph"
+          },
+          "task_complete": {
+            "label": "Complete Kanban Task",
+            "summary": "Let a worker write a structured completion result"
+          },
+          "task_block": {
+            "label": "Block Kanban Task",
+            "summary": "Let a worker write an actionable blocker"
+          },
+          "task_heartbeat": {
+            "label": "Task Heartbeat",
+            "summary": "Let a worker record progress and extend its claim"
+          },
+          "task_comment": {
+            "label": "Task Comment",
+            "summary": "Let a worker append intermediate findings or handoff notes"
+          },
           "browser": {
             "label": "Browser",
             "summary": "Control a headless browser to navigate web pages"
@@ -1070,6 +1167,10 @@
       "hint": "Always injected into conversations, never decay",
       "empty": "No pinned memories yet",
       "delete": "Delete",
+      "selectItem": "Select pinned memory: {text}",
+      "selectAll": "Select all",
+      "clearSelection": "Clear selection",
+      "deleteSelected": "Delete selected ({count})",
       "addPlaceholder": "Add a pinned memory..."
     },
     "experience": {

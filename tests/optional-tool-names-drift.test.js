@@ -1,8 +1,8 @@
 /**
  * Guards against drift between:
- *   - shared/tool-categories.js OPTIONAL_TOOL_NAMES (backend source of truth)
+ *   - shared/tool-categories.js CONFIGURABLE_TOOL_NAMES (backend source of truth)
  *   - desktop/src/react/settings/tabs/agent/AgentToolsSection.tsx
- *     OPTIONAL_TOOL_NAMES (frontend copy)
+ *     CONFIGURABLE_TOOL_NAMES (frontend copy)
  *
  * Frontend intentionally does not import from shared/ to keep the desktop
  * bundle independent of node-only code. This test is the safety net for that
@@ -12,11 +12,11 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { OPTIONAL_TOOL_NAMES, DEFAULT_DISABLED_TOOL_NAMES } from "../shared/tool-categories.js";
+import { CONFIGURABLE_TOOL_NAMES, DEFAULT_DISABLED_TOOL_NAMES } from "../shared/tool-categories.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-describe("OPTIONAL_TOOL_NAMES frontend/backend drift", () => {
+describe("CONFIGURABLE_TOOL_NAMES frontend/backend drift", () => {
   it("frontend copy in AgentToolsSection.tsx matches shared/tool-categories.js", () => {
     const tsxPath = resolve(
       __dirname,
@@ -25,25 +25,25 @@ describe("OPTIONAL_TOOL_NAMES frontend/backend drift", () => {
     const src = readFileSync(tsxPath, "utf8");
 
     const match = src.match(
-      /const\s+OPTIONAL_TOOL_NAMES\s*=\s*\[([\s\S]*?)\]\s*as\s+const/
+      /const\s+CONFIGURABLE_TOOL_NAMES\s*=\s*\[([\s\S]*?)\]\s*as\s+const/
     );
     expect(
       match,
-      "Could not find `const OPTIONAL_TOOL_NAMES = [...] as const` in AgentToolsSection.tsx"
+      "Could not find `const CONFIGURABLE_TOOL_NAMES = [...] as const` in AgentToolsSection.tsx"
     ).toBeTruthy();
 
     const arrayBody = match[1];
     const names = [...arrayBody.matchAll(/["']([^"']+)["']/g)].map((m) => m[1]);
 
-    expect(new Set(names)).toEqual(new Set(OPTIONAL_TOOL_NAMES));
+    expect(new Set(names)).toEqual(new Set(CONFIGURABLE_TOOL_NAMES));
   });
 
-  it("DEFAULT_DISABLED_TOOL_NAMES is a subset of OPTIONAL_TOOL_NAMES", () => {
-    // If a name is in DEFAULT_DISABLED but not in OPTIONAL, the backend PUT
+  it("DEFAULT_DISABLED_TOOL_NAMES is a subset of CONFIGURABLE_TOOL_NAMES", () => {
+    // If a name is in DEFAULT_DISABLED but not configurable, the backend PUT
     // whitelist would reject a user trying to re-enable it — a latent bug.
-    const optional = new Set(OPTIONAL_TOOL_NAMES);
+    const configurable = new Set(CONFIGURABLE_TOOL_NAMES);
     for (const name of DEFAULT_DISABLED_TOOL_NAMES) {
-      expect(optional.has(name)).toBe(true);
+      expect(configurable.has(name)).toBe(true);
     }
   });
 

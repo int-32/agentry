@@ -42,31 +42,36 @@ describe("AgentToolsSection", () => {
     vi.clearAllMocks();
   });
 
-  it("renders 5 toggles when availableTools includes all optional tools", () => {
+  it("renders only registered per-agent configurable tools", () => {
     const { container } = render(
       <AgentToolsSection
-        availableTools={["browser", "computer", "cron", "dm", "install_skill", "update_settings", "read"]}
+        availableTools={["browser", "computer", "cron", "dm", "install_skill", "update_settings", "todo_write", "task_create", "read"]}
         disabled={[]}
       />
     );
-    expect(container.querySelectorAll("[data-tool-name]")).toHaveLength(5);
+    expect(container.querySelectorAll("[data-tool-name]")).toHaveLength(7);
     expect(getRow(container, "browser")).toBeTruthy();
     expect(getRow(container, "computer")).toBeNull();
     expect(getRow(container, "cron")).toBeTruthy();
     expect(getRow(container, "dm")).toBeTruthy();
     expect(getRow(container, "install_skill")).toBeTruthy();
     expect(getRow(container, "update_settings")).toBeTruthy();
+    expect(getRow(container, "todo_write")).toBeTruthy();
+    expect(getRow(container, "task_create")).toBeTruthy();
+    expect(getRow(container, "read")).toBeNull();
   });
 
-  it("renders built-in optional toggles while availableTools is not returned yet", () => {
+  it("renders built-in configurable toggles while availableTools is not returned yet", () => {
     const { container } = render(
       <AgentToolsSection
         availableTools={undefined as unknown as string[]}
         disabled={["update_settings", "dm"]}
       />
     );
-    expect(container.querySelectorAll("[data-tool-name]")).toHaveLength(5);
+    expect(container.querySelectorAll("[data-tool-name]")).toHaveLength(25);
     expect(getRow(container, "browser")).toBeTruthy();
+    expect(getRow(container, "task_create")).toBeTruthy();
+    expect(getRow(container, "todo_write")).toBeTruthy();
     expect(getRow(container, "computer")).toBeNull();
   });
 
@@ -128,6 +133,51 @@ describe("AgentToolsSection", () => {
     expect(container.textContent).toContain("settings.agent.tools.items.browser.summary");
   });
 
+  it("renders plugin tools as readonly rows", () => {
+    const { container } = render(
+      <AgentToolsSection
+        availableTools={["browser"]}
+        disabled={[]}
+        pluginTools={[
+          {
+            name: "image-gen_generate-image",
+            description: "Generate images",
+            pluginId: "image-gen",
+            pluginName: "Image Generation",
+            hidden: true,
+          },
+        ]}
+      />
+    );
+
+    expect(container.querySelector('[data-plugin-tool-name="image-gen_generate-image"]')).toBeTruthy();
+    expect(container.querySelector('[data-tool-name="image-gen_generate-image"]')).toBeNull();
+    expect(container.textContent).toContain("image-gen_generate-image");
+    expect(container.textContent).toContain("Generate images");
+    expect(container.textContent).toContain("Image Generation");
+    expect(container.textContent).toContain("settings.agent.tools.pluginBadge");
+  });
+
+  it("renders the tools section when only plugin tools are present", () => {
+    const { container } = render(
+      <AgentToolsSection
+        availableTools={["read", "bash"]}
+        disabled={[]}
+        pluginTools={[
+          {
+            name: "image-gen_generate-video",
+            pluginId: "image-gen",
+            pluginName: "Image Generation",
+          },
+        ]}
+      />
+    );
+
+    expect(container.querySelectorAll("[data-tool-name]")).toHaveLength(0);
+    expect(container.querySelector('[data-plugin-tool-name="image-gen_generate-video"]')).toBeTruthy();
+    expect(container.textContent).toContain("settings.agent.tools.pluginDescription");
+  });
+
   it("two rapid clicks on different toggles both reach autoSaveConfig (P2 race regression)", () => {
     // Scenario: user disables browser, then disables cron before the first
     // PUT+GET round-trip refreshes the `disabled` prop. Without the useRef
@@ -147,11 +197,11 @@ describe("AgentToolsSection", () => {
     });
   });
 
-  it("returns null when no optional tools are available", () => {
+  it("returns null when no configurable tools are available", () => {
     const { container } = render(
       <AgentToolsSection availableTools={["read", "bash"]} disabled={[]} />
     );
-    // No optional tools registered → component renders nothing
+    // No configurable tools registered → component renders nothing
     expect(container.querySelector(`.${"settings-section"}`)).toBeNull();
     expect(container.querySelectorAll("[data-tool-name]")).toHaveLength(0);
   });

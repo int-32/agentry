@@ -80,7 +80,13 @@
     "bridge": "ソーシャル連携",
     "toggle": "サイドバー",
     "bridgeShort": "連携",
-    "pinned": "ピン留め"
+    "pinned": "ピン留め",
+    "groupBy": "チャットのグループ化",
+    "groupTime": "時間",
+    "groupWorkspace": "ワークスペース",
+    "groupByTime": "時間でグループ化",
+    "groupByWorkspace": "ワークスペースでグループ化",
+    "noWorkspace": "ワークスペース未設定"
   },
   "session": {
     "untitled": "新しいチャット",
@@ -111,6 +117,14 @@
       "cleanupConfirm": "{count} 件のアーカイブ（合計 {size}）を完全に削除します。取り消せません。続けますか？",
       "cleanupDone": "{count} 件を削除しました",
       "cleanupNoMatch": "該当するアーカイブがありません",
+      "selectAll": "すべて選択",
+      "selectItem": "{title} を選択",
+      "selectedStats": "{count} 件選択 · {size}",
+      "deleteSelected": "選択項目を削除 ({count})",
+      "deleteSelectedConfirm": "選択した {count} 件のアーカイブ（合計 {size}）を完全に削除します。取り消せません。続けますか？",
+      "deleteSelectedDone": "{count} 件のアーカイブを削除しました",
+      "deleteSelectedPartial": "{deleted} 件を削除、{failed} 件が失敗しました",
+      "deleteSelectedFailed": "{count} 件のアーカイブ削除に失敗しました",
       "restore": "復元",
       "restoreConfirm": "この会話を元の場所に復元しますか？",
       "restoreConflict": "元の場所が使用中のため、復元できません",
@@ -746,7 +760,90 @@
       "tools": {
         "title": "ツール",
         "description": "ツールの切り替えは、会話を再開するか新しく始めた後に反映されます。進行中の会話は開始時のツールセットを使い続けます。",
+        "pluginDescription": "システムプラグインツールはプラグインにより自動で読み込まれます。ここでは実際に注入されたツールのみを表示し、個別の切り替えは行いません。",
+        "pluginBadge": "システムプラグイン",
+        "pluginSource": "出所",
         "items": {
+          "web_fetch": {
+            "label": "Web Fetch",
+            "summary": "指定 URL のウェブページ内容を読み取ります"
+          },
+          "todo_write": {
+            "label": "タスクリスト",
+            "summary": "現在の作業手順を分解して追跡します"
+          },
+          "create_artifact": {
+            "label": "レガシー成果物",
+            "summary": "従来形式の視覚化またはファイル成果物を作成します"
+          },
+          "notify": {
+            "label": "通知",
+            "summary": "デスクトップまたは Bridge 通知を送信します"
+          },
+          "stage_files": {
+            "label": "ファイル納品",
+            "summary": "生成・準備したファイルを現在の会話に添付します"
+          },
+          "subagent": {
+            "label": "サブエージェント",
+            "summary": "独立した作業を自分または別の Agent にバックグラウンドで任せます"
+          },
+          "channel": {
+            "label": "チャンネル",
+            "summary": "チームチャンネルで発言または情報共有します"
+          },
+          "record_experience": {
+            "label": "経験を記録",
+            "summary": "この作業で得た教訓を経験ライブラリに保存します"
+          },
+          "recall_experience": {
+            "label": "経験を検索",
+            "summary": "作業開始前に関連する経験を検索します"
+          },
+          "check_pending_tasks": {
+            "label": "バックグラウンドタスク確認",
+            "summary": "未完了のサブエージェントタスクを確認します"
+          },
+          "current_status": {
+            "label": "現在の状態",
+            "summary": "現在時刻、モデル、UI コンテキスト、会話ファイルを読み取ります"
+          },
+          "wait": {
+            "label": "待機",
+            "summary": "現在のターン内でバックグラウンド結果を待ちます"
+          },
+          "stop_task": {
+            "label": "タスク停止",
+            "summary": "実行中のバックグラウンドタスクを停止します"
+          },
+          "terminal": {
+            "label": "ターミナル",
+            "summary": "出力を継続的に読めるローカルターミナルを使います"
+          },
+          "task_create": {
+            "label": "看板タスク作成",
+            "summary": "会話からプロジェクト看板タスクを作成し、既定で実行を開始します"
+          },
+          "task_orchestrate": {
+            "label": "タスク編成",
+            "summary": "複数 Agent の構造化タスクグラフを作成します"
+          },
+          "task_complete": {
+            "label": "看板タスク完了",
+            "summary": "worker が構造化された完了結果を書き込みます"
+          },
+          "task_block": {
+            "label": "看板タスクをブロック",
+            "summary": "worker が対応可能なブロック理由を書き込みます"
+          },
+          "task_heartbeat": {
+            "label": "タスクハートビート",
+            "summary": "worker が進捗を記録し claim を延長します"
+          },
+          "task_comment": {
+            "label": "タスクコメント",
+            "summary": "worker が中間結果や引き継ぎメモを追加します"
+          },
           "browser": {
             "label": "ブラウザ",
             "summary": "ヘッドレスブラウザを操作してウェブを閲覧"
@@ -1044,6 +1141,10 @@
       "hint": "常に会話に挿入され、減衰しません",
       "empty": "固定された記憶はまだありません",
       "delete": "削除",
+      "selectItem": "固定された記憶を選択: {text}",
+      "selectAll": "すべて選択",
+      "clearSelection": "選択を解除",
+      "deleteSelected": "選択項目を削除 ({count})",
       "addPlaceholder": "固定する記憶を追加..."
     },
     "experience": {

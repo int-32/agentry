@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   CORE_TOOL_NAMES,
+  CONFIGURABLE_TOOL_NAMES,
   GLOBAL_TOOL_NAMES,
   STANDARD_TOOL_NAMES,
   OPTIONAL_TOOL_NAMES,
@@ -28,10 +29,19 @@ describe("tool-categories constants", () => {
     }
   });
 
-  it("OPTIONAL_TOOL_NAMES is exactly the user-toggleable whitelist", () => {
+  it("OPTIONAL_TOOL_NAMES is exactly the optional/default-off-capable whitelist", () => {
     expect(new Set(OPTIONAL_TOOL_NAMES)).toEqual(
       new Set(["browser", "cron", "dm", "install_skill", "update_settings"])
     );
+  });
+
+  it("CONFIGURABLE_TOOL_NAMES includes standard and optional agent tools", () => {
+    expect(new Set(CONFIGURABLE_TOOL_NAMES)).toEqual(
+      new Set([...STANDARD_TOOL_NAMES, ...OPTIONAL_TOOL_NAMES])
+    );
+    expect(CONFIGURABLE_TOOL_NAMES).toContain("task_create");
+    expect(CONFIGURABLE_TOOL_NAMES).toContain("todo_write");
+    expect(CONFIGURABLE_TOOL_NAMES).toContain("browser");
   });
 
   it("GLOBAL_TOOL_NAMES is exactly the global setting governed whitelist", () => {
@@ -70,7 +80,7 @@ describe("computeToolSnapshot", () => {
     expect(computeToolSnapshot(allNames, [])).toEqual(allNames);
   });
 
-  it("removes optional tools that are in disabled list", () => {
+  it("removes configurable tools that are in disabled list", () => {
     expect(computeToolSnapshot(allNames, ["browser"])).toEqual(
       ["read", "bash", "cron", "todo_write", "web_fetch"]
     );
@@ -82,9 +92,10 @@ describe("computeToolSnapshot", () => {
     expect(result).not.toContain("browser");
   });
 
-  it("keeps standard tools even when disabled list contains them (tampering protection)", () => {
+  it("removes standard agent tools when disabled per agent", () => {
     const result = computeToolSnapshot(allNames, ["todo_write"]);
-    expect(result).toContain("todo_write");
+    expect(result).not.toContain("todo_write");
+    expect(result).toContain("web_fetch");
   });
 
   it("is order-preserving (follows allNames order)", () => {

@@ -35,7 +35,7 @@ import {
 } from "../../lib/tools/experience.js";
 import { splitByScope, injectGlobalFields } from '../../shared/config-scope.js';
 import { validateId, agentExists } from "../utils/validation.js";
-import { OPTIONAL_TOOL_NAMES } from "../../shared/tool-categories.js";
+import { CONFIGURABLE_TOOL_NAMES } from "../../shared/tool-categories.js";
 import {
   buildInlineProviderCredentialUpdate,
   clearInlineProviderCredentialFields,
@@ -80,6 +80,31 @@ function normalizeExperienceConfigForResponse(config) {
     ...current,
     enabled: current.enabled === true,
   };
+}
+
+function getPluginToolSummaries(engine) {
+  const pm = engine.pluginManager;
+  if (!pm || typeof pm.getAllTools !== "function") return [];
+
+  const pluginsById = new Map();
+  if (typeof pm.listPlugins === "function") {
+    for (const plugin of pm.listPlugins()) {
+      if (plugin?.id) pluginsById.set(plugin.id, plugin);
+    }
+  }
+
+  return pm.getAllTools()
+    .filter((tool) => tool?._pluginId && tool?.name)
+    .map((tool) => {
+      const plugin = pluginsById.get(tool._pluginId);
+      return {
+        name: tool.name,
+        description: tool.description || "",
+        pluginId: tool._pluginId,
+        pluginName: plugin?.name || tool._pluginId,
+        hidden: !!plugin?.hidden,
+      };
+    });
 }
 
 function emitAgentConfigAppEvents(engine, agentId, { globalFields, agentPartial, providersChanged }) {
@@ -407,6 +432,7 @@ export function createAgentsRoute(engine) {
           .map((t) => t.name)
           .filter(Boolean);
       }
+      config.pluginTools = getPluginToolSummaries(engine);
 
       return c.json(config);
     } catch (err) {
@@ -425,19 +451,19 @@ export function createAgentsRoute(engine) {
         return c.json({ error: "invalid JSON body" }, 400);
       }
 
-      // Whitelist check: tools.disabled may only contain OPTIONAL_TOOL_NAMES.
-      // Blocks attempts to disable core/standard tools via hand-crafted requests.
+      // Whitelist check: tools.disabled may only contain per-agent configurable
+      // tools. Core/global tools still cannot be disabled by hand-crafted requests.
       if (partial.tools?.disabled !== undefined) {
         if (!Array.isArray(partial.tools.disabled)) {
           return c.json({ error: "tools.disabled must be an array" }, 400);
         }
         const invalid = partial.tools.disabled.filter(
-          (n) => !OPTIONAL_TOOL_NAMES.includes(n)
+          (n) => !CONFIGURABLE_TOOL_NAMES.includes(n)
         );
         if (invalid.length > 0) {
           return c.json(
             {
-              error: `Invalid tool names in tools.disabled: ${invalid.join(", ")}. Only optional tools can be disabled.`,
+              error: `Invalid tool names in tools.disabled: ${invalid.join(", ")}. Only per-agent configurable tools can be disabled.`,
             },
             400
           );

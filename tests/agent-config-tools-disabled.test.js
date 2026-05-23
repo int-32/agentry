@@ -3,7 +3,7 @@
  * tool management (Tasks 7 + 8):
  *   - PUT accepts valid tools.disabled
  *   - PUT accepts empty tools.disabled []
- *   - PUT rejects non-optional tool names (400)
+ *   - PUT rejects non-configurable tool names (400)
  *   - PUT rejects non-array tools.disabled (400)
  *   - GET response includes availableTools field
  */
@@ -43,6 +43,9 @@ describe("agents route: tools.disabled", () => {
       tools: [
         { name: "read" },
         { name: "bash" },
+        { name: "todo_write" },
+        { name: "task_create" },
+        { name: "task_orchestrate" },
         { name: "browser" },
         { name: "computer" },
         { name: "cron" },
@@ -74,6 +77,18 @@ describe("agents route: tools.disabled", () => {
       getThinkingLevel: vi.fn(() => "auto"),
       getLearnSkills: vi.fn(() => true),
       getHeartbeatMaster: vi.fn(() => true),
+      pluginManager: {
+        listPlugins: vi.fn(() => [
+          { id: "image-gen", name: "Image Generation", hidden: true },
+        ]),
+        getAllTools: vi.fn(() => [
+          {
+            name: "image-gen_generate-image",
+            description: "Generate images",
+            _pluginId: "image-gen",
+          },
+        ]),
+      },
     };
 
     app = new Hono();
@@ -84,11 +99,11 @@ describe("agents route: tools.disabled", () => {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   });
 
-  it("PUT with valid tools.disabled (subset of OPTIONAL) returns 200", async () => {
+  it("PUT with valid tools.disabled (subset of per-agent configurable tools) returns 200", async () => {
     const res = await app.request(`/api/agents/${agentId}/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tools: { disabled: ["browser", "cron"] } }),
+      body: JSON.stringify({ tools: { disabled: ["browser", "cron", "todo_write", "task_create"] } }),
     });
     expect(res.status).toBe(200);
   });
@@ -113,7 +128,7 @@ describe("agents route: tools.disabled", () => {
     expect(res.status).toBe(200);
   });
 
-  it("PUT with non-optional tool name (read) returns 400", async () => {
+  it("PUT with non-configurable tool name (read) returns 400", async () => {
     const res = await app.request(`/api/agents/${agentId}/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -122,7 +137,7 @@ describe("agents route: tools.disabled", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toContain("read");
-    expect(body.error).toContain("Only optional tools");
+    expect(body.error).toContain("Only per-agent configurable tools");
   });
 
   it("PUT with mix of valid and invalid names returns 400 listing only invalid", async () => {
@@ -136,7 +151,8 @@ describe("agents route: tools.disabled", () => {
     expect(body.error).toContain("bash");
     expect(body.error).toContain("edit");
     // browser is valid — must not appear in the invalid names list
-    // The error message format is: "Invalid tool names in tools.disabled: bash, edit. Only optional tools..."
+    // The error message format is:
+    // "Invalid tool names in tools.disabled: bash, edit. Only per-agent configurable tools..."
     // "browser" does not appear anywhere in the invalid list portion
     expect(body.error).not.toMatch(/bash.*browser|browser.*bash/);
     const invalidPortion = body.error.split(".")[0]; // "Invalid tool names in tools.disabled: bash, edit"
@@ -164,5 +180,20 @@ describe("agents route: tools.disabled", () => {
     expect(body.availableTools).toContain("computer");
     expect(body.availableTools).toContain("cron");
     expect(engine.getAgent).toHaveBeenCalledWith(agentId);
+  });
+
+  it("GET response includes readonly plugin tool summaries", async () => {
+    const res = await app.request(`/api/agents/${agentId}/config`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.pluginTools).toEqual([
+      {
+        name: "image-gen_generate-image",
+        description: "Generate images",
+        pluginId: "image-gen",
+        pluginName: "Image Generation",
+        hidden: true,
+      },
+    ]);
   });
 });

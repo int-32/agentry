@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from '../../stores';
-import type { TabType, PluginPageInfo } from '../../types';
+import type { TabType, LegacyTabType, PluginPageInfo } from '../../types';
 import { toggleSidebar } from '../SidebarLayout';
 import { resolvePluginTitle } from '../../utils/resolve-plugin-title';
 import { reorderTabs, hidePluginTab, showPluginTab } from '../../stores/plugin-ui-actions';
@@ -21,20 +21,33 @@ const MAX_VISIBLE_DRAGGABLE = 5;
 
 // ── Tab switching logic ──
 
-export function switchTab(tab: TabType) {
-  const s = useStore.getState();
-  if (tab === s.currentTab) return;
+function normalizeTab(tab: LegacyTabType | string): TabType {
+  return tab === 'tasks' ? 'boards' : tab as TabType;
+}
 
-  if (tab === 'channels') {
+function normalizeTabOrder(order: string[]): string[] {
+  return order.map(tab => tab === 'tasks' ? 'boards' : tab);
+}
+
+export function switchTab(tab: LegacyTabType | string) {
+  const normalizedTab = normalizeTab(tab);
+  const s = useStore.getState();
+  if (normalizedTab === s.currentTab) return;
+
+  if (normalizedTab === 'channels') {
     s.setActivePanel(null);
   }
+  if (normalizedTab === 'boards') {
+    s.setJianOpen(true);
+    s.setJianAutoCollapsed(false);
+  }
 
-  s.setCurrentTab(tab);
-  localStorage.setItem('hana-tab', tab);
+  s.setCurrentTab(normalizedTab);
+  localStorage.setItem('hana-tab', normalizedTab);
 
   const isPluginTab = typeof tab === 'string' && tab.startsWith('plugin:');
   if (!isPluginTab) {
-    const savedLeft = localStorage.getItem(`hana-sidebar-${tab}`);
+    const savedLeft = localStorage.getItem(`hana-sidebar-${normalizedTab}`) ?? (normalizedTab === 'boards' ? localStorage.getItem('hana-sidebar-tasks') : null);
     const wantLeftOpen = savedLeft !== 'closed';
     if (s.sidebarOpen !== wantLeftOpen) toggleSidebar(wantLeftOpen);
   }
@@ -45,12 +58,12 @@ export function switchTab(tab: TabType) {
 
 function buildTabList(pluginPages: PluginPageInfo[], tabOrder: string[]): TabType[] {
   const pluginTabs: TabType[] = pluginPages.map(p => `plugin:${p.pluginId}` as TabType);
-  const draggable: TabType[] = ['channels' as TabType, ...pluginTabs];
+  const draggable: TabType[] = ['channels' as TabType, 'boards' as TabType, ...pluginTabs];
 
   // Order by user preference, with unordered at end
   const ordered: TabType[] = [];
-  for (const id of tabOrder) {
-    if (draggable.includes(id as TabType)) ordered.push(id as TabType);
+  for (const id of normalizeTabOrder(tabOrder)) {
+    if (draggable.includes(id as TabType) && !ordered.includes(id as TabType)) ordered.push(id as TabType);
   }
   for (const tab of draggable) {
     if (!ordered.includes(tab)) ordered.push(tab);
@@ -62,6 +75,7 @@ function buildTabList(pluginPages: PluginPageInfo[], tabOrder: string[]): TabTyp
 function getTabLabel(tab: TabType, pluginPages: PluginPageInfo[], locale: string): string {
   if (tab === 'chat') return t('channel.chatTab');
   if (tab === 'channels') return t('channel.tab');
+  if (tab === 'boards') return locale.startsWith('zh') ? '看板' : 'Boards';
   if (typeof tab === 'string' && tab.startsWith('plugin:')) {
     const pluginId = tab.slice(7);
     const page = pluginPages.find(p => p.pluginId === pluginId);
@@ -138,7 +152,7 @@ export function ChannelTabBar() {
   // Restore saved tab on mount
   useEffect(() => {
     const savedTab = localStorage.getItem('hana-tab');
-    if (savedTab && savedTab !== 'chat') switchTab(savedTab as TabType);
+    if (savedTab && savedTab !== 'chat') switchTab(savedTab);
   }, []);
 
   const handleTabClick = useCallback((tab: TabType) => {
@@ -180,7 +194,7 @@ export function ChannelTabBar() {
     e.preventDefault();
     setDragTab(null);
     setDragOverTab(null);
-    const sourceTab = e.dataTransfer.getData('text/plain') as TabType;
+    const sourceTab = normalizeTab(e.dataTransfer.getData('text/plain'));
     if (!sourceTab || sourceTab === targetTab || targetTab === 'chat') return;
 
     // Compute new order from current draggable list

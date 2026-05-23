@@ -3,6 +3,7 @@ import os from "os";
 import path from "path";
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { TaskRegistry } from "../lib/task-registry.js";
+import { TaskLedger } from "../lib/task-ledger.js";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -122,6 +123,35 @@ describe("TaskRegistry", () => {
       status: "failed",
       error: "network",
     });
+  });
+
+  it("mirrors plugin task lifecycle into TaskLedger", () => {
+    const ledger = new TaskLedger();
+    const reg = new TaskRegistry({ taskLedger: ledger });
+    reg.registerHandler("render", { abort: vi.fn() });
+
+    const registered = reg.register("p1", {
+      type: "render",
+      parentSessionPath: "/s/a",
+      pluginId: "image-gen",
+      meta: { summary: "生成图片" },
+    });
+    expect(registered.ledgerTaskId).toBeTruthy();
+    expect(ledger.getTask(registered.ledgerTaskId)).toMatchObject({
+      title: "生成图片",
+      status: "running",
+      source: { type: "plugin", registryTaskId: "p1", registryType: "render", pluginId: "image-gen" },
+    });
+
+    reg.update("p1", { status: "blocked", progress: { message: "waiting" } });
+    expect(ledger.getTask(registered.ledgerTaskId).status).toBe("blocked");
+
+    reg.complete("p1", { file: "out.png" });
+    const finalTask = ledger.getTask(registered.ledgerTaskId);
+    expect(finalTask.status).toBe("done");
+    expect(finalTask.artifacts).toEqual([
+      { type: "registry_result", registryTaskId: "p1", artifact: { file: "out.png" } },
+    ]);
   });
 
   it("cancel delegates to abort handler and marks canceled tasks", () => {
