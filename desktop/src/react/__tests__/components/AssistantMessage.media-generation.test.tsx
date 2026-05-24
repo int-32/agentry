@@ -57,4 +57,29 @@ describe('AssistantMessage media generation placeholder', () => {
     expect(container.querySelector('[class*="mediaGenerationDots"]')).toBeInTheDocument();
     expect(screen.getByText(/^Low-poly 3D illustration/)).toBeInTheDocument();
   });
+
+  it('isolates a malformed rich block without hiding sibling message blocks', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    expect(() => render(
+      <AssistantMessage
+        showAvatar={false}
+        sessionPath="/sessions/main.jsonl"
+        readOnly
+        message={{
+          id: 'a1',
+          role: 'assistant',
+          blocks: [
+            { type: 'text', html: '<p>before bad block</p>' },
+            { type: 'plugin_card' } as never,
+            { type: 'text', html: '<p>after bad block</p>' },
+          ],
+        }}
+      />,
+    )).not.toThrow();
+
+    expect(screen.getByText('before bad block')).toBeInTheDocument();
+    expect(screen.getByText('after bad block')).toBeInTheDocument();
+    expect(errorSpy).toHaveBeenCalled();
+  });
 });

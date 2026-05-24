@@ -2,7 +2,7 @@
  * AssistantMessage — 助手消息，遍历 ContentBlock 按类型渲染
  */
 
-import { memo, useCallback, useMemo, useState } from 'react';
+import { Component, memo, useCallback, useMemo, useState, type ErrorInfo, type ReactNode } from 'react';
 import { StreamingMarkdownContent } from './StreamingMarkdownContent';
 import { MoodBlock } from './MoodBlock';
 import { ThinkingBlock } from './ThinkingBlock';
@@ -46,6 +46,10 @@ interface Props {
   messageRef?: (element: HTMLDivElement | null) => void;
 }
 
+function isContentBlockCandidate(block: unknown): block is ContentBlock {
+  return !!block && typeof block === 'object' && typeof (block as { type?: unknown }).type === 'string';
+}
+
 export const AssistantMessage = memo(function AssistantMessage({
   message,
   showAvatar,
@@ -75,7 +79,9 @@ export const AssistantMessage = memo(function AssistantMessage({
   const displayYuan = displayInfo.yuan || globalYuan;
 
   const blocks = useMemo(
-    () => (message.blocks || []).filter(block => block.type !== 'session_confirmation' || block.surface !== 'input'),
+    () => (message.blocks || [])
+      .filter(isContentBlockCandidate)
+      .filter(block => block.type !== 'session_confirmation' || block.surface !== 'input'),
     [message.blocks],
   );
 
@@ -146,17 +152,23 @@ export const AssistantMessage = memo(function AssistantMessage({
       )}
       <div className={`${styles.message} ${styles.messageAssistant}`}>
         {blocks.map((block, i) => (
-          <ContentBlockView
+          <ContentBlockErrorBoundary
             key={`block-${i}`}
-            block={block}
-            agentName={displayName}
-            agentId={agentId}
-            yuan={displayYuan}
-            sessionPath={sessionPath}
             messageId={message.id}
+            blockType={block.type}
             blockIdx={i}
-            isStreaming={isStreaming}
-          />
+          >
+            <ContentBlockView
+              block={block}
+              agentName={displayName}
+              agentId={agentId}
+              yuan={displayYuan}
+              sessionPath={sessionPath}
+              messageId={message.id}
+              blockIdx={i}
+              isStreaming={isStreaming}
+            />
+          </ContentBlockErrorBoundary>
         ))}
       </div>
       {!readOnly && (
@@ -189,6 +201,44 @@ function RegenerateIcon() {
       <path d="M21 3v6h-6" />
     </svg>
   );
+}
+
+class ContentBlockErrorBoundary extends Component<{
+  messageId: string;
+  blockType: string;
+  blockIdx: number;
+  children: ReactNode;
+}, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[AssistantMessage] content block render failed', {
+      messageId: this.props.messageId,
+      blockType: this.props.blockType,
+      blockIdx: this.props.blockIdx,
+      componentStack: info.componentStack,
+    }, error);
+  }
+
+  componentDidUpdate(prevProps: Readonly<{ messageId: string; blockType: string; blockIdx: number; children: ReactNode }>) {
+    if (!this.state.hasError) return;
+    if (
+      prevProps.messageId !== this.props.messageId ||
+      prevProps.blockIdx !== this.props.blockIdx ||
+      prevProps.blockType !== this.props.blockType
+    ) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
 }
 
 // ── ContentBlock 分发 ──
