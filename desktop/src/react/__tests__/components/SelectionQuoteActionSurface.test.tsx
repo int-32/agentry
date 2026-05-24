@@ -68,8 +68,11 @@ describe('SelectionQuoteActionSurface', () => {
 
     const button = screen.getByRole('button', { name: '引用到对话' });
     const surface = button.closest('[data-selection-ignore="true"]') as HTMLElement;
+    const icon = button.querySelector('svg');
 
-    expect(button.querySelector('svg')).not.toBeNull();
+    expect(icon).not.toBeNull();
+    expect(icon?.getAttribute('fill')).toBe('currentColor');
+    expect(icon?.hasAttribute('stroke')).toBe(false);
     expect(button.textContent).not.toContain('"');
     expect(surface.style.left).toBe('147px');
     expect(surface.style.top).toBe('86px');

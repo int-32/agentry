@@ -124,15 +124,11 @@ function QuoteIcon() {
       width="12"
       height="12"
       viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      fill="currentColor"
       aria-hidden="true"
     >
-      <path d="M8 11H5.5A2.5 2.5 0 0 1 8 8.5V7a4 4 0 0 0-4 4v5h4v-5Z" />
-      <path d="M18 11h-2.5A2.5 2.5 0 0 1 18 8.5V7a4 4 0 0 0-4 4v5h4v-5Z" />
+      <path d="M7.4 6.2C5.2 7.7 4 9.9 4 12.8V18h5.7v-5.7H7.1c.1-1.6.9-2.8 2.3-3.8l-2-2.3Z" />
+      <path d="M16.4 6.2c-2.2 1.5-3.4 3.7-3.4 6.6V18h5.7v-5.7h-2.6c.1-1.6.9-2.8 2.3-3.8l-2-2.3Z" />
     </svg>
   );
 }
