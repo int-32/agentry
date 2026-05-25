@@ -1,9 +1,8 @@
 /**
- * GuestHandler — Guest 留言机处理
+ * GuestHandler — legacy guest message adapter
  *
- * 所有非主人的消息都经过这里。
- * A: 消息前缀标注发送者身份
- * B: system prompt 注入对话上下文（不暴露任何主人隐私）
+ * Bridge/social messages now use the full local Agent runtime. This adapter is
+ * kept for compatibility with older callers that still pass role="guest".
  */
 
 import { getLocale } from "../server/i18n.js";
@@ -18,7 +17,7 @@ export class GuestHandler {
   }
 
   /**
-   * 处理 guest 消息
+   * 处理旧 guest 消息：保留发送者前缀，但使用完整 Agent 会话。
    * @param {string} text
    * @param {string} sessionKey
    * @param {object} [meta]  { name, avatarUrl, userId }
@@ -41,7 +40,7 @@ export class GuestHandler {
       : (isZh ? "当前对话来自外部访客。" : "This conversation is from an external guest.");
 
     return this._hub.engine.executeExternalMessage(prefixed, sessionKey, meta, {
-      guest: true,
+      guest: false,
       agentId: opts.agentId,
       contextTag,
       onDelta: opts.onDelta,

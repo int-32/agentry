@@ -151,4 +151,67 @@ describe('ProviderModelList', () => {
     expect(id.nextElementSibling?.nextElementSibling).toHaveAttribute('title', 'settings.api.capability.video');
     expect(id.nextElementSibling?.nextElementSibling?.nextElementSibling).toHaveAttribute('title', 'settings.api.capability.reasoning');
   });
+
+  it('persists discovered model capabilities when adding a model from the discovery dropdown', async () => {
+    mocks.hanaFetch.mockImplementation(async (path: unknown, opts?: unknown) => {
+      if (path === '/api/providers/dashscope/discovered-models') {
+        return jsonResponse({
+          models: [{
+            id: 'qwen-vl-plus',
+            name: 'Qwen VL Plus',
+            context: 131072,
+            maxOutput: 8192,
+            image: true,
+            reasoning: true,
+          }],
+        });
+      }
+      return jsonResponse({ ok: true });
+    });
+    const onRefresh = vi.fn(async () => {});
+
+    render(
+      <ProviderModelList
+        providerId="dashscope"
+        summary={{
+          type: 'api-key',
+          auth_type: 'api-key',
+          display_name: 'DashScope',
+          base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+          api: 'openai-completions',
+          api_key: 'sk-test',
+          models: [],
+          custom_models: [],
+          has_credentials: true,
+          supports_oauth: false,
+          is_coding_plan: false,
+          can_delete: true,
+        }}
+        onRefresh={onRefresh}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'settings.api.addModel' }));
+    fireEvent.click(await screen.findByText('qwen-vl-plus'));
+
+    await waitFor(() => {
+      expect(mocks.hanaFetch).toHaveBeenCalledWith('/api/config', expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({
+          providers: {
+            dashscope: {
+              models: [{
+                id: 'qwen-vl-plus',
+                name: 'Qwen VL Plus',
+                context: 131072,
+                maxOutput: 8192,
+                image: true,
+                reasoning: true,
+              }],
+            },
+          },
+        }),
+      }));
+    });
+  });
 });

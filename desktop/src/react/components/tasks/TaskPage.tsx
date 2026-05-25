@@ -13,6 +13,7 @@ import type {
 } from '../../stores/task-graph-slice';
 import type { Agent } from '../../types';
 import { hanaFetch } from '../../hooks/use-hana-fetch';
+import { logAsyncPerf } from '../../utils/perf';
 import { TASK_DRAG_MIME, hasTaskDrag } from '../../utils/task-drag';
 import styles from './TaskPage.module.css';
 
@@ -24,6 +25,8 @@ const ROW_H = 144;
 const TOP = 30;
 const LANE_GAP = 18;
 const DEFAULT_BOARD_ID = 'default-board';
+const TASK_REFRESH_TTL_MS = 15_000;
+let lastTaskRefreshAt = 0;
 
 type KanbanColumn = {
   id: TaskLedgerStatus;
@@ -1373,17 +1376,33 @@ export function TaskPage() {
 
   useEffect(() => {
     if (!connected) { setTaskRunsLoading(false); return; }
+    const now = Date.now();
+    const hasCachedData = Object.keys(useStore.getState().taskLedgerTasksById).length > 0;
+    if (lastTaskRefreshAt > 0 && now - lastTaskRefreshAt < TASK_REFRESH_TTL_MS) {
+      setTaskRunsLoading(false);
+      return;
+    }
     let cancelled = false;
-    setTaskRunsLoading(true);
-    Promise.all([hanaFetch('/api/tasks').then(res => res.json()), hanaFetch('/api/tasks/runs').then(res => res.json())])
+    setTaskRunsLoading(!hasCachedData);
+    logAsyncPerf('tasks.refresh', () => Promise.all([
+      hanaFetch('/api/tasks').then(res => res.json()),
+      hanaFetch('/api/tasks/runs').then(res => res.json()),
+    ]), () => ({ cached: hasCachedData }))
       .then(([taskData, runData]) => {
         if (cancelled) return;
         if (taskData.error) throw new Error(taskData.error);
         if (runData.error) throw new Error(runData.error);
+        lastTaskRefreshAt = Date.now();
         setTaskLedgerTasks(Array.isArray(taskData.tasks) ? taskData.tasks : []);
         setTaskRuns(Array.isArray(runData.runs) ? runData.runs : []);
+        setTaskRunsLoading(false);
       })
-      .catch(err => { if (!cancelled) setTaskRunsError(err.message || String(err)); });
+      .catch(err => {
+        if (!cancelled) {
+          setTaskRunsError(err.message || String(err));
+          setTaskRunsLoading(false);
+        }
+      });
     return () => { cancelled = true; };
   }, [connected, setTaskLedgerTasks, setTaskRuns, setTaskRunsError, setTaskRunsLoading]);
 

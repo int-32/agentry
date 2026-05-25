@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useStore } from '../../stores';
 import { hanaFetch } from '../../hooks/use-hana-fetch';
 import { useI18n } from '../../hooks/use-i18n';
+import { logPerf, markPerf } from '../../utils/perf';
+import { applyPendingModelLocally } from '../../utils/ui-helpers';
 import type { Model } from '../../types';
 import type { SessionModel } from '../../stores/chat-types';
 import styles from './InputArea.module.css';
@@ -42,6 +44,7 @@ export function ModelSelector({ models, sessionModel, isStreaming = false }: {
   }, [open]);
 
   const switchModel = useCallback(async (modelId: string, provider?: string) => {
+    const started = markPerf('model.switch');
     try {
       const { currentSessionPath, pendingNewSession, chatSessions, sessionModelsByPath } = useStore.getState();
       const sessionHasMessages = !!(currentSessionPath && chatSessions[currentSessionPath]?.items?.length);
@@ -63,6 +66,12 @@ export function ModelSelector({ models, sessionModel, isStreaming = false }: {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'switch failed');
+        logPerf('model.switch', started, {
+          mode: 'session',
+          model: modelId,
+          provider,
+          adaptations: Array.isArray(data.adaptations) ? data.adaptations.join(',') : '',
+        });
 
         if (data.model) {
           useStore.getState().updateSessionModel(currentSessionPath, data.model);
@@ -93,11 +102,11 @@ export function ModelSelector({ models, sessionModel, isStreaming = false }: {
           const { createNewSession } = await import('../../stores/session-actions');
           await createNewSession();
         }
-        const res = await hanaFetch('/api/models');
-        const data = await res.json();
-        useStore.setState({ models: data.models || [] });
+        applyPendingModelLocally(modelId, provider);
+        logPerf('model.switch', started, { mode: 'global', model: modelId, provider });
       }
     } catch (err) {
+      logPerf('model.switch', started, { model: modelId, provider, failed: true });
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes('cannot switch model while streaming')) {
         useStore.getState().addToast(t('model.switchWhileStreaming'), 'warning', 4000, {

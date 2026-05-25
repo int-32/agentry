@@ -11,11 +11,12 @@ import type { MutableRefObject } from 'react';
 import { useStore } from '../stores';
 import { hanaFetch } from '../hooks/use-hana-fetch';
 import { useI18n } from '../hooks/use-i18n';
-import { loadModels } from '../utils/ui-helpers';
-import { activateWorkspaceDesk, addWorkspaceFolder, applyFolder, removeWorkspaceFolder } from '../stores/desk-actions';
+import { applyPendingModelLocally, loadModels } from '../utils/ui-helpers';
+import { activateWorkspaceDesk, addWorkspaceFolder, applyFolder, loadDeskFiles, removeWorkspaceFolder } from '../stores/desk-actions';
 import { openSettingsModal } from '../stores/settings-modal-actions';
 import type { Agent } from '../types';
 import { AgentAvatar, refreshAgentAvatarVersion, resolveAgentDisplayInfo, type AgentDisplayInfo } from '../utils/agent-display';
+import { logAsyncPerf, logPerf, markPerf } from '../utils/perf';
 import styles from './Welcome.module.css';
 // @ts-expect-error — shared JS module
 import { buildWorkspacePickerItems } from '../../../../shared/workspace-history.js';
@@ -53,6 +54,88 @@ function readConfigChatModel(config: any): { id: string; provider: string } | nu
   const id = typeof chat.id === 'string' ? chat.id.trim() : '';
   const provider = typeof chat.provider === 'string' ? chat.provider.trim() : '';
   return id && provider ? { id, provider } : null;
+}
+
+function hasAvailableModel(chatModel: { id: string; provider: string }): boolean {
+  const models = useStore.getState().models;
+  return Array.isArray(models) && models.some(model => model.id === chatModel.id && model.provider === chatModel.provider);
+}
+
+async function canApplyModel(chatModel: { id: string; provider: string }): Promise<boolean> {
+  let models = useStore.getState().models;
+  if (!Array.isArray(models) || models.length === 0) {
+    await loadModels();
+    models = useStore.getState().models;
+    if (!Array.isArray(models) || models.length === 0) return true;
+  }
+  return hasAvailableModel(chatModel);
+}
+
+const agentConfigCache = new Map<string, any>();
+const AGENT_SWITCH_COMMIT_DELAY_MS = 160;
+const ENABLE_AGENT_CONFIG_CACHE = typeof process === 'undefined' || process.env?.NODE_ENV !== 'test';
+
+async function loadAgentConfig(agentId: string): Promise<any> {
+  const cached = ENABLE_AGENT_CONFIG_CACHE ? agentConfigCache.get(agentId) : null;
+  if (cached) return cached;
+  const config = await logAsyncPerf(
+    'welcome.agent.config',
+    () => hanaFetch(`/api/agents/${encodeURIComponent(agentId)}/config`).then(r => r.json()),
+    { agent: agentId },
+  );
+  if (ENABLE_AGENT_CONFIG_CACHE && !config?.error) agentConfigCache.set(agentId, config);
+  return config;
+}
+
+function scheduleAgentDeskLoad(agentId: string, homeFolder: string | null, version: number, selectionVersionRef: MutableRefObject<number>): void {
+  const start = markPerf('welcome.agent.desk');
+  void activateWorkspaceDesk(homeFolder, { reload: false })
+    .then(() => {
+      logPerf('welcome.agent.desk', start, { agent: agentId, root: homeFolder || '' });
+      if (version !== selectionVersionRef.current) return;
+      window.requestAnimationFrame(() => {
+        if (version !== selectionVersionRef.current) return;
+        const subdir = useStore.getState().deskCurrentPath || '';
+        void logAsyncPerf(
+          'welcome.agent.deskFiles',
+          () => loadDeskFiles(subdir, homeFolder),
+          { agent: agentId, root: homeFolder || '', subdir },
+        );
+      });
+    })
+    .catch((err) => {
+      logPerf('welcome.agent.desk', start, { agent: agentId, failed: true });
+      console.warn('[welcome] activate agent desk failed:', err);
+    });
+}
+
+function applyAgentChatModel(agentId: string, chatModel: { id: string; provider: string } | null, version: number, selectionVersionRef: MutableRefObject<number>): void {
+  if (!chatModel) return;
+  void logAsyncPerf(
+    'welcome.agent.model',
+    async () => {
+      const available = await canApplyModel(chatModel);
+      if (version !== selectionVersionRef.current) return;
+      if (!available) {
+        useStore.getState().addToast(
+          `Agent ${agentId} 配置的模型不可用，已跳过模型切换：${chatModel.provider}/${chatModel.id}`,
+          'warning',
+          5000,
+          { dedupeKey: `agent-model-unavailable:${agentId}:${chatModel.provider}/${chatModel.id}` },
+        );
+        return;
+      }
+      await hanaFetch('/api/models/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modelId: chatModel.id, provider: chatModel.provider }),
+      });
+      if (version === selectionVersionRef.current) {
+        applyPendingModelLocally(chatModel.id, chatModel.provider);
+      }
+    },
+    { agent: agentId, model: chatModel.id, provider: chatModel.provider },
+  ).catch(() => {});
 }
 
 // ── 内部组件 ──
@@ -161,46 +244,48 @@ function AgentChips({ agents, selectedId, selectionVersionRef }: {
   selectedId: string | null;
   selectionVersionRef: MutableRefObject<number>;
 }) {
+  const commitTimerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (commitTimerRef.current != null) window.clearTimeout(commitTimerRef.current);
+  }, []);
+
   const handleClick = useCallback((agentId: string) => {
     const version = ++selectionVersionRef.current;
+    const started = markPerf('welcome.agent.switch');
     useStore.setState({ selectedAgentId: agentId });
     const agent = agents.find(a => a.id === agentId) as any;
+    logPerf('welcome.agent.switch', started, { agent: agentId, phase: 'selected' });
 
-    hanaFetch(`/api/agents/${encodeURIComponent(agentId)}/config`)
-      .then(r => r.json())
-      .then(async (config: any) => {
-        if (version !== selectionVersionRef.current) return;
-        if (config?.error) throw new Error(String(config.error));
+    if (commitTimerRef.current != null) window.clearTimeout(commitTimerRef.current);
+    commitTimerRef.current = window.setTimeout(() => {
+      commitTimerRef.current = null;
+      if (version !== selectionVersionRef.current) return;
 
-        const homeFolder = normalizeWorkspacePath(config?.desk?.home_folder);
-        useStore.setState({
-          homeFolder,
-          selectedFolder: homeFolder,
-          workspaceFolders: [],
+      loadAgentConfig(agentId)
+        .then(async (config: any) => {
+          if (version !== selectionVersionRef.current) return;
+          if (config?.error) throw new Error(String(config.error));
+
+          const homeFolder = normalizeWorkspacePath(config?.desk?.home_folder);
+          useStore.setState({
+            homeFolder,
+            selectedFolder: homeFolder,
+            workspaceFolders: [],
+          });
+          scheduleAgentDeskLoad(agentId, homeFolder, version, selectionVersionRef);
+
+          const chatModel = readConfigChatModel(config) || (agent?.chatModel?.id && agent?.chatModel?.provider
+            ? { id: agent.chatModel.id, provider: agent.chatModel.provider }
+            : null);
+          applyAgentChatModel(agentId, chatModel, version, selectionVersionRef);
+        })
+        .catch(() => {
+          if (version !== selectionVersionRef.current) return;
+          if (!agent?.chatModel?.id || !agent?.chatModel?.provider) return;
+          applyAgentChatModel(agentId, { id: agent.chatModel.id, provider: agent.chatModel.provider }, version, selectionVersionRef);
         });
-        await activateWorkspaceDesk(homeFolder);
-        if (version !== selectionVersionRef.current) return;
-
-        const chatModel = readConfigChatModel(config) || (agent?.chatModel?.id && agent?.chatModel?.provider
-          ? { id: agent.chatModel.id, provider: agent.chatModel.provider }
-          : null);
-        if (!chatModel) return;
-        await hanaFetch('/api/models/set', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ modelId: chatModel.id, provider: chatModel.provider }),
-        });
-        if (version === selectionVersionRef.current) loadModels();
-      })
-      .catch(() => {
-        if (version !== selectionVersionRef.current) return;
-        if (!agent?.chatModel?.id || !agent?.chatModel?.provider) return;
-        hanaFetch('/api/models/set', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ modelId: agent.chatModel.id, provider: agent.chatModel.provider }),
-        }).then(() => loadModels()).catch(() => {});
-      });
+    }, AGENT_SWITCH_COMMIT_DELAY_MS);
   }, [agents, selectionVersionRef]);
 
   return (

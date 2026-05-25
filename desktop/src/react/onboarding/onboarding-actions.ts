@@ -80,6 +80,10 @@ export interface DiscoveredModel {
   name?: string;
   context?: number | null;
   maxOutput?: number | null;
+  type?: string;
+  image?: boolean;
+  video?: boolean;
+  reasoning?: boolean;
 }
 
 export interface LoadModelsResult {
@@ -112,7 +116,9 @@ export interface AddedModelObject {
   name?: string;
   context?: number;
   maxOutput?: number;
+  type?: string;
   image?: boolean;
+  video?: boolean;
   reasoning?: boolean;
 }
 
@@ -134,7 +140,9 @@ function compactModelEntry(entry: AddedModelEntry): AddedModelEntry {
   if (name) next.name = name;
   if (typeof entry.context === 'number' && Number.isFinite(entry.context)) next.context = entry.context;
   if (typeof entry.maxOutput === 'number' && Number.isFinite(entry.maxOutput)) next.maxOutput = entry.maxOutput;
+  if (typeof entry.type === 'string' && entry.type.trim()) next.type = entry.type.trim();
   if (typeof entry.image === 'boolean') next.image = entry.image;
+  if (typeof entry.video === 'boolean') next.video = entry.video;
   if (typeof entry.reasoning === 'boolean') next.reasoning = entry.reasoning;
   return Object.keys(next).length === 1 ? next.id : next;
 }

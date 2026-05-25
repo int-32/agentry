@@ -1,7 +1,7 @@
 /**
  * Local CLI Agent 路由（agentry 独家扩展）
  *
- * GET    /api/local-cli/scan          — 扫 PATH，返三家 CLI 之安装状态
+ * GET    /api/local-cli/scan          — 扫 PATH，返内置 CLI 之安装状态
  * GET    /api/local-cli/:id/models    — 返某 CLI 之模型清单（从 known-models.json）
  *
  * 与"云端 LLM 供应商"路由（providers.js）相对：本路由仅处理本机已装 agent CLI。
@@ -14,7 +14,7 @@ import path from "node:path";
 import { scanAllAgentCliS, getModelsForCli, KNOWN_AGENT_CLIS } from "../../lib/local-cli/detector.js";
 
 export const LOCAL_CLI_SCAN_CACHE_FILE = "local-cli-scan-cache.json";
-export const LOCAL_CLI_SCAN_CACHE_SCHEMA_VERSION = 2;
+export const LOCAL_CLI_SCAN_CACHE_SCHEMA_VERSION = 3;
 export const DEFAULT_LOCAL_CLI_SCAN_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
 
 function boolQuery(value) {

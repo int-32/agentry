@@ -2,7 +2,7 @@
  * BridgeManager._handleMessage 测试
  *
  * 关键路径：
- * - 群聊：直接发送，不 debounce 不 abort（guest 快速回复）
+ * - 群聊：直接发送，不 debounce 不 abort（完整 Agent 快速回复）
  * - 私聊：debounce 2s 聚合 → 合并发送
  * - 私聊新消息到达：abort 正在进行的生成
  * - /stop 命令：abort + 清空 pending
@@ -112,7 +112,7 @@ describe("BridgeManager._handleMessage", () => {
 
       expect(hub.send).toHaveBeenCalledWith(
         tagged("Alice: hello"),
-        expect.objectContaining({ sessionKey: "tg_group_g1@hana", role: "guest", isGroup: true }),
+        expect.objectContaining({ sessionKey: "tg_group_g1@hana", role: "owner", isGroup: true }),
       );
       await vi.waitFor(() => expect(adapter.sendReply).toHaveBeenCalled());
       expect(adapter.sendReply).toHaveBeenCalledWith("g1", "AI response");
@@ -234,12 +234,12 @@ describe("BridgeManager._handleMessage", () => {
       expect(hub.send).toHaveBeenNthCalledWith(
         1,
         tagged("Alice: first"),
-        expect.objectContaining({ sessionKey: "tg_group_g1@hana", role: "guest", isGroup: true }),
+        expect.objectContaining({ sessionKey: "tg_group_g1@hana", role: "owner", isGroup: true }),
       );
       expect(hub.send).toHaveBeenNthCalledWith(
         2,
         tagged("Bob: second"),
-        expect.objectContaining({ sessionKey: "tg_group_g1@hana", role: "guest", isGroup: true }),
+        expect.objectContaining({ sessionKey: "tg_group_g1@hana", role: "owner", isGroup: true }),
       );
     });
   });
@@ -408,7 +408,7 @@ describe("BridgeManager._handleMessage", () => {
       );
     });
 
-    it("uses guest role for non-owner DMs", async () => {
+    it("uses owner role for non-owner DMs while preserving sender label", async () => {
       const { bm, hub } = createMocks();
 
       bm._handleMessage("telegram", {
@@ -424,7 +424,7 @@ describe("BridgeManager._handleMessage", () => {
 
       expect(hub.send).toHaveBeenCalledWith(
         tagged("Stranger: hi"),
-        expect.objectContaining({ role: "guest" }),
+        expect.objectContaining({ role: "owner" }),
       );
     });
 
@@ -926,9 +926,7 @@ describe("BridgeManager._handleMessage", () => {
       expect(hub.send).not.toHaveBeenCalled();
     });
 
-    it("non-owner /slash-like text flows to LLM as plain text (Phase 2-F: guest slash not eaten by dispatcher)", async () => {
-      // 新 spec：guest 发的 /stop 不再被 dispatcher 静默吞掉——直接当文本进 LLM，
-      // agent 可以正常回应。这样群里的其他人发 /xxx 不会像消息消失一样。
+    it("non-owner slash commands run through the full bridge command path", async () => {
       const { bm, engine, hub, adapter } = createMocks();
       engine.isBridgeSessionStreaming.mockReturnValue(false);
 
@@ -941,15 +939,10 @@ describe("BridgeManager._handleMessage", () => {
         agentId: "hana",
       });
 
-      // abort 不应被调用（不是真正的斜杠命令路径）
-      expect(engine.abortBridgeSession).not.toHaveBeenCalled();
-      // 2s debounce 后，消息进 LLM
+      expect(engine.abortBridgeSession).toHaveBeenCalledWith("tg_dm_stranger@hana");
       await vi.advanceTimersByTimeAsync(2100);
-      expect(hub.send).toHaveBeenCalledOnce();
-      // hub.send 的 text 参数包含 "/stop" 原文（会带 timeTag 前缀和 sender prefix）
-      expect(hub.send.mock.calls[0][0]).toContain("/stop");
-      // agent 的回复送回 adapter
-      await vi.waitFor(() => expect(adapter.sendReply).toHaveBeenCalled());
+      expect(hub.send).not.toHaveBeenCalled();
+      await vi.waitFor(() => expect(adapter.sendReply).toHaveBeenCalledWith("stranger", "已停止（当前无活动回复）"));
     });
   });
 

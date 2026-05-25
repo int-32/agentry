@@ -1640,6 +1640,20 @@ export class AgentryEngine {
     });
   }
 
+  _allAgentDeskRoots() {
+    const roots = [];
+    try {
+      for (const entry of this.listAgents()) {
+        const agent = this.getAgent(entry.id);
+        const cfg = agent?.config;
+        if (cfg?.desk?.home_folder) roots.push(cfg.desk.home_folder);
+        if (cfg?.last_cwd) roots.push(cfg.last_cwd);
+        if (Array.isArray(cfg?.cwd_history)) roots.push(...cfg.cwd_history);
+      }
+    } catch {}
+    return roots;
+  }
+
   isApprovedDeskDir(dir) {
     const resolved = this._realPathForWorkspaceCheck(dir);
     if (!resolved) return false;
@@ -1648,6 +1662,7 @@ export class AgentryEngine {
       this.deskCwd,
       ...this.getSessionWorkspaceFolders(this.currentSessionPath),
       ...(Array.isArray(this.config?.cwd_history) ? this.config.cwd_history : []),
+      ...this._allAgentDeskRoots(),
     ].filter(Boolean);
     return roots.some((root) => {
       const base = this._realPathForWorkspaceCheck(root);

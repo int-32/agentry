@@ -14,6 +14,9 @@ interface DiscoveredModel {
   context?: number | null;
   maxOutput?: number | null;
   type?: string;
+  image?: boolean;
+  video?: boolean;
+  reasoning?: boolean;
 }
 
 type CapabilityKind = 'image' | 'video' | 'reasoning';
@@ -81,6 +84,9 @@ export function ProviderModelList({ providerId, summary, onRefresh }: {
     if (discovered?.context != null) entry.context = discovered.context;
     if (discovered?.maxOutput != null) entry.maxOutput = discovered.maxOutput;
     if (type) entry.type = type;
+    if (typeof discovered?.image === 'boolean') entry.image = discovered.image;
+    if (typeof discovered?.video === 'boolean') entry.video = discovered.video;
+    if (typeof discovered?.reasoning === 'boolean') entry.reasoning = discovered.reasoning;
     return Object.keys(entry).length > 1 ? entry : mid;
   };
   // Merge: discovered model IDs + custom_models, deduplicated, with currentModelIds included for display
@@ -295,6 +301,7 @@ export function ProviderModelList({ providerId, summary, onRefresh }: {
                 const meta = lookupModelMeta(mid, providerId) || {};
                 const discovered = discoveredModels.find(d => d.id === mid);
                 const ctx = meta.context || discovered?.context;
+                const optionMeta = { ...meta, ...(discovered || {}) };
                 return (
                   <button
                     key={mid}
@@ -303,6 +310,9 @@ export function ProviderModelList({ providerId, summary, onRefresh }: {
                   >
                     <span className={styles['pv-model-dropdown-option-name']}>{mid}</span>
                     {isAdded && <span className={styles['pv-model-dropdown-option-check']}>{'\u2713'}</span>}
+                    {(optionMeta.image === true || optionMeta.type === 'image') && <CapabilityIcon kind="image" />}
+                    {optionMeta.video === true && <CapabilityIcon kind="video" />}
+                    {optionMeta.reasoning === true && <CapabilityIcon kind="reasoning" />}
                     {ctx && <span className={styles['pv-model-ctx']}>{formatContext(ctx)}</span>}
                   </button>
                 );

@@ -13,6 +13,7 @@ import { resolvePluginTitle } from '../../utils/resolve-plugin-title';
 import { reorderTabs, hidePluginTab, showPluginTab } from '../../stores/plugin-ui-actions';
 import { PluginTabOverflow } from '../plugin/PluginTabOverflow';
 import { ContextMenu, type ContextMenuItem } from '../../ui';
+import { logPerf, markPerf } from '../../utils/perf';
 import styles from './Channels.module.css';
 
 declare function t(key: string, vars?: Record<string, string | number>): string;
@@ -33,6 +34,7 @@ export function switchTab(tab: LegacyTabType | string) {
   const normalizedTab = normalizeTab(tab);
   const s = useStore.getState();
   if (normalizedTab === s.currentTab) return;
+  const started = markPerf(`tab.switch.${normalizedTab}`);
 
   if (normalizedTab === 'channels') {
     s.setActivePanel(null);
@@ -52,6 +54,9 @@ export function switchTab(tab: LegacyTabType | string) {
     if (s.sidebarOpen !== wantLeftOpen) toggleSidebar(wantLeftOpen);
   }
 
+  requestAnimationFrame(() => {
+    logPerf(`tab.switch.${normalizedTab}`, started, { from: s.currentTab, to: normalizedTab });
+  });
 }
 
 // ── Build ordered tab list ──

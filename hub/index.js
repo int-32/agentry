@@ -8,7 +8,6 @@
  * 模块：
  *   EventBus      — 统一事件总线
  *   ChannelRouter  — 频道手机送达 + 调度
- *   GuestHandler   — Guest 留言机
  *   Scheduler      — Heartbeat + Cron
  */
 
@@ -17,7 +16,6 @@ import fs from "fs";
 import crypto from "crypto";
 import { EventBus } from "./event-bus.js";
 import { ChannelRouter } from "./channel-router.js";
-import { GuestHandler } from "./guest-handler.js";
 import { Scheduler } from "./scheduler.js";
 import { DmRouter } from "./dm-router.js";
 import { AgentPhoneActivityStore } from "../lib/conversations/agent-phone-activity.js";
@@ -38,7 +36,6 @@ export class Hub {
     this._engine = engine;
     this._eventBus = new EventBus();
     this._channelRouter = new ChannelRouter({ hub: this });
-    this._guestHandler = new GuestHandler({ hub: this });
     this._scheduler = new Scheduler({ hub: this });
     this._dmRouter = new DmRouter({ hub: this });
     this._agentPhoneActivities = new AgentPhoneActivityStore({
@@ -104,10 +101,10 @@ export class Hub {
    * @param {string} text  消息文本
    * @param {object} [opts]
    * @param {string}  [opts.sessionKey]  Bridge/频道的 session 标识
-   * @param {string}  [opts.role]        "owner" | "agent" | "guest"（默认 "owner"）
+   * @param {string}  [opts.role]        "owner" | "agent" | "guest"（默认 "owner"；Bridge guest 兼容值也走完整 Agent）
    * @param {boolean} [opts.ephemeral]   true = 不持久化 session（cron/heartbeat/channel）
    * @param {object}  [opts.meta]        Bridge 元数据 { name, avatarUrl, userId }
-   * @param {boolean} [opts.isGroup]     是否群聊（影响 guest 上下文标签）
+   * @param {boolean} [opts.isGroup]     是否群聊
    * @param {string}  [opts.cwd]         工作目录覆盖
    * @param {string}  [opts.model]       模型覆盖
    * @param {string}  [opts.persist]     持久化目录（activity session）
@@ -209,11 +206,7 @@ export class Hub {
           })
           : this._engine.prompt(text, { images: o.images, videos: o.videos }),
       },
-      { // Bridge guest
-        match: o => o.sessionKey && o.role === "guest",
-        handle: () => this._guestHandler.handle(text, o.sessionKey, o.meta, { isGroup: o.isGroup, agentId: o.agentId, onDelta: o.onDelta, images: o.images, imageAttachmentPaths: o.imageAttachmentPaths, videos: o.videos, videoAttachmentPaths: o.videoAttachmentPaths, inboundFiles: o.inboundFiles, displayMessage: o.displayMessage }),
-      },
-      { // Bridge owner
+      { // Bridge/social sessions use the full local Agent runtime.
         match: o => o.sessionKey && !o.ephemeral,
         handle: () => this._engine.executeExternalMessage(text, o.sessionKey, o.meta, { guest: false, agentId: o.agentId, onDelta: o.onDelta, images: o.images, imageAttachmentPaths: o.imageAttachmentPaths, videos: o.videos, videoAttachmentPaths: o.videoAttachmentPaths, inboundFiles: o.inboundFiles, displayMessage: o.displayMessage }),
       },

@@ -406,6 +406,10 @@ export function createAgentsRoute(engine) {
             api: p.api || entry?.api || "",
             api_key: p.api_key || "",
             models: p.models || [],
+            workspace_root: typeof p.workspace_root === "string" ? p.workspace_root : "",
+            workspace_folders: Array.isArray(p.workspace_folders)
+              ? p.workspace_folders.filter(item => typeof item === "string" && item.trim())
+              : [],
             model_count: (p.models || []).length,
           };
         }

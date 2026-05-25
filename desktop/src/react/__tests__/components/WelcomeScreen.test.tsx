@@ -58,6 +58,8 @@ describe('WelcomeScreen workspace picker', () => {
       homeFolder: '/workspace/Desktop/project-hana',
       cwdHistory: ['/workspace/Desktop/project-hana'],
       workspaceFolders: ['/workspace/Reference'],
+      models: [],
+      toasts: [],
       locale: 'zh',
     } as never);
   });
@@ -144,6 +146,47 @@ describe('WelcomeScreen workspace picker', () => {
       method: 'POST',
       body: JSON.stringify({ modelId: 'artist-chat', provider: 'deepseek' }),
     }));
+  });
+
+  it('skips model switching when the selected agent model is unavailable', async () => {
+    hanaFetchMock.mockImplementation(async (url: string) => {
+      if (url === '/api/agents/artist/config') {
+        return {
+          json: async () => ({
+            desk: { home_folder: '/workspace/ArtistHome' },
+            models: { chat: { id: 'missing-chat', provider: 'deepseek' } },
+          }),
+        };
+      }
+      if (url === '/api/desk') {
+        return { json: async () => ({ files: [] }) };
+      }
+      return { json: async () => ({ ok: true, models: [] }) };
+    });
+    useStore.setState({
+      agents: [
+        { id: 'hana', name: 'Agentry', yuan: 'hanako', isPrimary: true, memoryMasterEnabled: true },
+        { id: 'artist', name: 'Artist', yuan: 'ming', isPrimary: false, memoryMasterEnabled: true },
+      ],
+      models: [{ id: 'available-chat', name: 'Available Chat', provider: 'deepseek' }],
+      currentAgentId: 'hana',
+      selectedAgentId: null,
+      selectedFolder: '/workspace/agentry',
+      homeFolder: '/workspace/agentry',
+      deskBasePath: '/workspace/agentry',
+      workspaceFolders: ['/workspace/Reference'],
+    } as never);
+    const { WelcomeScreen } = await import('../../components/WelcomeScreen');
+
+    render(<WelcomeScreen />);
+    fireEvent.click(screen.getByRole('button', { name: /Artist/ }));
+    await waitFor(() => {
+      expect(useStore.getState().selectedFolder).toBe('/workspace/ArtistHome');
+    });
+
+    expect(hanaFetchMock).toHaveBeenCalledWith('/api/agents/artist/config');
+    expect(hanaFetchMock).not.toHaveBeenCalledWith('/api/models/set', expect.anything());
+    expect(useStore.getState().toasts.some(t => t.dedupeKey === 'agent-model-unavailable:artist:deepseek/missing-chat')).toBe(true);
   });
 
   it('clears the inherited workspace when the selected agent has no configured home folder', async () => {

@@ -423,18 +423,19 @@ export class BridgeSessionManager {
    * @param {string} prompt - 格式化后的用户消息
    * @param {string} sessionKey - 会话标识（如 tg_dm_12345）
    * @param {object} [meta] - 元数据（name, avatarUrl, userId）
-   * @param {object} [opts] - { guest: boolean, contextTag?: string, onDelta? }
+   * @param {object} [opts] - { contextTag?: string, onDelta? }
    * @returns {Promise<string|null>} agent 的回复文本
    */
   async executeExternalMessage(prompt, sessionKey, meta, opts = {}) {
     try {
       let promptText = prompt;
-      const isGuest = opts.guest === true;
       const agent = this._resolveAgent(opts, "executeExternalMessage");
-      const bridgeContext = this._buildBridgeContext(sessionKey, meta, opts, agent);
+      // Bridge/social sessions intentionally use the full local Agent runtime.
+      // Older callers may still pass opts.guest; keep the public/guest path disabled here.
+      const bridgeContext = this._buildBridgeContext(sessionKey, meta, { ...opts, guest: false }, agent);
       const mm = this._deps.getModelManager();
       const bridgeDir = path.join(agent.sessionDir, "bridge");
-      const subDir = opts.guest ? "guests" : "owner";
+      const subDir = "owner";
       const sessionDir = path.join(bridgeDir, subDir);
       fs.mkdirSync(sessionDir, { recursive: true });
 
@@ -466,54 +467,8 @@ export class BridgeSessionManager {
       // 工具 details.media 收集器（被动提取 tool_execution_end 事件）
       const toolMediaUrls = [];
 
-      if (isGuest) {
-        // guest 模式：yuan + public-ishiki + contextTag，主模型，无工具
-        const yuanBase = agent.yuanPrompt;
-        const pubIshiki = agent.publicIshiki;
-        const bridgePromptLine = appendBridgePromptLine("", bridgeContext, getLocale()).trim();
-        const parts = [yuanBase, pubIshiki, opts.contextTag, bridgePromptLine].filter(Boolean);
-        const guestPrompt = parts.join("\n\n");
-        const tempResourceLoader = Object.create(this._deps.getResourceLoader());
-        tempResourceLoader.getSystemPrompt = () => guestPrompt;
-        tempResourceLoader.getSkills = () => ({ skills: [], diagnostics: [] });
-        const guestResourceLoader = withVisionExtension(
-          tempResourceLoader,
-          () => this._deps.getVisionBridge?.(),
-          () => sessionPathRef.current,
-          () => this._deps.isVisionAuxiliaryEnabled?.() === true,
-          (msg) => console.warn(`[bridge-session] ${msg}`),
-          ({ fileId, filePath, sessionPath }) => {
-            const lookupSessionPath = sessionPath || sessionPathRef.current || null;
-            if (fileId) return this._deps.getSessionFile?.(fileId, { sessionPath: lookupSessionPath });
-            if (filePath) return this._deps.getSessionFileByPath?.(filePath, { sessionPath: lookupSessionPath });
-            return null;
-          },
-        );
-
-        // 使用 agent 配置的模型，而非 defaultModel。
-        // migration #5 之后 models.chat 必为 {id, provider} 对象；缺 provider 视为未配置。
-        const chatRef = agent.config?.models?.chat;
-        const ref = (typeof chatRef === "object" && chatRef?.id && chatRef?.provider) ? chatRef : null;
-        if (!ref) {
-          throw new Error(t("error.bridgeAgentNoChatModel", { name: agent.agentName }));
-        }
-        const chatModel = findModel(mm.availableModels, ref.id, ref.provider);
-        if (!chatModel) {
-          throw new Error(t("error.bridgeAgentModelNotAvailable", { name: agent.agentName, model: `${ref.provider}/${ref.id}` }));
-        }
-
-        sessionOpts = {
-          model: chatModel,
-          thinkingLevel: "none",
-          resourceLoader: guestResourceLoader,
-          tools: [],
-          customTools: [],
-          settingsManager: this._createSettings(chatModel),
-        };
-      } else {
-        // owner 模式：完整 agent。抽出 _buildOwnerSessionOpts 后，compactSession 也能复用同一构造逻辑
-        sessionOpts = this._buildOwnerSessionOpts(agent, mm, homeCwd, sessionPathRef, { bridgeContext });
-      }
+      // 完整 agent 模式。抽出 _buildOwnerSessionOpts 后，compactSession 也能复用同一构造逻辑。
+      sessionOpts = this._buildOwnerSessionOpts(agent, mm, homeCwd, sessionPathRef, { bridgeContext });
 
       const { session } = await createAgentSession({
         cwd: homeCwd,

@@ -3362,7 +3362,7 @@ function startAgentryBridge() {
   try {
     bridgeProcess = spawn(process.execPath, [bridgePath], {
       cwd: path.join(__dirname, ".."),
-      env: { ...process.env, AGENTRY_BRIDGE_PORT: BRIDGE_PORT, ELECTRON_RUN_AS_NODE: "1" },
+      env: { ...process.env, AGENTRY_HOME: agentryHome, AGENTRY_BRIDGE_PORT: BRIDGE_PORT, ELECTRON_RUN_AS_NODE: "1" },
       stdio: ["ignore", "pipe", "pipe"],
     });
     bridgeProcess.stdout?.on("data", (chunk) => process.stdout.write(`[bridge] ${chunk}`));

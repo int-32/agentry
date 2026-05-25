@@ -33,6 +33,7 @@ function createEngine(overrides = {}) {
     isSessionStreaming: vi.fn(() => false),
     promptSession: vi.fn(async () => {}),
     abortSession: vi.fn(async () => true),
+    executeExternalMessage: vi.fn(async () => "ok"),
     dispose: vi.fn(async () => {}),
     ...overrides,
   };
@@ -78,5 +79,23 @@ describe("Hub agent config bus handlers", () => {
     const noLookup = await noLookupHub.eventBus.request("agent:config", { agentId: "agent-1" });
 
     expect(noLookup.error).toBe("agent_lookup_unavailable");
+  });
+
+  it("routes legacy bridge guest sends through the full local agent path", async () => {
+    const engine = createEngine();
+    const hub = new Hub({ engine });
+
+    await hub.send("hello", {
+      sessionKey: "tg_dm_guest@agent-1",
+      role: "guest",
+      agentId: "agent-1",
+    });
+
+    expect(engine.executeExternalMessage).toHaveBeenCalledWith(
+      "hello",
+      "tg_dm_guest@agent-1",
+      undefined,
+      expect.objectContaining({ guest: false, agentId: "agent-1" }),
+    );
   });
 });

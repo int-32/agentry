@@ -87,6 +87,7 @@ plugins/image-gen/TDD.md
 - [供应商与模型设置](./features/provider-model-settings.md)
 - [频道与多 Agent 协作](./features/channels-and-agent-collaboration.md)
 - [任务编排图](./features/task-orchestration.md)
+- [媒体生成插件](./features/media-generation.md)
 
 已建立模块本地三件套的重点实现目录：
 

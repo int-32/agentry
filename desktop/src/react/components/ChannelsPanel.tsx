@@ -31,6 +31,25 @@ import chatStyles from './chat/Chat.module.css';
 const CHANNEL_SCROLL_THRESHOLD = 80;
 const EMPTY_CHAT_ITEMS: ChatListItem[] = [];
 const PHONE_STREAM_MESSAGE_PREFIX = 'agent-phone-stream';
+const CHANNEL_MARKDOWN_CACHE_LIMIT = 500;
+const channelMarkdownCache = new Map<string, string>();
+
+function channelMessageMarkdownKey(msg: { sender?: string; timestamp?: string; body?: string }): string {
+  return `${msg.timestamp || ''}\n${msg.sender || ''}\n${msg.body || ''}`;
+}
+
+function renderChannelMarkdownCached(msg: { sender?: string; timestamp?: string; body?: string }): string {
+  const key = channelMessageMarkdownKey(msg);
+  const cached = channelMarkdownCache.get(key);
+  if (cached !== undefined) return cached;
+  const html = renderMarkdown(msg.body || '');
+  channelMarkdownCache.set(key, html);
+  if (channelMarkdownCache.size > CHANNEL_MARKDOWN_CACHE_LIMIT) {
+    const first = channelMarkdownCache.keys().next().value;
+    if (first) channelMarkdownCache.delete(first);
+  }
+  return html;
+}
 
 export function ChannelsPanel() {
   const channelsEnabled = useStore(s => s.channelsEnabled);
@@ -138,12 +157,16 @@ export function ChannelMessages() {
 
   const ch = channels.find((c) => c.id === currentChannel);
   const isDM = ch?.isDM ?? false;
+  const renderedMessages = useMemo(() => messages.map(msg => ({
+    msg,
+    html: renderChannelMarkdownCached(msg),
+  })), [messages]);
   let lastSender: string | null = null;
 
   return (
     <>
       <div ref={wrapperRef}>
-        {messages.map((msg, idx) => {
+        {renderedMessages.map(({ msg, html }, idx) => {
           const isContinuation = msg.sender === lastSender;
           const senderInfo = resolveChannelMember(msg.sender, userName, userAvatarUrl, agents, currentAgentId, agentMap);
           const isSelf = senderInfo.isUser || (isDM && msg.sender === (currentAgentId || ''));
@@ -168,7 +191,7 @@ export function ChannelMessages() {
                 )}
                 <MarkdownContent
                   className={styles.channelMsgText}
-                  html={renderMarkdown(msg.body || '')}
+                  html={html}
                 />
               </div>
             </div>

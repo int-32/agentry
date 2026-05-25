@@ -121,6 +121,10 @@ export function createProvidersRoute(engine) {
         api: p.api || "",
         api_key: p.api_key || "",
         models: rawModels,
+        workspace_root: typeof p.workspace_root === "string" ? p.workspace_root : "",
+        workspace_folders: Array.isArray(p.workspace_folders)
+          ? p.workspace_folders.filter(item => typeof item === "string" && item.trim())
+          : [],
         custom_models: customModels,
         has_credentials: hasCredentials,
         logged_in: isOAuth ? !!oauthInfo?.loggedIn : undefined,
@@ -203,8 +207,23 @@ export function createProvidersRoute(engine) {
     return [];
   }
 
+  function lowerStrings(values) {
+    return values.map(v => String(v).trim().toLowerCase()).filter(Boolean);
+  }
+
+  function finiteNumber(...values) {
+    for (const value of values) {
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      if (typeof value === "string" && value.trim()) {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+    }
+    return null;
+  }
+
   function hasImageOutputSignal(raw) {
-    const capabilityStrings = [
+    const capabilityStrings = lowerStrings([
       ...stringList(raw?.output),
       ...stringList(raw?.outputs),
       ...stringList(raw?.output_modalities),
@@ -214,7 +233,8 @@ export function createProvidersRoute(engine) {
       ...stringList(raw?.capabilities?.outputs),
       ...stringList(raw?.capabilities?.output_modalities),
       ...stringList(raw?.capabilities?.outputModalities),
-    ].map(v => v.toLowerCase());
+      ...stringList(raw?.capabilities?.modalities?.output),
+    ]);
     if (capabilityStrings.includes("image")) return true;
     return raw?.supports_image_generation === true
       || raw?.supportsImageGeneration === true
@@ -250,47 +270,111 @@ export function createProvidersRoute(engine) {
     return undefined;
   }
 
-  function withDiscoveredModelType(providerName, model, raw = model) {
+  function hasImageInputSignal(raw) {
+    const capabilityStrings = lowerStrings([
+      ...stringList(raw?.input),
+      ...stringList(raw?.inputs),
+      ...stringList(raw?.input_modalities),
+      ...stringList(raw?.inputModalities),
+      ...stringList(raw?.modalities?.input),
+      ...stringList(raw?.capabilities?.input),
+      ...stringList(raw?.capabilities?.inputs),
+      ...stringList(raw?.capabilities?.input_modalities),
+      ...stringList(raw?.capabilities?.inputModalities),
+      ...stringList(raw?.capabilities?.modalities?.input),
+    ]);
+    return capabilityStrings.includes("image")
+      || capabilityStrings.includes("vision")
+      || raw?.supports_image_input === true
+      || raw?.supportsImageInput === true
+      || raw?.supports_vision === true
+      || raw?.supportsVision === true
+      || raw?.vision === true
+      || raw?.image === true
+      || raw?.capabilities?.vision === true
+      || raw?.capabilities?.image === true
+      || raw?.capabilities?.image_input === true
+      || raw?.capabilities?.imageInput === true;
+  }
+
+  function hasVideoInputSignal(raw) {
+    const capabilityStrings = lowerStrings([
+      ...stringList(raw?.input),
+      ...stringList(raw?.inputs),
+      ...stringList(raw?.input_modalities),
+      ...stringList(raw?.inputModalities),
+      ...stringList(raw?.modalities?.input),
+      ...stringList(raw?.capabilities?.input),
+      ...stringList(raw?.capabilities?.inputs),
+      ...stringList(raw?.capabilities?.input_modalities),
+      ...stringList(raw?.capabilities?.inputModalities),
+      ...stringList(raw?.capabilities?.modalities?.input),
+    ]);
+    return capabilityStrings.includes("video")
+      || raw?.supports_video_input === true
+      || raw?.supportsVideoInput === true
+      || raw?.video === true
+      || raw?.capabilities?.video === true
+      || raw?.capabilities?.video_input === true
+      || raw?.capabilities?.videoInput === true;
+  }
+
+  function hasReasoningSignal(raw) {
+    return raw?.reasoning === true
+      || raw?.supports_reasoning === true
+      || raw?.supportsReasoning === true
+      || raw?.capabilities?.reasoning === true
+      || raw?.capabilities?.reasoning_effort === true
+      || raw?.capabilities?.reasoningEffort === true;
+  }
+
+  function withDiscoveredModelCapabilities(providerName, model, raw = model) {
     const type = inferDiscoveredModelType(providerName, raw);
-    return type ? { ...model, type } : model;
+    return {
+      ...model,
+      ...(type ? { type } : {}),
+      ...(hasImageInputSignal(raw) ? { image: true } : {}),
+      ...(hasVideoInputSignal(raw) ? { video: true } : {}),
+      ...(hasReasoningSignal(raw) ? { reasoning: true } : {}),
+    };
   }
 
   function normalizeRegistryModels(providerName, models) {
     return models.map((model) => ({
       id: model.id,
       name: model.name || model.id,
-      context: model.contextWindow ?? model.context ?? null,
-      maxOutput: model.maxOutputTokens ?? model.maxOutput ?? null,
-    })).map((model, index) => withDiscoveredModelType(providerName, model, models[index]));
+      context: finiteNumber(model.contextWindow, model.context),
+      maxOutput: finiteNumber(model.maxOutputTokens, model.maxOutput, model.maxTokens),
+    })).map((model, index) => withDiscoveredModelCapabilities(providerName, model, models[index]));
   }
 
   function normalizeRemoteModels(data, api, providerName) {
     if (api === "anthropic-messages") {
-      return (data.data || []).map(m => withDiscoveredModelType(providerName, {
+      return (data.data || []).map(m => withDiscoveredModelCapabilities(providerName, {
         id: m.id,
         name: m.display_name || m.id,
-        context: m.max_input_tokens ?? null,
-        maxOutput: m.max_tokens ?? null,
+        context: finiteNumber(m.max_input_tokens, m.input_token_limit, m.context_length),
+        maxOutput: finiteNumber(m.max_tokens, m.max_output_tokens, m.output_token_limit),
       }, m));
     }
 
     if (api === "google-generative-ai") {
       return (data.models || []).map(m => {
         const id = m.baseModelId || String(m.name || "").replace(/^models\//, "");
-        return withDiscoveredModelType(providerName, {
+        return withDiscoveredModelCapabilities(providerName, {
           id,
           name: m.displayName || id,
-          context: m.inputTokenLimit ?? null,
-          maxOutput: m.outputTokenLimit ?? null,
+          context: finiteNumber(m.inputTokenLimit),
+          maxOutput: finiteNumber(m.outputTokenLimit),
         }, m);
       }).filter(m => m.id);
     }
 
-    return (data.data || []).map(m => withDiscoveredModelType(providerName, {
+    return (data.data || []).map(m => withDiscoveredModelCapabilities(providerName, {
       id: m.id,
       name: m.display_name || m.name || m.id,
-      context: m.context_length || m.context_window || m.max_context_length || null,
-      maxOutput: m.max_completion_tokens || m.max_output_tokens || null,
+      context: finiteNumber(m.context_length, m.context_window, m.max_context_length, m.max_input_tokens, m.input_token_limit),
+      maxOutput: finiteNumber(m.max_completion_tokens, m.max_output_tokens, m.max_tokens, m.output_token_limit),
     }, m));
   }
 

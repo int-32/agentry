@@ -247,6 +247,46 @@ describe("BridgeSessionManager teardown", () => {
     });
   });
 
+  it("runs legacy guest bridge calls through the full local agent runtime", async () => {
+    const agent = makeAgent(rootDir);
+    agent.buildSystemPrompt = vi.fn(() => "system prompt");
+    agent.tools = [{ name: "search_memory" }];
+    const buildTools = vi.fn((_cwd, customTools) => ({
+      tools: [{ name: "read" }],
+      customTools,
+    }));
+    const deps = {
+      ...makeDeps(agent),
+      buildTools,
+    };
+    const mgrPath = path.join(agent.sessionDir, "bridge", "owner", "full-agent.jsonl");
+    const manager = new BridgeSessionManager(deps);
+    sessionManagerCreateMock.mockReturnValue({ getSessionFile: () => mgrPath });
+
+    createAgentSessionMock.mockResolvedValue({
+      session: {
+        model: { input: ["text"] },
+        prompt: vi.fn(async () => {}),
+        subscribe: vi.fn(() => () => {}),
+        dispose: vi.fn(),
+        sessionManager: { getSessionFile: () => mgrPath },
+        extensionRunner: { hasHandlers: vi.fn(() => false) },
+      },
+    });
+
+    await manager.executeExternalMessage("hello", "tg_dm_stranger@agent-a", null, {
+      agentId: "agent-a",
+      guest: true,
+    });
+
+    expect(sessionManagerCreateMock).toHaveBeenCalledWith(rootCwd, path.join(agent.sessionDir, "bridge", "owner"));
+    expect(agent.buildSystemPrompt).toHaveBeenCalled();
+    const createArgs = createAgentSessionMock.mock.calls.at(-1)[0];
+    expect(createArgs.tools.map((tool) => tool.name)).toEqual(["read"]);
+    expect(createArgs.customTools.map((tool) => tool.name)).toEqual(["search_memory"]);
+    expect(createArgs.thinkingLevel).toBe("medium");
+  });
+
   it("freshCompactSession compacts with the current owner prompt and records freshness metadata", async () => {
     const agent = makeAgent(rootDir);
     agent.buildSystemPrompt = vi.fn(() => "system prompt v2");

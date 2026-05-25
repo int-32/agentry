@@ -19,10 +19,58 @@ import { createServer } from "node:http";
 import { query as claudeQuery } from "@anthropic-ai/claude-agent-sdk";
 import { Codex } from "@openai/codex-sdk";
 import { spawn } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import readline from "node:readline";
 import { randomUUID, createHash } from "node:crypto";
+import YAML from "js-yaml";
 
 const PORT = parseInt(process.env.AGENTRY_BRIDGE_PORT || "51720", 10);
+const AGENTRY_HOME = process.env.AGENTRY_HOME
+  || process.env.HANA_HOME
+  || path.join(os.homedir(), ".agentry");
+
+let cliWorkspaceCache = { mtimeMs: 0, providers: {} };
+
+function cleanPath(value) {
+  if (typeof value !== "string") return "";
+  return value.trim();
+}
+
+function cleanPathList(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const item of value) {
+    const folder = cleanPath(item);
+    if (!folder || seen.has(folder)) continue;
+    seen.add(folder);
+    out.push(folder);
+  }
+  return out;
+}
+
+function loadCliProviderConfig(providerId) {
+  const configPath = path.join(AGENTRY_HOME, "added-models.yaml");
+  try {
+    const stat = fs.statSync(configPath);
+    if (cliWorkspaceCache.mtimeMs !== stat.mtimeMs) {
+      const raw = YAML.load(fs.readFileSync(configPath, "utf-8")) || {};
+      cliWorkspaceCache = {
+        mtimeMs: stat.mtimeMs,
+        providers: raw && typeof raw.providers === "object" && raw.providers ? raw.providers : {},
+      };
+    }
+  } catch {
+    cliWorkspaceCache = { mtimeMs: 0, providers: {} };
+  }
+  const cfg = cliWorkspaceCache.providers[providerId] || {};
+  return {
+    workspaceRoot: cleanPath(cfg.workspace_root || cfg.workspaceRoot),
+    workspaceFolders: cleanPathList(cfg.workspace_folders || cfg.workspaceFolders),
+  };
+}
 
 // ── conversation → backend session 映射 ──
 // Hanako 每轮发完整 messages 历史给 bridge，但 Claude / Codex SDK 之 query 之 prompt 只取最后一条
@@ -68,6 +116,13 @@ function routeBackend(model) {
   if (m.includes("gemini")) return "gemini";
   // 默认 Claude
   return "claude";
+}
+
+function cliProviderForBackend(backend) {
+  if (backend === "claude") return "cli-claude-code";
+  if (backend === "codex") return "cli-codex";
+  if (backend === "gemini") return "cli-gemini";
+  return null;
 }
 
 // ── 把 OpenAI 消息 content（string / 多模 array）拼成纯文本 ──
@@ -186,7 +241,7 @@ function writeDone(res, id, model, finishReason = "stop", usage = null) {
 //   assistant.thinking   → delta.reasoning_content（pi-ai → thinking 块 / ThinkingBlock）
 //   assistant.tool_use   → markdown 头 "▸ <name>(args)"（不发 delta.tool_calls，避免 Hanako 重执行死循环）
 //   user.tool_result     → markdown fenced code block
-async function streamClaude({ res, id, model, prompt, systemPrompt, conversationFp }) {
+async function streamClaude({ res, id, model, prompt, systemPrompt, conversationFp, workspaceConfig = {} }) {
   // Claude SDK 隔离配置：
   //   - settingSources: [] —— 禁加载 ~/.claude/settings.json + project/.claude/settings.json
   //     避免本机 CC session 之 SessionStart hook（persona-inject 等）污染 bridge 子进程之 persona
@@ -200,6 +255,10 @@ async function streamClaude({ res, id, model, prompt, systemPrompt, conversation
     settingSources: [],
     disallowedTools: ["AskUserQuestion", "ExitPlanMode"],
   };
+  if (workspaceConfig.workspaceRoot) options.cwd = workspaceConfig.workspaceRoot;
+  if (workspaceConfig.workspaceFolders?.length) {
+    options.additionalDirectories = workspaceConfig.workspaceFolders;
+  }
   if (systemPrompt) options.systemPrompt = systemPrompt;
   const resumeId = conversationFp ? lookupSession(conversationFp, "claude") : null;
   if (resumeId) options.resume = resumeId;
@@ -259,11 +318,12 @@ async function streamClaude({ res, id, model, prompt, systemPrompt, conversation
 //   item.completed/file_change       → markdown edit 行
 //   item.completed/mcp_tool_call     → markdown 行 + 结果块
 //   item.completed/web_search        → markdown web_search 行
-async function streamCodex({ res, id, model, prompt, systemPrompt, conversationFp }) {
+async function streamCodex({ res, id, model, prompt, systemPrompt, conversationFp, workspaceConfig = {} }) {
   // Codex SDK ThreadOptions 无 system/instructions 槽，把 systemPrompt prepend 到 prompt
   // 次轮起以 resumeThread 续命 codex 端存于 ~/.codex/sessions/ 之 thread，保 chat 上下文
   const codex = new Codex();
   const threadOpts = { sandboxMode: "read-only", skipGitRepoCheck: true, approvalPolicy: "never" };
+  if (workspaceConfig.workspaceRoot) threadOpts.cwd = workspaceConfig.workspaceRoot;
   const resumeId = conversationFp ? lookupSession(conversationFp, "codex") : null;
   const thread = resumeId ? codex.resumeThread(resumeId, threadOpts) : codex.startThread(threadOpts);
   // 续命时 system prompt 不必再 prepend（前轮已植）；首轮才注入
@@ -325,7 +385,7 @@ async function streamCodex({ res, id, model, prompt, systemPrompt, conversationF
 //   { type:"tool_use", tool_name, tool_id, parameters }         → tool_call
 //   { type:"tool_result", tool_id, status, output, error }      → tool_result block
 //   { type:"result", stats }                                    → usage
-async function streamGemini({ res, id, model, fullHistoryPrompt }) {
+async function streamGemini({ res, id, model, fullHistoryPrompt, workspaceConfig = {} }) {
   // gemini CLI 无 --system flag，把 systemPrompt + full history prepend 到 -p prompt（approach A）。
   // --resume 取 project-scoped index 不利多 conv 并存，故 bridge 每轮重发完整 history 代替续命。
   // --approval-mode yolo：bridge 无 GUI 接通道，缺省 default 模式会等用户确认致流挂死
@@ -333,7 +393,7 @@ async function streamGemini({ res, id, model, fullHistoryPrompt }) {
     const child = spawn(
       "gemini",
       ["-p", fullHistoryPrompt, "-o", "stream-json", "--approval-mode", "yolo"],
-      { stdio: ["ignore", "pipe", "pipe"], env: process.env }
+      { stdio: ["ignore", "pipe", "pipe"], env: process.env, cwd: workspaceConfig.workspaceRoot || undefined }
     );
     const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
     let usage = null;
@@ -408,6 +468,8 @@ const server = createServer(async (req, res) => {
       const conversationFp = fingerprintConversation(model, systemPrompt, payload.messages);
       const id = `chatcmpl-${randomUUID()}`;
       const backend = routeBackend(model);
+      const cliProviderId = cliProviderForBackend(backend);
+      const workspaceConfig = cliProviderId ? loadCliProviderConfig(cliProviderId) : {};
       const wantStream = payload.stream === true;
       // Gemini 走 approach A（history concat），其他走 B（SDK resume by sessionId）
       const fullHistoryPrompt = (backend === "gemini")
@@ -435,9 +497,9 @@ const server = createServer(async (req, res) => {
         };
         console.error(`[bridge] ${new Date().toISOString()} ${backend} ${model} (non-stream) sys=${systemPrompt.length}B fp=${conversationFp.slice(0, 8)} prompt=${prompt.slice(0, 60).replace(/\n/g, "↵")}`);
         try {
-          if (backend === "claude") await streamClaude({ res: fakeRes, id, model, prompt, systemPrompt, conversationFp });
-          else if (backend === "codex") await streamCodex({ res: fakeRes, id, model, prompt, systemPrompt, conversationFp });
-          else if (backend === "gemini") await streamGemini({ res: fakeRes, id, model, fullHistoryPrompt });
+          if (backend === "claude") await streamClaude({ res: fakeRes, id, model, prompt, systemPrompt, conversationFp, workspaceConfig });
+          else if (backend === "codex") await streamCodex({ res: fakeRes, id, model, prompt, systemPrompt, conversationFp, workspaceConfig });
+          else if (backend === "gemini") await streamGemini({ res: fakeRes, id, model, fullHistoryPrompt, workspaceConfig });
         } catch (err) {
           console.error(`[bridge][ERROR non-stream] ${err.message}`);
           textBuf += `\n[bridge:error] ${err.message}`;
@@ -466,9 +528,9 @@ const server = createServer(async (req, res) => {
       console.error(`[bridge] ${new Date().toISOString()} ${backend} ${model} (stream) sys=${systemPrompt.length}B fp=${conversationFp.slice(0, 8)} prompt=${prompt.slice(0, 60).replace(/\n/g, "↵")}`);
 
       try {
-        if (backend === "claude") await streamClaude({ res, id, model, prompt, systemPrompt, conversationFp });
-        else if (backend === "codex") await streamCodex({ res, id, model, prompt, systemPrompt, conversationFp });
-        else if (backend === "gemini") await streamGemini({ res, id, model, fullHistoryPrompt });
+        if (backend === "claude") await streamClaude({ res, id, model, prompt, systemPrompt, conversationFp, workspaceConfig });
+        else if (backend === "codex") await streamCodex({ res, id, model, prompt, systemPrompt, conversationFp, workspaceConfig });
+        else if (backend === "gemini") await streamGemini({ res, id, model, fullHistoryPrompt, workspaceConfig });
         else {
           writeDelta(res, id, model, `[bridge] unknown backend for model ${model}`);
           writeDone(res, id, model);

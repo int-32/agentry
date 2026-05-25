@@ -2,7 +2,7 @@
  * LocalCliSection — Providers Tab 顶部的「本机 Agent CLI」独立区块
  *
  * agentry 之独家差异：与"云端 LLM 供应商"概念分层，按 PATH 扫描显示已装
- * agent CLI（claude / codex / gemini / qwen-code / opencode）+ 模型清单。
+ * agent CLI（claude / codex / gemini / antigravity / qwen-code / opencode）+ 模型清单。
  */
 
 import React, { useCallback, useEffect, useState } from "react";
@@ -46,7 +46,12 @@ interface CliScanResponse {
 }
 
 type SettingsModelEntry = string | { id?: unknown };
-type SettingsProvidersConfig = Record<string, { models?: SettingsModelEntry[] } | undefined>;
+type SettingsProviderConfig = {
+  models?: SettingsModelEntry[];
+  workspace_root?: string;
+  workspace_folders?: string[];
+};
+type SettingsProvidersConfig = Record<string, SettingsProviderConfig | undefined>;
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -71,6 +76,23 @@ function formatScanTime(scannedAt: string | null): string | null {
   });
 }
 
+function normalizeWorkspacePath(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeWorkspaceFolders(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of value) {
+    const folder = normalizeWorkspacePath(item);
+    if (!folder || seen.has(folder)) continue;
+    seen.add(folder);
+    out.push(folder);
+  }
+  return out;
+}
+
 export function LocalCliSection() {
   const { currentAgentId, settingsConfig, showToast } = useSettingsStore(
     useShallow(s => ({
@@ -87,6 +109,7 @@ export function LocalCliSection() {
   const [lastScannedAt, setLastScannedAt] = useState<string | null>(null);
   const [loadedFromCache, setLoadedFromCache] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
+  const [workspaceDrafts, setWorkspaceDrafts] = useState<Record<string, string>>({});
 
   // 已启用之模型清单：从 settingsConfig.providers[cli-<id>].models 派生
   const enabledByCli = React.useMemo(() => {
@@ -103,6 +126,23 @@ export function LocalCliSection() {
         ? cfg.models.map((m) => typeof m === "string" ? m : (typeof m?.id === "string" ? m.id : ""))
         : [];
       out[cli.id] = new Set(ids.filter(Boolean));
+    }
+    return out;
+  }, [settingsConfig, cliS]);
+
+  const workspaceByCli = React.useMemo(() => {
+    const out: Record<string, { root: string; folders: string[] }> = {};
+    const ps: SettingsProvidersConfig = (
+      settingsConfig && typeof settingsConfig === "object" && "providers" in settingsConfig
+        ? (settingsConfig as { providers?: SettingsProvidersConfig }).providers
+        : undefined
+    ) || {};
+    for (const cli of (cliS || [])) {
+      const cfg = ps[`cli-${cli.id}`];
+      out[cli.id] = {
+        root: normalizeWorkspacePath(cfg?.workspace_root),
+        folders: normalizeWorkspaceFolders(cfg?.workspace_folders),
+      };
     }
     return out;
   }, [settingsConfig, cliS]);
@@ -126,6 +166,76 @@ export function LocalCliSection() {
     });
     await loadSettingsConfig();
   }, [currentAgentId]);
+
+  const writeCliWorkspace = useCallback(async (cliId: string, root: string, folders: string[]) => {
+    if (!currentAgentId) return;
+    const pid = `cli-${cliId}`;
+    await hanaFetch(`/api/agents/${currentAgentId}/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        providers: {
+          [pid]: {
+            base_url: BRIDGE_BASE_URL,
+            api_key: BRIDGE_API_KEY,
+            api: BRIDGE_PROTOCOL,
+            workspace_root: root || "",
+            workspace_folders: normalizeWorkspaceFolders(folders),
+          },
+        },
+      }),
+    });
+    await loadSettingsConfig();
+  }, [currentAgentId]);
+
+  const pickWorkspaceRoot = useCallback(async (cliId: string) => {
+    const folder = await window.platform?.selectFolder?.();
+    if (!folder) return;
+    const key = `${cliId}::__workspace_root`;
+    setPending(key);
+    try {
+      await writeCliWorkspace(cliId, folder, workspaceByCli[cliId]?.folders || []);
+      showToast?.("已更新 CLI 工作区", "success");
+    } catch (err: unknown) {
+      showToast?.(`更新失败: ${errorMessage(err)}`, "error");
+    } finally {
+      setPending(null);
+    }
+  }, [workspaceByCli, writeCliWorkspace, showToast]);
+
+  const addWorkspaceFolder = useCallback(async (cliId: string) => {
+    const draft = normalizeWorkspacePath(workspaceDrafts[cliId]);
+    const picked = draft || await window.platform?.selectFolder?.();
+    const folder = normalizeWorkspacePath(picked);
+    if (!folder) return;
+    const current = workspaceByCli[cliId] || { root: "", folders: [] };
+    const nextFolders = normalizeWorkspaceFolders([...current.folders, folder]);
+    const key = `${cliId}::__workspace_add`;
+    setPending(key);
+    try {
+      await writeCliWorkspace(cliId, current.root, nextFolders);
+      setWorkspaceDrafts(prev => ({ ...prev, [cliId]: "" }));
+      showToast?.("已添加授权目录", "success");
+    } catch (err: unknown) {
+      showToast?.(`添加失败: ${errorMessage(err)}`, "error");
+    } finally {
+      setPending(null);
+    }
+  }, [workspaceByCli, workspaceDrafts, writeCliWorkspace, showToast]);
+
+  const removeWorkspaceFolder = useCallback(async (cliId: string, folder: string) => {
+    const current = workspaceByCli[cliId] || { root: "", folders: [] };
+    const key = `${cliId}::__workspace_remove::${folder}`;
+    setPending(key);
+    try {
+      await writeCliWorkspace(cliId, current.root, current.folders.filter(p => p !== folder));
+      showToast?.("已移除授权目录", "success");
+    } catch (err: unknown) {
+      showToast?.(`移除失败: ${errorMessage(err)}`, "error");
+    } finally {
+      setPending(null);
+    }
+  }, [workspaceByCli, writeCliWorkspace, showToast]);
 
   const enableAllForCli = useCallback(async (cliId: string) => {
     const list = models[cliId] || [];
@@ -430,6 +540,90 @@ export function LocalCliSection() {
                       {modelList.length > 30 && (
                         <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>… 还有 {modelList.length - 30} 个</div>
                       )}
+                    </div>
+                  )}
+                  {cli.installed && (
+                    <div style={{ padding: "var(--space-sm) 0", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "var(--space-xs)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-xs)", fontSize: "0.74rem", color: "var(--text-muted)" }}>
+                        <span style={{ fontWeight: 500, color: "var(--text)" }}>工作区</span>
+                        <span>仅用于本机 CLI 模型；Claude Code 会同步为 additionalDirectories</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-xs)", minWidth: 0 }}>
+                        <span style={{ color: "var(--text-muted)", fontSize: "0.72rem", flex: "0 0 auto" }}>cwd</span>
+                        <code style={{ color: "var(--text)", fontSize: "0.72rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                          {workspaceByCli[cli.id]?.root || "未设置"}
+                        </code>
+                        <button
+                          onClick={() => pickWorkspaceRoot(cli.id)}
+                          disabled={pending === `${cli.id}::__workspace_root`}
+                          style={{
+                            padding: "2px 8px",
+                            border: "1px solid var(--border)",
+                            borderRadius: 4,
+                            background: "var(--bg-card)",
+                            color: "var(--text)",
+                            fontSize: "0.72rem",
+                            cursor: pending === `${cli.id}::__workspace_root` ? "default" : "pointer",
+                          }}
+                        >
+                          选择
+                        </button>
+                      </div>
+                      {(workspaceByCli[cli.id]?.folders || []).map(folder => (
+                        <div key={folder} style={{ display: "flex", alignItems: "center", gap: "var(--space-xs)", minWidth: 0 }}>
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem", flex: "0 0 auto" }}>授权</span>
+                          <code style={{ color: "var(--text)", fontSize: "0.72rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{folder}</code>
+                          <button
+                            onClick={() => removeWorkspaceFolder(cli.id, folder)}
+                            disabled={pending === `${cli.id}::__workspace_remove::${folder}`}
+                            style={{
+                              width: 22,
+                              height: 22,
+                              border: "1px solid var(--border)",
+                              borderRadius: 4,
+                              background: "var(--bg-card)",
+                              color: "var(--text-muted)",
+                              cursor: pending === `${cli.id}::__workspace_remove::${folder}` ? "default" : "pointer",
+                              lineHeight: 1,
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                      <div style={{ display: "flex", gap: "var(--space-xs)" }}>
+                        <input
+                          value={workspaceDrafts[cli.id] || ""}
+                          onChange={(e) => setWorkspaceDrafts(prev => ({ ...prev, [cli.id]: e.target.value }))}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder="绝对路径；留空则打开目录选择"
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            padding: "4px 8px",
+                            border: "1px solid var(--border)",
+                            borderRadius: 4,
+                            background: "var(--bg)",
+                            color: "var(--text)",
+                            fontSize: "0.72rem",
+                          }}
+                        />
+                        <button
+                          onClick={() => addWorkspaceFolder(cli.id)}
+                          disabled={pending === `${cli.id}::__workspace_add`}
+                          style={{
+                            padding: "2px 8px",
+                            border: "1px solid var(--border)",
+                            borderRadius: 4,
+                            background: "var(--bg-card)",
+                            color: "var(--text)",
+                            fontSize: "0.72rem",
+                            cursor: pending === `${cli.id}::__workspace_add` ? "default" : "pointer",
+                          }}
+                        >
+                          添加
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

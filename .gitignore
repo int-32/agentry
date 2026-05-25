@@ -43,6 +43,7 @@ node_modules/
 
 # IDE / 工具
 .claude/
+.antigravitycli/
 .agents/skills/
 *.code-workspace
 

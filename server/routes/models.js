@@ -138,6 +138,10 @@ export function createModelsRoute(engine) {
       if (!provider) {
         return c.json({ error: t("error.missingParam", { param: "provider" }) }, 400);
       }
+      const available = Array.isArray(engine.availableModels) ? engine.availableModels : [];
+      if (!available.some(m => m.id === modelId && m.provider === provider)) {
+        return c.json({ error: t("error.modelNotFound", { id: `${provider}/${modelId}` }) }, 404);
+      }
       engine.setPendingModel(modelId, provider);
       return c.json({ ok: true, model: engine.currentModel?.name, pendingModel: true });
     } catch (err) {

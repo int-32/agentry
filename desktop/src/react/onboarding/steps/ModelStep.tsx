@@ -28,7 +28,9 @@ function toSavedModelEntry(model: AddedModelDraft): AddedModelEntry {
   const hasMeta = !!model.name?.trim()
     || typeof model.context === 'number'
     || typeof model.maxOutput === 'number'
+    || typeof model.type === 'string'
     || typeof model.image === 'boolean'
+    || typeof model.video === 'boolean'
     || typeof model.reasoning === 'boolean';
   if (!hasMeta) return model.id;
   return {
@@ -36,7 +38,9 @@ function toSavedModelEntry(model: AddedModelDraft): AddedModelEntry {
     ...(model.name?.trim() ? { name: model.name.trim() } : {}),
     ...(typeof model.context === 'number' ? { context: model.context } : {}),
     ...(typeof model.maxOutput === 'number' ? { maxOutput: model.maxOutput } : {}),
+    ...(typeof model.type === 'string' && model.type.trim() ? { type: model.type.trim() } : {}),
     ...(typeof model.image === 'boolean' ? { image: model.image } : {}),
+    ...(typeof model.video === 'boolean' ? { video: model.video } : {}),
     ...(typeof model.reasoning === 'boolean' ? { reasoning: model.reasoning } : {}),
   };
 }
@@ -124,7 +128,9 @@ export function ModelStep({
       name: reference?.name || fetched?.name || '',
       context: numberFromMeta(reference?.context) ?? numberFromMeta(fetched?.context),
       maxOutput: numberFromMeta(reference?.maxOutput) ?? numberFromMeta(fetched?.maxOutput),
+      type: typeof reference?.type === 'string' ? reference.type : (typeof fetched?.type === 'string' ? fetched.type : undefined),
       image: boolFromMeta(reference?.image ?? reference?.vision),
+      video: boolFromMeta(reference?.video),
       reasoning: boolFromMeta(reference?.reasoning),
     };
   }, [fetchedModels, providerName]);
@@ -135,7 +141,9 @@ export function ModelStep({
       name: model.name ?? baseline.name,
       context: model.context ?? baseline.context,
       maxOutput: model.maxOutput ?? baseline.maxOutput,
+      type: model.type ?? baseline.type,
       image: model.image ?? baseline.image,
+      video: model.video ?? baseline.video,
       reasoning: model.reasoning ?? baseline.reasoning,
     };
   }, [baselineForModel]);
@@ -157,12 +165,22 @@ export function ModelStep({
   const addModel = useCallback((rawModelId: string) => {
     const modelId = rawModelId.trim();
     if (!modelId || addedModelIds.has(modelId)) return;
-    const next = [...addedModels, { id: modelId }];
+    const baseline = baselineForModel(modelId);
+    const next = [...addedModels, {
+      id: modelId,
+      ...(baseline.name ? { name: baseline.name } : {}),
+      ...(typeof baseline.context === 'number' ? { context: baseline.context } : {}),
+      ...(typeof baseline.maxOutput === 'number' ? { maxOutput: baseline.maxOutput } : {}),
+      ...(typeof baseline.type === 'string' ? { type: baseline.type } : {}),
+      ...(typeof baseline.image === 'boolean' ? { image: baseline.image } : {}),
+      ...(typeof baseline.video === 'boolean' ? { video: baseline.video } : {}),
+      ...(typeof baseline.reasoning === 'boolean' ? { reasoning: baseline.reasoning } : {}),
+    }];
     setAddedModels(next);
     if (!selectedModel) setSelectedModel(modelId);
     setAddMenuOpen(false);
     setModelSearch('');
-  }, [addedModelIds, addedModels, selectedModel]);
+  }, [addedModelIds, addedModels, baselineForModel, selectedModel]);
 
   const addManualModel = useCallback(() => {
     const modelId = manualModelId.trim();

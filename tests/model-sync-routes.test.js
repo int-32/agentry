@@ -861,6 +861,13 @@ describe("model sync related routes", () => {
         json: async () => ({
           data: [
             { id: "qwen3.6-plus", context_length: 1000000 },
+            {
+              id: "qwen-vl-plus",
+              context_length: "131072",
+              max_output_tokens: "8192",
+              input_modalities: ["text", "image"],
+              capabilities: { reasoning: true },
+            },
             { id: "wan2.7-image", name: "Wan 2.7 Image" },
             { id: "custom-render", output_modalities: ["image"] },
           ],
@@ -895,12 +902,23 @@ describe("model sync related routes", () => {
       const data = await res.json();
       expect(data.models).toEqual([
         expect.objectContaining({ id: "qwen3.6-plus" }),
+        expect.objectContaining({
+          id: "qwen-vl-plus",
+          context: 131072,
+          maxOutput: 8192,
+          image: true,
+          reasoning: true,
+        }),
         expect.objectContaining({ id: "wan2.7-image", type: "image" }),
         expect.objectContaining({ id: "custom-render", type: "image" }),
       ]);
 
       const cached = JSON.parse(fs.readFileSync(path.join(tmpDir, "models-cache.json"), "utf-8"));
       expect(cached.dashscope.models.find(m => m.id === "wan2.7-image").type).toBe("image");
+      expect(cached.dashscope.models.find(m => m.id === "qwen-vl-plus")).toMatchObject({
+        image: true,
+        reasoning: true,
+      });
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

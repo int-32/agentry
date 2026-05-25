@@ -50,3 +50,18 @@ export async function loadModels(): Promise<void> {
   } catch { /* silent */ }
 }
 
+export function applyPendingModelLocally(modelId: string, provider?: string): void {
+  if (!modelId || !provider) return;
+  const state = useStore.getState();
+  const models = Array.isArray(state.models) ? state.models : [];
+  const nextModels = models.length > 0
+    ? models.map((m: any) => ({
+      ...m,
+      isCurrent: m.id === modelId && m.provider === provider,
+    }))
+    : models;
+  useStore.setState({
+    ...(models.length > 0 ? { models: nextModels } : {}),
+    currentModel: { id: modelId, provider },
+  });
+}
