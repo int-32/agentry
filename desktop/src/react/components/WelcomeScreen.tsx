@@ -11,7 +11,7 @@ import type { MutableRefObject } from 'react';
 import { useStore } from '../stores';
 import { hanaFetch } from '../hooks/use-hana-fetch';
 import { useI18n } from '../hooks/use-i18n';
-import { applyPendingModelLocally, loadModels } from '../utils/ui-helpers';
+import { applyPendingModelLocally } from '../utils/ui-helpers';
 import { activateWorkspaceDesk, addWorkspaceFolder, applyFolder, loadDeskFiles, removeWorkspaceFolder } from '../stores/desk-actions';
 import { openSettingsModal } from '../stores/settings-modal-actions';
 import type { Agent } from '../types';
@@ -56,21 +56,6 @@ function readConfigChatModel(config: any): { id: string; provider: string } | nu
   return id && provider ? { id, provider } : null;
 }
 
-function hasAvailableModel(chatModel: { id: string; provider: string }): boolean {
-  const models = useStore.getState().models;
-  return Array.isArray(models) && models.some(model => model.id === chatModel.id && model.provider === chatModel.provider);
-}
-
-async function canApplyModel(chatModel: { id: string; provider: string }): Promise<boolean> {
-  let models = useStore.getState().models;
-  if (!Array.isArray(models) || models.length === 0) {
-    await loadModels();
-    models = useStore.getState().models;
-    if (!Array.isArray(models) || models.length === 0) return true;
-  }
-  return hasAvailableModel(chatModel);
-}
-
 const agentConfigCache = new Map<string, any>();
 const AGENT_SWITCH_COMMIT_DELAY_MS = 160;
 const ENABLE_AGENT_CONFIG_CACHE = typeof process === 'undefined' || process.env?.NODE_ENV !== 'test';
@@ -109,29 +94,43 @@ function scheduleAgentDeskLoad(agentId: string, homeFolder: string | null, versi
     });
 }
 
+function addAgentModelUnavailableToast(agentId: string, chatModel: { id: string; provider: string }): void {
+  useStore.getState().addToast(
+    `Agent ${agentId} 配置的模型不可用，已跳过模型切换：${chatModel.provider}/${chatModel.id}`,
+    'warning',
+    5000,
+    { dedupeKey: `agent-model-unavailable:${agentId}:${chatModel.provider}/${chatModel.id}` },
+  );
+}
+
 function applyAgentChatModel(agentId: string, chatModel: { id: string; provider: string } | null, version: number, selectionVersionRef: MutableRefObject<number>): void {
   if (!chatModel) return;
   void logAsyncPerf(
     'welcome.agent.model',
     async () => {
-      const available = await canApplyModel(chatModel);
       if (version !== selectionVersionRef.current) return;
-      if (!available) {
-        useStore.getState().addToast(
-          `Agent ${agentId} 配置的模型不可用，已跳过模型切换：${chatModel.provider}/${chatModel.id}`,
-          'warning',
-          5000,
-          { dedupeKey: `agent-model-unavailable:${agentId}:${chatModel.provider}/${chatModel.id}` },
-        );
+
+      const previousModel = useStore.getState().currentModel;
+      if (previousModel?.id === chatModel.id && previousModel?.provider === chatModel.provider) {
         return;
       }
-      await hanaFetch('/api/models/set', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelId: chatModel.id, provider: chatModel.provider }),
-      });
-      if (version === selectionVersionRef.current) {
-        applyPendingModelLocally(chatModel.id, chatModel.provider);
+
+      applyPendingModelLocally(chatModel.id, chatModel.provider);
+
+      try {
+        await hanaFetch('/api/models/set', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modelId: chatModel.id, provider: chatModel.provider }),
+        });
+      } catch {
+        if (version !== selectionVersionRef.current) return;
+        if (previousModel?.id && previousModel?.provider) {
+          applyPendingModelLocally(previousModel.id, previousModel.provider);
+        } else {
+          useStore.setState({ currentModel: null });
+        }
+        addAgentModelUnavailableToast(agentId, chatModel);
       }
     },
     { agent: agentId, model: chatModel.id, provider: chatModel.provider },

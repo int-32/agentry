@@ -148,7 +148,7 @@ describe('WelcomeScreen workspace picker', () => {
     }));
   });
 
-  it('skips model switching when the selected agent model is unavailable', async () => {
+  it('shows a warning and reverts local state when the selected agent model is rejected by the server', async () => {
     hanaFetchMock.mockImplementation(async (url: string) => {
       if (url === '/api/agents/artist/config') {
         return {
@@ -161,6 +161,9 @@ describe('WelcomeScreen workspace picker', () => {
       if (url === '/api/desk') {
         return { json: async () => ({ files: [] }) };
       }
+      if (url === '/api/models/set') {
+        throw new Error('hanaFetch /api/models/set: 404 Not Found');
+      }
       return { json: async () => ({ ok: true, models: [] }) };
     });
     useStore.setState({
@@ -169,6 +172,7 @@ describe('WelcomeScreen workspace picker', () => {
         { id: 'artist', name: 'Artist', yuan: 'ming', isPrimary: false, memoryMasterEnabled: true },
       ],
       models: [{ id: 'available-chat', name: 'Available Chat', provider: 'deepseek' }],
+      currentModel: { id: 'available-chat', provider: 'deepseek' },
       currentAgentId: 'hana',
       selectedAgentId: null,
       selectedFolder: '/workspace/agentry',
@@ -185,8 +189,61 @@ describe('WelcomeScreen workspace picker', () => {
     });
 
     expect(hanaFetchMock).toHaveBeenCalledWith('/api/agents/artist/config');
-    expect(hanaFetchMock).not.toHaveBeenCalledWith('/api/models/set', expect.anything());
+    expect(hanaFetchMock).toHaveBeenCalledWith('/api/models/set', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ modelId: 'missing-chat', provider: 'deepseek' }),
+    }));
+    expect(useStore.getState().currentModel).toEqual({ id: 'available-chat', provider: 'deepseek' });
     expect(useStore.getState().toasts.some(t => t.dedupeKey === 'agent-model-unavailable:artist:deepseek/missing-chat')).toBe(true);
+  });
+
+  it('does not reload the full model list when switching from a CLI model to an agent provider model', async () => {
+    const urls: string[] = [];
+    hanaFetchMock.mockImplementation(async (url: string) => {
+      urls.push(url);
+      if (url === '/api/agents/artist/config') {
+        return {
+          json: async () => ({
+            desk: { home_folder: '/workspace/ArtistHome' },
+            models: { chat: { id: 'artist-chat', provider: 'deepseek' } },
+          }),
+        };
+      }
+      if (url === '/api/models') {
+        throw new Error('unexpected full model reload');
+      }
+      if (url === '/api/desk') {
+        return { json: async () => ({ files: [] }) };
+      }
+      return { json: async () => ({ ok: true }) };
+    });
+    useStore.setState({
+      agents: [
+        { id: 'hana', name: 'Agentry', yuan: 'hanako', isPrimary: true, memoryMasterEnabled: true },
+        { id: 'artist', name: 'Artist', yuan: 'ming', isPrimary: false, memoryMasterEnabled: true },
+      ],
+      models: [{ id: 'agy-gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'cli-antigravity', isCurrent: true }],
+      currentModel: { id: 'agy-gemini-3.5-flash', provider: 'cli-antigravity' },
+      currentAgentId: 'hana',
+      selectedAgentId: null,
+      selectedFolder: '/workspace/agentry',
+      homeFolder: '/workspace/agentry',
+      deskBasePath: '/workspace/agentry',
+      workspaceFolders: ['/workspace/Reference'],
+    } as never);
+    const { WelcomeScreen } = await import('../../components/WelcomeScreen');
+
+    render(<WelcomeScreen />);
+    fireEvent.click(screen.getByRole('button', { name: /Artist/ }));
+    await waitFor(() => {
+      expect(hanaFetchMock).toHaveBeenCalledWith('/api/models/set', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ modelId: 'artist-chat', provider: 'deepseek' }),
+      }));
+    });
+
+    expect(urls).not.toContain('/api/models');
+    expect(useStore.getState().currentModel).toEqual({ id: 'artist-chat', provider: 'deepseek' });
   });
 
   it('clears the inherited workspace when the selected agent has no configured home folder', async () => {
