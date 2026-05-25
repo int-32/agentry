@@ -2065,10 +2065,48 @@
     }
   },
   "antigravity": {
-    "antigravity": {
-      "name": "Antigravity CLI",
+    "agy-gemini-3.5-flash": {
+      "name": "Gemini 3.5 Flash",
+      "context": 1048576,
+      "maxOutput": 65536,
+      "reasoning": true
+    },
+    "agy-gemini-3.1-pro-high": {
+      "name": "Gemini 3.1 Pro (High)",
+      "context": 1048576,
+      "maxOutput": 65536,
+      "reasoning": true,
+      "xhigh": true
+    },
+    "agy-gemini-3.1-pro-low": {
+      "name": "Gemini 3.1 Pro (Low)",
+      "context": 1048576,
+      "maxOutput": 65536,
+      "reasoning": true
+    },
+    "agy-gemini-3-flash": {
+      "name": "Gemini 3 Flash",
+      "context": 1048576,
+      "maxOutput": 65535,
+      "reasoning": true
+    },
+    "agy-claude-sonnet-4.6-thinking": {
+      "name": "Claude Sonnet 4.6 (Thinking)",
+      "context": 200000,
+      "maxOutput": 64000,
+      "reasoning": true
+    },
+    "agy-claude-opus-4.6-thinking": {
+      "name": "Claude Opus 4.6 (Thinking)",
+      "context": 200000,
+      "maxOutput": 64000,
+      "reasoning": true,
+      "xhigh": true
+    },
+    "agy-gpt-oss-120b": {
+      "name": "GPT-OSS-120b",
       "context": 128000,
-      "maxOutput": 8192,
+      "maxOutput": 32768,
       "reasoning": true
     }
   },

@@ -39,6 +39,9 @@ describe("local cli detector", () => {
     fs.chmodSync(binaryPath, 0o755);
 
     expect(resolveBinaryOnAgentCliPath("agy", { envPath: "/usr/bin", homeDir: tempRoot })).toBe(binaryPath);
-    expect(getModelsForCli("antigravity").map(model => model.id)).toContain("antigravity");
+    const modelIds = getModelsForCli("antigravity").map(model => model.id);
+    expect(modelIds).toContain("agy-gemini-3.5-flash");
+    expect(modelIds).toContain("agy-claude-opus-4.6-thinking");
+    expect(modelIds.length).toBeGreaterThan(1);
   });
 });

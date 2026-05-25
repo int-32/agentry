@@ -504,7 +504,13 @@ const server = createServer(async (req, res) => {
         { id: "claude-sonnet-4-5", object: "model", owned_by: "agentry-bridge" },
         { id: "codex", object: "model", owned_by: "agentry-bridge" },
         { id: "gemini-3", object: "model", owned_by: "agentry-bridge" },
-        { id: "antigravity", object: "model", owned_by: "agentry-bridge" },
+        { id: "agy-gemini-3.5-flash", object: "model", owned_by: "agentry-bridge" },
+        { id: "agy-gemini-3.1-pro-high", object: "model", owned_by: "agentry-bridge" },
+        { id: "agy-gemini-3.1-pro-low", object: "model", owned_by: "agentry-bridge" },
+        { id: "agy-gemini-3-flash", object: "model", owned_by: "agentry-bridge" },
+        { id: "agy-claude-sonnet-4.6-thinking", object: "model", owned_by: "agentry-bridge" },
+        { id: "agy-claude-opus-4.6-thinking", object: "model", owned_by: "agentry-bridge" },
+        { id: "agy-gpt-oss-120b", object: "model", owned_by: "agentry-bridge" },
       ],
     }));
     return;
