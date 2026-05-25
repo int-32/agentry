@@ -7,11 +7,11 @@ import os from "os";
 import path from "path";
 import YAML from "js-yaml";
 import { runMigrations } from "../core/migrations.js";
-import { getAgentPhoneProjectionPath } from "../lib/conversations/agent-phone-projection.js";
+import { getAgentPhoneProjectionPath, safeConversationStem } from "../lib/conversations/agent-phone-projection.js";
 
 // ── 测试工具 ────────────────────────────────────────────────────────────────
 
-const LATEST_DATA_VERSION = 31;
+const LATEST_DATA_VERSION = 32;
 
 function makeTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "hana-migrations-"));
@@ -2987,6 +2987,90 @@ describe("migration #29 — heartbeat default is explicit opt-in", () => {
     expect(readAgentConfig(agentsDir, "missing").desk.heartbeat_enabled).toBe(false);
     expect(readAgentConfig(agentsDir, "enabled").desk.heartbeat_enabled).toBe(true);
     expect(readAgentConfig(agentsDir, "disabled").desk.heartbeat_enabled).toBe(false);
+    expect(prefs.getPreferences()._dataVersion).toBe(LATEST_DATA_VERSION);
+  });
+});
+
+describe("migration #32 — move Agent Phone runtime out of projection", () => {
+  let tmpDir, userDir, agentsDir;
+
+  beforeEach(() => {
+    tmpDir = makeTmpDir();
+    userDir = path.join(tmpDir, "user");
+    agentsDir = path.join(tmpDir, "agents");
+    fs.mkdirSync(userDir, { recursive: true });
+    fs.mkdirSync(agentsDir, { recursive: true });
+  });
+
+  afterEach(() => { fs.rmSync(tmpDir, { recursive: true, force: true }); });
+
+  it("moves session runtime fields to a sidecar and removes stale toolNames from projection", () => {
+    const agentDir = path.join(agentsDir, "hana");
+    const projectionPath = getAgentPhoneProjectionPath(agentDir, "ch_legacy");
+    fs.mkdirSync(path.dirname(projectionPath), { recursive: true });
+    fs.writeFileSync(
+      projectionPath,
+      [
+        "---",
+        "agentId: hana",
+        "conversationId: ch_legacy",
+        "conversationType: channel",
+        "state: idle",
+        "summary: Replied",
+        "lastViewedTimestamp: 2026-05-25 12:00:00",
+        "phoneSessionFile: phone/sessions/ch_legacy/old.jsonl",
+        "lastPhoneSessionUsedAt: 2026-05-25T12:10:00.000Z",
+        "phoneSessionStartedAt: 2026-05-25T12:00:00.000Z",
+        `promptSnapshot: ${encodeURIComponent(JSON.stringify({ version: 1, systemPrompt: "old prompt" }))}`,
+        `toolNames: ${encodeURIComponent(JSON.stringify(["search_memory"]))}`,
+        "---",
+        "",
+        "# Agent Phone",
+        "",
+        "## Activity",
+        "- 2026-05-25T12:11:00.000Z [idle] Replied",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    const prefs = makePrefs(userDir);
+    prefs.savePreferences({ _dataVersion: 31 });
+    runMigrations({
+      hanakoHome: tmpDir,
+      agentsDir,
+      prefs,
+      providerRegistry: makeRegistry([]),
+      log: () => {},
+    });
+
+    const projectionRaw = fs.readFileSync(projectionPath, "utf-8");
+    expect(projectionRaw).toContain("state: idle");
+    expect(projectionRaw).toContain("lastViewedTimestamp: 2026-05-25 12:00:00");
+    expect(projectionRaw).toContain("[idle] Replied");
+    expect(projectionRaw).not.toContain("phoneSessionFile");
+    expect(projectionRaw).not.toContain("lastPhoneSessionUsedAt");
+    expect(projectionRaw).not.toContain("phoneSessionStartedAt");
+    expect(projectionRaw).not.toContain("promptSnapshot");
+    expect(projectionRaw).not.toContain("toolNames");
+
+    const runtimePath = path.join(
+      agentDir,
+      "phone",
+      "session-runtime",
+      `${safeConversationStem("ch_legacy")}.json`,
+    );
+    const runtime = JSON.parse(fs.readFileSync(runtimePath, "utf-8"));
+    expect(runtime).toMatchObject({
+      agentId: "hana",
+      conversationId: "ch_legacy",
+      conversationType: "channel",
+      phoneSessionFile: "phone/sessions/ch_legacy/old.jsonl",
+      lastPhoneSessionUsedAt: "2026-05-25T12:10:00.000Z",
+      phoneSessionStartedAt: "2026-05-25T12:00:00.000Z",
+      promptSnapshot: { version: 1, systemPrompt: "old prompt" },
+    });
+    expect(runtime.toolNames).toBeUndefined();
     expect(prefs.getPreferences()._dataVersion).toBe(LATEST_DATA_VERSION);
   });
 });
