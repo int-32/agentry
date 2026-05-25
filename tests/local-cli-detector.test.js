@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   buildAgentCliSearchPath,
+  getModelsForCli,
   resolveBinaryOnAgentCliPath,
 } from "../lib/local-cli/detector.js";
 
@@ -28,5 +29,16 @@ describe("local cli detector", () => {
 
     expect(buildAgentCliSearchPath({ envPath: "/usr/bin", homeDir: tempRoot })).toContain(localBin);
     expect(resolveBinaryOnAgentCliPath("claude", { envPath: "/usr/bin", homeDir: tempRoot })).toBe(binaryPath);
+  });
+
+  it("detects Antigravity CLI from the common user bin path", () => {
+    const localBin = path.join(tempRoot, ".local", "bin");
+    const binaryPath = path.join(localBin, "agy");
+    fs.mkdirSync(localBin, { recursive: true });
+    fs.writeFileSync(binaryPath, "#!/bin/sh\nprintf '1.0.1\\n'\n", "utf-8");
+    fs.chmodSync(binaryPath, 0o755);
+
+    expect(resolveBinaryOnAgentCliPath("agy", { envPath: "/usr/bin", homeDir: tempRoot })).toBe(binaryPath);
+    expect(getModelsForCli("antigravity").map(model => model.id)).toContain("antigravity");
   });
 });

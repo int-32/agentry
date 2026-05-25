@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 /**
- * agentry-bridge — 本机 OpenAI 兼容 HTTP server，桥三家 SDK/CLI 到 chat completions 协议
+ * agentry-bridge — 本机 OpenAI 兼容 HTTP server，桥本机 SDK/CLI 到 chat completions 协议
  *
  * 监听 :51720，实现 POST /v1/chat/completions + SSE，按 model 字段路由：
  *   claude-* / opus / sonnet / haiku  → @anthropic-ai/claude-agent-sdk
  *   codex / gpt-codex                  → @openai/codex-sdk
  *   gemini / gemini-*                  → gemini CLI spawn `-o stream-json`
+ *   antigravity / agy                  → Antigravity CLI spawn `--print`
  *
  * Hanako / 任何 OpenAI 兼容 client 可注册为 API provider，
  *   base_url: http://127.0.0.1:51720/v1
  *   api_key:  任意（本机不验）
- *   model:    claude-opus-4-1 / codex / gemini-3 等
+ *   model:    claude-opus-4-1 / codex / gemini-3 / antigravity 等
  *
  * 跑法：node scripts/agentry-bridge/server.mjs
  */
@@ -76,7 +77,7 @@ function loadCliProviderConfig(providerId) {
 // Hanako 每轮发完整 messages 历史给 bridge，但 Claude / Codex SDK 之 query 之 prompt 只取最后一条
 // （丢历史）。修法：bridge 维护 fingerprint(model + system + 首 user 内容) → SDK session_id 之
 // 映射；首轮新建并捕 session_id 入表，次轮起以 resume / resumeThread 续接 SDK 端持化之 session。
-// Gemini CLI 之 --resume 取 project-scoped index 不利多 conv 并存，降级走 history concat。
+// Gemini / Antigravity CLI 之 --resume/--continue 取 project-scoped index 不利多 conv 并存，降级走 history concat。
 const conversationSessions = new Map(); // fp -> { backend, sessionId, lastAccessed }
 const CONV_CACHE_MAX = 200; // 简易 LRU 上限
 
@@ -113,6 +114,7 @@ function lookupSession(fp, backend) {
 function routeBackend(model) {
   const m = (model || "").toLowerCase();
   if (m.includes("codex") || m.includes("gpt-codex")) return "codex";
+  if (m.includes("antigravity") || m === "agy" || m.startsWith("agy-")) return "antigravity";
   if (m.includes("gemini")) return "gemini";
   // 默认 Claude
   return "claude";
@@ -122,6 +124,7 @@ function cliProviderForBackend(backend) {
   if (backend === "claude") return "cli-claude-code";
   if (backend === "codex") return "cli-codex";
   if (backend === "gemini") return "cli-gemini";
+  if (backend === "antigravity") return "cli-antigravity";
   return null;
 }
 
@@ -161,9 +164,9 @@ function composeForNoSystemBackend(systemPrompt, userPrompt) {
   return `=== SYSTEM ===\n${systemPrompt}\n\n=== USER ===\n${userPrompt}`;
 }
 
-// ── Gemini 用：把完整 conversation 历史拍平为单段 text（approach A — token 倍增但能跑）──
-// 用于 Gemini 因其 --resume 取 project-scoped index 不利多 conv 并存，故走 history concat 代替
-function flattenHistoryForGemini(systemPrompt, messages) {
+// ── CLI 用：把完整 conversation 历史拍平为单段 text（approach A — token 倍增但能跑）──
+// 用于 Gemini / Antigravity 因 CLI 续接是 project-scoped，不利多 conv 并存，故走 history concat 代替
+function flattenHistoryForCli(systemPrompt, messages) {
   const parts = [];
   if (systemPrompt) parts.push(`=== SYSTEM ===\n${systemPrompt}`);
   if (!Array.isArray(messages)) return parts.join("\n\n");
@@ -433,6 +436,58 @@ async function streamGemini({ res, id, model, fullHistoryPrompt, workspaceConfig
   });
 }
 
+// ── Antigravity CLI spawn ──
+// agy 1.x 当前仅公开 --print 文本模式，未提供 gemini CLI 的 stream-json 事件流。
+// 因此这里把 stdout 直接作为 assistant text 增量透出，tool/usage 先降级为空。
+async function streamAntigravity({ res, id, model, fullHistoryPrompt, workspaceConfig = {} }) {
+  return new Promise((resolve) => {
+    const args = ["--print", fullHistoryPrompt, "--print-timeout", process.env.AGENTRY_BRIDGE_AGY_PRINT_TIMEOUT || "10m"];
+    for (const folder of workspaceConfig.workspaceFolders || []) {
+      args.push("--add-dir", folder);
+    }
+    if (process.env.AGENTRY_BRIDGE_AGY_SKIP_PERMISSIONS !== "0") {
+      args.push("--dangerously-skip-permissions");
+    }
+
+    const child = spawn(
+      "agy",
+      args,
+      { stdio: ["ignore", "pipe", "pipe"], env: process.env, cwd: workspaceConfig.workspaceRoot || undefined }
+    );
+    let stderr = "";
+    let wrote = false;
+    let finished = false;
+
+    const finish = (finishReason = "stop") => {
+      if (finished) return;
+      finished = true;
+      if (!wrote && stderr.trim()) {
+        writeDelta(res, id, model, `\n[bridge:antigravity] ${stderr.trim()}`);
+      }
+      writeDone(res, id, model, finishReason);
+      resolve();
+    };
+
+    child.stdout.on("data", (chunk) => {
+      const text = chunk.toString("utf-8");
+      if (!text) return;
+      wrote = true;
+      writeDelta(res, id, model, text);
+    });
+    child.stderr.on("data", (chunk) => {
+      const text = chunk.toString("utf-8");
+      stderr += text;
+      if (stderr.length > 8000) stderr = stderr.slice(-8000);
+    });
+    child.on("close", () => finish("stop"));
+    child.on("error", (err) => {
+      writeDelta(res, id, model, `\n[bridge:antigravity-spawn-error] ${err.message}`);
+      wrote = true;
+      finish("stop");
+    });
+  });
+}
+
 // ── HTTP server ──
 const server = createServer(async (req, res) => {
   // CORS / preflight
@@ -449,6 +504,7 @@ const server = createServer(async (req, res) => {
         { id: "claude-sonnet-4-5", object: "model", owned_by: "agentry-bridge" },
         { id: "codex", object: "model", owned_by: "agentry-bridge" },
         { id: "gemini-3", object: "model", owned_by: "agentry-bridge" },
+        { id: "antigravity", object: "model", owned_by: "agentry-bridge" },
       ],
     }));
     return;
@@ -471,9 +527,9 @@ const server = createServer(async (req, res) => {
       const cliProviderId = cliProviderForBackend(backend);
       const workspaceConfig = cliProviderId ? loadCliProviderConfig(cliProviderId) : {};
       const wantStream = payload.stream === true;
-      // Gemini 走 approach A（history concat），其他走 B（SDK resume by sessionId）
-      const fullHistoryPrompt = (backend === "gemini")
-        ? flattenHistoryForGemini(systemPrompt, payload.messages)
+      // CLI 后端走 approach A（history concat），SDK 后端走 B（SDK resume by sessionId）
+      const fullHistoryPrompt = (backend === "gemini" || backend === "antigravity")
+        ? flattenHistoryForCli(systemPrompt, payload.messages)
         : null;
 
       // ── 非流式 (stream: false) —— 累计后一次返完整 ChatCompletion JSON ──
@@ -500,6 +556,7 @@ const server = createServer(async (req, res) => {
           if (backend === "claude") await streamClaude({ res: fakeRes, id, model, prompt, systemPrompt, conversationFp, workspaceConfig });
           else if (backend === "codex") await streamCodex({ res: fakeRes, id, model, prompt, systemPrompt, conversationFp, workspaceConfig });
           else if (backend === "gemini") await streamGemini({ res: fakeRes, id, model, fullHistoryPrompt, workspaceConfig });
+          else if (backend === "antigravity") await streamAntigravity({ res: fakeRes, id, model, fullHistoryPrompt, workspaceConfig });
         } catch (err) {
           console.error(`[bridge][ERROR non-stream] ${err.message}`);
           textBuf += `\n[bridge:error] ${err.message}`;
@@ -531,6 +588,7 @@ const server = createServer(async (req, res) => {
         if (backend === "claude") await streamClaude({ res, id, model, prompt, systemPrompt, conversationFp, workspaceConfig });
         else if (backend === "codex") await streamCodex({ res, id, model, prompt, systemPrompt, conversationFp, workspaceConfig });
         else if (backend === "gemini") await streamGemini({ res, id, model, fullHistoryPrompt, workspaceConfig });
+        else if (backend === "antigravity") await streamAntigravity({ res, id, model, fullHistoryPrompt, workspaceConfig });
         else {
           writeDelta(res, id, model, `[bridge] unknown backend for model ${model}`);
           writeDone(res, id, model);
@@ -555,4 +613,5 @@ server.listen(PORT, "127.0.0.1", () => {
   console.error(`  claude-*  → @anthropic-ai/claude-agent-sdk`);
   console.error(`  codex     → @openai/codex-sdk`);
   console.error(`  gemini-*  → gemini CLI (-o stream-json)`);
+  console.error(`  antigravity / agy → Antigravity CLI (--print)`);
 });
