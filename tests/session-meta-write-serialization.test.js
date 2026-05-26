@@ -31,7 +31,6 @@ vi.mock("../lib/debug-log.js", () => ({
 }));
 
 import { SessionCoordinator } from "../core/session-coordinator.js";
-import { SessionManager } from "../lib/pi-sdk/index.js";
 
 function makeCoordinatorDeps(overrides = {}) {
   return {
@@ -80,8 +79,6 @@ describe("SessionCoordinator.writeSessionMeta serialization", () => {
     sessionDir = path.join(tmpDir, "sessions");
     fs.mkdirSync(sessionDir, { recursive: true });
     fakeSessionPath = path.join(sessionDir, "test-session.jsonl");
-    vi.mocked(SessionManager.list).mockReset();
-
     const deps = makeCoordinatorDeps({ _sessionDir: sessionDir });
     // override getAgent to return dynamic sessionDir from tmpDir
     deps.getAgent = () => ({
@@ -201,16 +198,22 @@ describe("SessionCoordinator.writeSessionMeta serialization", () => {
       "utf-8",
     );
 
-    vi.mocked(SessionManager.list).mockResolvedValueOnce([
-      {
-        path: sessionPath,
-        title: null,
-        firstMessage: "hello",
-        modified: new Date("2026-04-29T07:00:00.000Z"),
-        messageCount: 1,
+    fs.writeFileSync(sessionPath, [
+      JSON.stringify({
+        type: "session",
+        id: "pinned",
+        timestamp: "2026-04-29T07:00:00.000Z",
         cwd: "/tmp/work",
-      },
-    ]);
+      }),
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "hello" }],
+          timestamp: "2026-04-29T07:01:00.000Z",
+        },
+      }),
+    ].join("\n") + "\n");
 
     const coord = new SessionCoordinator(makeCoordinatorDeps({
       agentsDir,

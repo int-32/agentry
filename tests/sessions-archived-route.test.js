@@ -30,6 +30,7 @@ function makeEngine(tmpDir) {
   return {
     agentsDir: path.join(tmpDir, "agents"),
     closeSession: vi.fn(async () => {}),
+    discardSessionRuntime: vi.fn(async () => false),
     setSessionPinned: vi.fn(async () => null),
     agentIdFromSessionPath: (p) => {
       const rel = path.relative(path.join(tmpDir, "agents"), p);
@@ -92,6 +93,21 @@ describe("archive route: mtime semantics", () => {
     expect(res.status).toBe(200);
     expect(fs.existsSync(sidecar)).toBe(false);
     expect(fs.existsSync(`${dest}.files.json`)).toBe(true);
+  });
+
+  it("discards active and archived runtime state before moving the session", async () => {
+    const src = path.join(tmpDir, "agents", "a", "sessions", "s1.jsonl");
+    const dest = path.join(tmpDir, "agents", "a", "sessions", "archived", "s1.jsonl");
+
+    const res = await app.request("/api/sessions/archive", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: src }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(engine.discardSessionRuntime).toHaveBeenCalledWith(src, "parent session archived");
+    expect(engine.discardSessionRuntime).toHaveBeenCalledWith(dest, "parent session archived");
   });
 
   it("invalidates rc attachment and pending that point at the archived session", async () => {
@@ -295,6 +311,18 @@ describe("POST /api/sessions/archived/delete", () => {
       }),
       activeKey,
     );
+  });
+
+  it("discards active and archived runtime state before permanent delete", async () => {
+    const res = await app.request("/api/sessions/archived/delete", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: archPath }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(engine.discardSessionRuntime).toHaveBeenCalledWith(activeKey, "parent session deleted");
+    expect(engine.discardSessionRuntime).toHaveBeenCalledWith(archPath, "parent session deleted");
   });
 
   it("rejects non-archived path", async () => {

@@ -101,6 +101,20 @@ export function createSessionsRoute(engine) {
     };
   }
 
+  async function discardSessionRuntimeOrClose(sessionPath, reason) {
+    if (!sessionPath) return false;
+    if (typeof engine.discardSessionRuntime === "function") {
+      return engine.discardSessionRuntime(sessionPath, reason);
+    }
+    if (typeof engine.closeSession === "function") {
+      return engine.closeSession(sessionPath);
+    }
+    if (typeof engine.abortSessionByPath === "function") {
+      return engine.abortSessionByPath(sessionPath);
+    }
+    return false;
+  }
+
   function applySubagentIdentity(block, task, readSessionMeta) {
     const sessionPath = block.streamKey || task?.meta?.sessionPath || null;
     const sessionMeta = readSessionMeta(sessionPath);
@@ -754,12 +768,14 @@ export function createSessionsRoute(engine) {
           try {
             const stat = await fs.stat(fp);
             if (stat.mtime.getTime() < cutoff) {
+              const activeKey = path.join(agentsDir, agentId, "sessions", f);
+              await discardSessionRuntimeOrClose(activeKey, "parent session deleted");
+              await discardSessionRuntimeOrClose(fp, "parent session deleted");
               await fs.unlink(fp);
               deleteSessionFileSidecarSync(fp);
               deleteSessionSkillSnapshotSync(fp);
               deleted++;
               // 清理 titles.json 孤儿（key = 对应的活跃路径）
-              const activeKey = path.join(agentsDir, agentId, "sessions", f);
               invalidateRcTarget(activeKey);
               try { await engine.clearSessionTitle(activeKey); } catch {}
             }
@@ -803,10 +819,6 @@ export function createSessionsRoute(engine) {
         return c.json({ error: t("error.sessionNotFound") }, 404);
       }
 
-      // 先从 engine 的 session map 中移除（如果正在后台跑会被 abort）
-      await engine.setSessionPinned(sessionPath, false);
-      await engine.closeSession(sessionPath);
-
       // 从 session 路径推导归档目录（同 agent 的 sessions/archived/）
       const sessDir = path.dirname(sessionPath);
       const archiveDir = path.join(sessDir, "archived");
@@ -817,6 +829,12 @@ export function createSessionsRoute(engine) {
       if (await pathExists(sessionFileSidecarPath(destPath))) {
         return c.json({ error: "Stage file sidecar destination already exists" }, 409);
       }
+
+      // 先从 engine 的 session map 中移除（如果正在后台跑会被 abort）
+      await engine.setSessionPinned(sessionPath, false);
+      await discardSessionRuntimeOrClose(sessionPath, "parent session archived");
+      await discardSessionRuntimeOrClose(destPath, "parent session archived");
+
       await fs.rename(sessionPath, destPath);
       moveSessionFileSidecarSync(sessionPath, destPath);
 
@@ -889,6 +907,9 @@ export function createSessionsRoute(engine) {
       if (path.basename(archDir) !== "archived") {
         return c.json({ error: "Not an archived session path" }, 403);
       }
+      const activeKey = path.join(path.dirname(archDir), path.basename(sessionPath));
+      await discardSessionRuntimeOrClose(activeKey, "parent session deleted");
+      await discardSessionRuntimeOrClose(sessionPath, "parent session deleted");
       try {
         await fs.unlink(sessionPath);
         deleteSessionFileSidecarSync(sessionPath);
@@ -900,7 +921,6 @@ export function createSessionsRoute(engine) {
         throw err;
       }
       // 清理 titles.json 孤儿（key = 对应的活跃路径）
-      const activeKey = path.join(path.dirname(archDir), path.basename(sessionPath));
       invalidateRcTarget(activeKey);
       try { await engine.clearSessionTitle(activeKey); } catch {}
       return c.json({ ok: true });

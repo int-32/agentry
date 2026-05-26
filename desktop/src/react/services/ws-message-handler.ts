@@ -10,7 +10,7 @@ import { streamBufferManager } from '../hooks/use-stream-buffer';
 import { dispatchStreamKey } from './stream-key-dispatcher';
 import { useStore } from '../stores';
 import { updateKeyed } from '../stores/create-keyed-slice';
-import { loadSessions as loadSessionsAction } from '../stores/session-actions';
+import { scheduleSessionsRefresh } from './session-refresh-scheduler';
 import { handleLegacyArtifactBlock } from '../stores/preview-actions';
 import { loadDeskFiles } from '../stores/desk-actions';
 import {
@@ -142,7 +142,7 @@ export function applyStreamingStatus(isStreaming: boolean, sessionPath: string |
   if (isStreaming) {
     ensureCurrentSessionVisible();
   } else if (hasOptimisticCurrentSession()) {
-    loadSessionsAction().catch(err => console.warn('[ws] loadSessions failed:', err));
+    scheduleSessionsRefresh('optimistic_session_settled');
   }
 }
 
@@ -235,7 +235,7 @@ export function handleServerMessage(msg: any): void {
     streamBufferManager.handle(msg);
     // turn_end 后仍需执行部分通用逻辑（loadSessions、context_usage）
     if (msg.type === 'turn_end') {
-      loadSessionsAction();
+      scheduleSessionsRefresh('turn_end');
       const turnSp = msg.sessionPath;
       if (turnSp) {
         requestContextUsage(turnSp);

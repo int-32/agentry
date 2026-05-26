@@ -1,7 +1,7 @@
 # 供应商与模型设置
 
 Status: draft
-Last updated: 2026-05-22
+Last updated: 2026-05-26
 
 ## Scope
 
@@ -15,8 +15,8 @@ Last updated: 2026-05-22
 | Library | `lib/llm/provider-client.js`, `lib/providers/`, `lib/default-models.json`, `lib/known-models.json` |
 | Server | `server/routes/providers.js`, `server/routes/models.js`, `server/routes/local-cli.js` |
 | Media plugin | `plugins/image-gen/`, `plugins/image-gen/adapters/`, `plugins/image-gen/tools/` |
-| Desktop | `desktop/src/react/settings/`, `desktop/src/react/settings/tabs/providers/`, `desktop/src/react/settings/tabs/media/` |
-| Tests | `tests/provider-*.test.js`, `tests/model-*.test.js`, `desktop/src/react/__tests__/settings/` |
+| Desktop | `desktop/src/react/settings/`, `desktop/src/react/settings/tabs/providers/`, `desktop/src/react/settings/tabs/media/`, `desktop/src/react/components/WelcomeScreen.tsx` |
+| Tests | `tests/provider-*.test.js`, `tests/model-*.test.js`, `desktop/src/react/__tests__/settings/`, `desktop/src/react/__tests__/components/WelcomeScreen.test.tsx` |
 
 ## Terms
 
@@ -36,6 +36,7 @@ Last updated: 2026-05-22
 | AG-EARS-PROVIDER-003 | Unwanted behavior | If a provider probe, OAuth launch, model fetch, or local CLI scan fails, the system shall expose an actionable error instead of presenting a silent no-op. | AG-BDD-PROVIDER-003 | AG-TDD-PROVIDER-003 |
 | AG-EARS-PROVIDER-004 | Ubiquitous | The system shall keep chat model availability and media generation capability as separate decisions, even when both are backed by the same provider. | AG-BDD-PROVIDER-004 | AG-TDD-PROVIDER-004 |
 | AG-EARS-PROVIDER-005 | Event-driven | When discovered model metadata is incomplete, the system shall keep conservative defaults and shall not infer unsupported output capabilities from the model name alone. | AG-BDD-PROVIDER-005 | AG-TDD-PROVIDER-005 |
+| AG-EARS-PROVIDER-006 | Event-driven | When switching to an Agent with a configured chat model, the desktop shall ask the server to apply that model directly and shall preserve the previous current model with a visible warning if the server rejects it. | AG-BDD-PROVIDER-006 | AG-TDD-PROVIDER-006 |
 
 ## BDD Scenarios
 
@@ -73,6 +74,13 @@ Feature: Provider and model settings
     When models are normalized
     Then the system preserves the model as selectable for configured usage
     And does not mark image or video generation support without a positive signal
+
+  Scenario: Agent switch applies configured model through server validation [AG-BDD-PROVIDER-006]
+    Given an Agent has a configured chat model from its provider
+    And the current desktop model list may contain only a local CLI model
+    When the user switches to that Agent from the welcome screen
+    Then the desktop posts the configured model to the server without forcing a full model list reload
+    And if the server rejects the model, the previous current model remains selected and a warning toast is shown
 ```
 
 ## TDD Matrix
@@ -84,6 +92,7 @@ Feature: Provider and model settings
 | AG-TDD-PROVIDER-003 | AG-EARS-PROVIDER-003, AG-BDD-PROVIDER-003 | `desktop/src/react/__tests__/settings/SettingsContent.test.tsx`, `desktop/src/react/__tests__/settings/MediaTab.test.tsx` | UI visible failures | `npm test -- desktop/src/react/__tests__/settings/SettingsContent.test.tsx desktop/src/react/__tests__/settings/MediaTab.test.tsx` | needs-review |
 | AG-TDD-PROVIDER-004 | AG-EARS-PROVIDER-004, AG-BDD-PROVIDER-004 | `tests/provider-media-capabilities.test.js`, `tests/image-gen-provider-discovery.test.js`, `tests/image-gen-adapters.test.js`, `tests/image-gen-tool.test.js` | media capability split and image adapter selection | `npm test -- tests/provider-media-capabilities.test.js tests/image-gen-provider-discovery.test.js tests/image-gen-adapters.test.js tests/image-gen-tool.test.js` | needs-review |
 | AG-TDD-PROVIDER-005 | AG-EARS-PROVIDER-005, AG-BDD-PROVIDER-005 | `tests/model-known-enrichment.test.js`, `tests/known-models.test.js` | conservative metadata enrichment | `npm test -- tests/model-known-enrichment.test.js tests/known-models.test.js` | needs-review |
+| AG-TDD-PROVIDER-006 | AG-EARS-PROVIDER-006, AG-BDD-PROVIDER-006 | `desktop/src/react/__tests__/components/WelcomeScreen.test.tsx` | agent configured model application and rejection rollback | `npm test -- desktop/src/react/__tests__/components/WelcomeScreen.test.tsx` | needs-review |
 
 ## Manual Verification
 

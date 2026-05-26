@@ -515,6 +515,7 @@ export class AgentryEngine {
   get slashDispatcher() { return this._slashSystem?.dispatcher ?? null; }
   /** /rc 接管态 + pending-selection 内存 store（Phase 2-A） */
   get rcState() { return this._slashSystem?.rcState ?? null; }
+  async discardSessionRuntime(p, reason) { return this._sessionCoord.discardSessionRuntime(p, reason); }
   async closeSession(p) { return this._sessionCoord.closeSession(p); }
   getSessionByPath(p) { return this._sessionCoord.getSessionByPath(p); }
   getSessionContextUsage(p) { return this._sessionCoord.getSessionContextUsage(p); }

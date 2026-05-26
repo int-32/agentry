@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../hooks/use-stream-buffer', () => ({
   streamBufferManager: {
@@ -41,9 +41,14 @@ vi.mock('../../services/stream-key-dispatcher', () => ({
 import { streamBufferManager } from '../../hooks/use-stream-buffer';
 import { useStore } from '../../stores';
 import { applyStreamingStatus, configureWsMessageHandler, handleServerMessage } from '../../services/ws-message-handler';
+import { resetSessionRefreshSchedulerForTest } from '../../services/session-refresh-scheduler';
 import { dispatchStreamKey } from '../../services/stream-key-dispatcher';
 import { handleAppEvent } from '../../services/app-event-actions';
 import { clearMessageLiveVersion, readMessageLiveVersion } from '../../stores/message-live-version';
+
+afterEach(() => {
+  resetSessionRefreshSchedulerForTest();
+});
 
 describe('ws-message-handler applyStreamingStatus', () => {
   beforeEach(() => {
