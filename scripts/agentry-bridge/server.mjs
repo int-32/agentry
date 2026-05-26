@@ -6,7 +6,7 @@
  *   claude-* / opus / sonnet / haiku  → @anthropic-ai/claude-agent-sdk
  *   codex / gpt-codex                  → @openai/codex-sdk
  *   gemini / gemini-*                  → gemini CLI spawn `-o stream-json`
- *   antigravity / agy                  → Antigravity CLI spawn `--print`
+ *   antigravity / agy                  → Antigravity App local RPC, fallback to agy `--print`
  *
  * Hanako / 任何 OpenAI 兼容 client 可注册为 API provider，
  *   base_url: http://127.0.0.1:51720/v1
@@ -19,7 +19,7 @@
 import { createServer } from "node:http";
 import { query as claudeQuery } from "@anthropic-ai/claude-agent-sdk";
 import { Codex } from "@openai/codex-sdk";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -33,6 +33,7 @@ const AGENTRY_HOME = process.env.AGENTRY_HOME
   || path.join(os.homedir(), ".agentry");
 
 let cliWorkspaceCache = { mtimeMs: 0, providers: {} };
+let antigravityAppCache = { checkedAt: 0, endpoint: null };
 
 function cleanPath(value) {
   if (typeof value !== "string") return "";
@@ -436,18 +437,195 @@ async function streamGemini({ res, id, model, fullHistoryPrompt, workspaceConfig
   });
 }
 
-// ── Antigravity CLI spawn ──
-// agy 1.x 当前仅公开 --print 文本模式，未提供 gemini CLI 的 stream-json 事件流。
-// 因此这里把 stdout 直接作为 assistant text 增量透出，tool/usage 先降级为空。
-async function streamAntigravity({ res, id, model, fullHistoryPrompt, workspaceConfig = {} }) {
+// ── Antigravity App RPC / CLI fallback ──
+// Antigravity App 的本地 language_server 暴露 Connect JSON RPC，可直接指定 App 侧可用模型。
+// agy 1.x 的 --print 模式没有公开模型选择参数，且会固定走 CLI 默认模型；仅保留作兜底。
+const ANTIGRAVITY_RPC_SERVICE = "exa.language_server_pb.LanguageServerService";
+const ANTIGRAVITY_APP_MODEL_LABELS = (process.env.AGENTRY_BRIDGE_ANTIGRAVITY_MODEL_LABELS || "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
+const ANTIGRAVITY_DEFAULT_MODEL_LABELS = [
+  "Claude Sonnet 4.6 (Thinking)",
+  "Claude Opus 4.6 (Thinking)",
+  "GPT-OSS 120B (Medium)",
+  "Gemini 3.5 Flash (Medium)",
+];
+
+function fetchWithTimeout(url, options = {}, timeoutMs = 1500) {
+  const signal = options.signal || AbortSignal.timeout(timeoutMs);
+  return fetch(url, { ...options, signal });
+}
+
+function candidateAntigravityPorts() {
+  const ports = new Set();
+  const envPort = Number(process.env.AGENTRY_BRIDGE_ANTIGRAVITY_APP_PORT || 0);
+  if (Number.isInteger(envPort) && envPort > 0) ports.add(envPort);
+
+  try {
+    const output = execFileSync("lsof", ["-Pan", "-iTCP", "-sTCP:LISTEN"], {
+      encoding: "utf-8",
+      timeout: 2000,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    for (const line of output.split(/\r?\n/)) {
+      if (!/^(?:language_|\S*\blanguage_server\b)/.test(line)) continue;
+      const match = line.match(/TCP\s+(?:127\.0\.0\.1|\[::1\]|\*):(\d+)\s+\(LISTEN\)/);
+      if (match) ports.add(Number(match[1]));
+    }
+  } catch {}
+
+  return [...ports];
+}
+
+async function probeAntigravityAppPort(port) {
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const response = await fetchWithTimeout(`${baseUrl}/`, {}, 800);
+  if (!response.ok) return null;
+  const html = await response.text();
+  if (!html.includes("window.__APP_CONFIG__") || !html.includes('"productName":"antigravity"')) return null;
+  const csrfToken = html.match(/"csrfToken":"([^"]+)"/)?.[1];
+  if (!csrfToken) return null;
+  return { baseUrl, csrfToken };
+}
+
+async function discoverAntigravityAppEndpoint() {
+  const now = Date.now();
+  if (antigravityAppCache.endpoint && now - antigravityAppCache.checkedAt < 15_000) {
+    return antigravityAppCache.endpoint;
+  }
+
+  const explicitUrl = process.env.AGENTRY_BRIDGE_ANTIGRAVITY_APP_URL;
+  if (explicitUrl) {
+    const html = await (await fetchWithTimeout(explicitUrl, {}, 1000)).text();
+    const csrfToken = html.match(/"csrfToken":"([^"]+)"/)?.[1] || process.env.AGENTRY_BRIDGE_ANTIGRAVITY_CSRF_TOKEN;
+    if (csrfToken) {
+      antigravityAppCache = { checkedAt: now, endpoint: { baseUrl: explicitUrl.replace(/\/$/, ""), csrfToken } };
+      return antigravityAppCache.endpoint;
+    }
+  }
+
+  for (const port of candidateAntigravityPorts()) {
+    try {
+      const endpoint = await probeAntigravityAppPort(port);
+      if (endpoint) {
+        antigravityAppCache = { checkedAt: now, endpoint };
+        return endpoint;
+      }
+    } catch {}
+  }
+  antigravityAppCache = { checkedAt: now, endpoint: null };
+  return null;
+}
+
+async function callAntigravityAppRpc(endpoint, method, body) {
+  const response = await fetchWithTimeout(`${endpoint.baseUrl}/${ANTIGRAVITY_RPC_SERVICE}/${method}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-codeium-csrf-token": endpoint.csrfToken,
+    },
+    body: JSON.stringify(body || {}),
+  }, Number(process.env.AGENTRY_BRIDGE_ANTIGRAVITY_RPC_TIMEOUT_MS || 120_000));
+
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`${method} ${response.status}: ${text.slice(0, 1000)}`);
+  }
+  return text ? JSON.parse(text) : {};
+}
+
+function antigravityModelHasUsableQuota(config) {
+  const quota = config?.quotaInfo;
+  if (!quota) return true;
+  if (typeof quota.remainingFraction === "number") return quota.remainingFraction > 0;
+  if (quota.resetTime && new Date(quota.resetTime) > new Date()) return false;
+  return true;
+}
+
+function getAntigravityModelEnum(config) {
+  return config?.modelOrAlias?.model;
+}
+
+async function selectAntigravityAppModel(endpoint) {
+  const status = await callAntigravityAppRpc(endpoint, "GetUserStatus", {});
+  const configs = status?.userStatus?.cascadeModelConfigData?.clientModelConfigs || [];
+  const usable = configs.filter(config => getAntigravityModelEnum(config) && !config.disabled);
+  const labels = ANTIGRAVITY_APP_MODEL_LABELS.length
+    ? ANTIGRAVITY_APP_MODEL_LABELS
+    : ANTIGRAVITY_DEFAULT_MODEL_LABELS;
+
+  for (const label of labels) {
+    const match = usable.find(config => config.label === label && antigravityModelHasUsableQuota(config));
+    if (match) return { label: match.label, model: getAntigravityModelEnum(match) };
+  }
+
+  const firstWithQuota = usable.find(antigravityModelHasUsableQuota);
+  if (firstWithQuota) return { label: firstWithQuota.label, model: getAntigravityModelEnum(firstWithQuota) };
+
+  const fallback = usable[0];
+  if (fallback) return { label: fallback.label, model: getAntigravityModelEnum(fallback) };
+  throw new Error("Antigravity App did not return any callable models.");
+}
+
+async function streamAntigravityApp({ res, id, model, fullHistoryPrompt }) {
+  const endpoint = await discoverAntigravityAppEndpoint();
+  if (!endpoint) throw new Error("Antigravity App local RPC server was not found.");
+
+  const selected = await selectAntigravityAppModel(endpoint);
+  console.error(`[bridge][antigravity-app] using ${selected.label} (${selected.model}) via ${endpoint.baseUrl}`);
+  const result = await callAntigravityAppRpc(endpoint, "GetModelResponse", {
+    prompt: fullHistoryPrompt,
+    model: selected.model,
+  });
+  writeDelta(res, id, model, result.response || "");
+  writeDone(res, id, model, "stop");
+}
+
+function summarizeAntigravityLog(stderr, logPath) {
+  const chunks = [];
+  if (stderr?.trim()) chunks.push(stderr);
+  try {
+    if (logPath && fs.existsSync(logPath)) {
+      chunks.push(fs.readFileSync(logPath, "utf-8"));
+    }
+  } catch {}
+
+  const raw = chunks.join("\n");
+  if (!raw.trim()) return "Antigravity CLI exited without output.";
+
+  const important = raw
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => line.replace(/^[IWEF]\d{4}\s+\d{2}:\d{2}:\d{2}\.\d+\s+\d+\s+.*?\]\s*/i, ""))
+    .filter(line => /(RESOURCE_EXHAUSTED|UNAUTHENTICATED|PERMISSION_DENIED|ModelNotFound|Invalid model|not logged|quota|capacity|exhausted|error|failed)/i.test(line))
+    .filter(line => !/^(URL:|Print mode:|Starting language server|Language server|CLI app data directory|project:)/i.test(line))
+    .filter(line => !/mcp_config\.json/i.test(line));
+
+  const unique = [];
+  for (const line of important) {
+    if (!unique.includes(line)) unique.push(line);
+  }
+  const severe = unique.filter(line => /(RESOURCE_EXHAUSTED|UNAUTHENTICATED|PERMISSION_DENIED|ModelNotFound|Invalid model|Individual quota|capacity)/i.test(line));
+  const summary = (severe.length ? severe : unique).slice(-3).join("\n");
+  return summary || "Antigravity CLI exited without output.";
+}
+
+async function streamAntigravityCli({ res, id, model, fullHistoryPrompt, workspaceConfig = {} }) {
   return new Promise((resolve) => {
-    const args = ["--print", fullHistoryPrompt, "--print-timeout", process.env.AGENTRY_BRIDGE_AGY_PRINT_TIMEOUT || "10m"];
+    const logPath = path.join(os.tmpdir(), `agentry-agy-${id}-${randomUUID()}.log`);
+    const args = [
+      "--log-file", logPath,
+      "--print-timeout", process.env.AGENTRY_BRIDGE_AGY_PRINT_TIMEOUT || "10m",
+    ];
     for (const folder of workspaceConfig.workspaceFolders || []) {
       args.push("--add-dir", folder);
     }
     if (process.env.AGENTRY_BRIDGE_AGY_SKIP_PERMISSIONS !== "0") {
       args.push("--dangerously-skip-permissions");
     }
+    args.push("--print", fullHistoryPrompt);
 
     const child = spawn(
       "agy",
@@ -461,8 +639,12 @@ async function streamAntigravity({ res, id, model, fullHistoryPrompt, workspaceC
     const finish = (finishReason = "stop") => {
       if (finished) return;
       finished = true;
-      if (!wrote && stderr.trim()) {
-        writeDelta(res, id, model, `\n[bridge:antigravity] ${stderr.trim()}`);
+      if (!wrote) {
+        writeDelta(res, id, model, `\n[bridge:antigravity] ${summarizeAntigravityLog(stderr, logPath)}`);
+        wrote = true;
+      }
+      if (process.env.AGENTRY_BRIDGE_KEEP_AGY_LOGS !== "1") {
+        try { fs.unlinkSync(logPath); } catch {}
       }
       writeDone(res, id, model, finishReason);
       resolve();
@@ -488,6 +670,23 @@ async function streamAntigravity({ res, id, model, fullHistoryPrompt, workspaceC
   });
 }
 
+async function streamAntigravity({ res, id, model, fullHistoryPrompt, workspaceConfig = {} }) {
+  if (process.env.AGENTRY_BRIDGE_ANTIGRAVITY_APP_RPC !== "0") {
+    try {
+      await streamAntigravityApp({ res, id, model, fullHistoryPrompt });
+      return;
+    } catch (err) {
+      console.error(`[bridge][antigravity-app-fallback] ${err.message}`);
+      if (process.env.AGENTRY_BRIDGE_ANTIGRAVITY_CLI_FALLBACK === "0") {
+        writeDelta(res, id, model, `\n[bridge:antigravity-app] ${err.message}`);
+        writeDone(res, id, model, "stop");
+        return;
+      }
+    }
+  }
+  await streamAntigravityCli({ res, id, model, fullHistoryPrompt, workspaceConfig });
+}
+
 // ── HTTP server ──
 const server = createServer(async (req, res) => {
   // CORS / preflight
@@ -504,13 +703,7 @@ const server = createServer(async (req, res) => {
         { id: "claude-sonnet-4-5", object: "model", owned_by: "agentry-bridge" },
         { id: "codex", object: "model", owned_by: "agentry-bridge" },
         { id: "gemini-3", object: "model", owned_by: "agentry-bridge" },
-        { id: "agy-gemini-3.5-flash", object: "model", owned_by: "agentry-bridge" },
-        { id: "agy-gemini-3.1-pro-high", object: "model", owned_by: "agentry-bridge" },
-        { id: "agy-gemini-3.1-pro-low", object: "model", owned_by: "agentry-bridge" },
-        { id: "agy-gemini-3-flash", object: "model", owned_by: "agentry-bridge" },
-        { id: "agy-claude-sonnet-4.6-thinking", object: "model", owned_by: "agentry-bridge" },
-        { id: "agy-claude-opus-4.6-thinking", object: "model", owned_by: "agentry-bridge" },
-        { id: "agy-gpt-oss-120b", object: "model", owned_by: "agentry-bridge" },
+        { id: "antigravity", object: "model", owned_by: "agentry-bridge" },
       ],
     }));
     return;
@@ -619,5 +812,5 @@ server.listen(PORT, "127.0.0.1", () => {
   console.error(`  claude-*  → @anthropic-ai/claude-agent-sdk`);
   console.error(`  codex     → @openai/codex-sdk`);
   console.error(`  gemini-*  → gemini CLI (-o stream-json)`);
-  console.error(`  antigravity / agy → Antigravity CLI (--print)`);
+  console.error(`  antigravity / agy → Antigravity App RPC (fallback: agy --print)`);
 });
