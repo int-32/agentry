@@ -35,6 +35,7 @@ const AGENTRY_HOME = process.env.AGENTRY_HOME
 
 let cliWorkspaceCache = { mtimeMs: 0, providers: {} };
 let antigravityAppCache = { checkedAt: 0, endpoint: null };
+const antigravityPendingInteractions = new Map();
 
 function cleanPath(value) {
   if (typeof value !== "string") return "";
@@ -640,6 +641,46 @@ function summarizeAntigravityToolResult(steps = []) {
   return "";
 }
 
+function formatAntigravityAskQuestion(step) {
+  const questions = step?.requestedInteraction?.askQuestion?.questions
+    || step?.askQuestion?.questions
+    || [];
+  if (!questions.length) return "";
+
+  const lines = [
+    "Antigravity 需要你补充下面的问题。请直接在当前 Agentry 对话框里回复，可以写选项编号，也可以直接写具体要求。",
+    "",
+  ];
+  questions.forEach((question, index) => {
+    lines.push(`${index + 1}. ${question.question || "请补充信息"}`);
+    for (const option of question.options || []) {
+      lines.push(`   ${option.id || "-"}: ${option.text || ""}`.trimEnd());
+    }
+    lines.push("");
+  });
+  return lines.join("\n").trim();
+}
+
+function getAntigravityPendingInteraction(step) {
+  if (!step?.requestedInteraction) return null;
+  const source = step.metadata?.sourceTrajectoryStepInfo || {};
+  return {
+    cascadeId: source.cascadeId,
+    trajectoryId: source.trajectoryId,
+    stepIndex: source.stepIndex,
+    request: step.requestedInteraction,
+    createdAt: Date.now(),
+  };
+}
+
+function formatAntigravityWaitingInteraction(step) {
+  const askQuestion = formatAntigravityAskQuestion(step);
+  if (askQuestion) return askQuestion;
+
+  const summary = step?.metadata?.toolSummary || step?.metadata?.toolAction || step?.type || "unknown step";
+  return `Antigravity executor 正在等待交互处理：${summary}`;
+}
+
 function antigravityStepsStillRunning(steps = []) {
   return steps.some(step => /PENDING|RUNNING|GENERATING/.test(String(step?.status || "")));
 }
@@ -652,7 +693,6 @@ async function waitForAntigravityCascade(endpoint, cascadeId) {
   const timeoutMs = Number(process.env.AGENTRY_BRIDGE_ANTIGRAVITY_CASCADE_TIMEOUT_MS || 180_000);
   const deadline = Date.now() + timeoutMs;
   let lastText = "";
-  let waitingSince = 0;
   let lastSteps = [];
 
   while (Date.now() < deadline) {
@@ -664,29 +704,109 @@ async function waitForAntigravityCascade(endpoint, cascadeId) {
 
     const running = antigravityStepsStillRunning(steps);
     const waiting = antigravityStepsWaiting(steps);
-    if (lastText && !running && waiting.length === 0) return lastText;
+    if (lastText && !running && waiting.length === 0) return { text: lastText, pending: null };
 
     if (waiting.length > 0) {
-      waitingSince ||= Date.now();
-      if (Date.now() - waitingSince > 10_000) {
-        const names = waiting.map(step => step.type).filter(Boolean).join(", ");
-        return lastText || `Antigravity executor is waiting for approval or workspace access: ${names || "unknown step"}`;
-      }
-    } else {
-      waitingSince = 0;
+      const step = waiting[waiting.length - 1];
+      const pending = getAntigravityPendingInteraction(step);
+      const prompt = formatAntigravityWaitingInteraction(step);
+      const textParts = [lastText, prompt].filter(Boolean);
+      return {
+        text: textParts.join("\n\n"),
+        pending,
+      };
     }
 
     await sleep(1_000);
   }
 
   const fallback = lastText || summarizeAntigravityToolResult(lastSteps);
-  if (fallback) return fallback;
+  if (fallback) return { text: fallback, pending: null };
   throw new Error(`Antigravity cascade timed out after ${timeoutMs}ms.`);
 }
 
-async function streamAntigravityApp({ res, id, model, fullHistoryPrompt, workspaceConfig = {} }) {
+function cleanupAntigravityPendingInteractions() {
+  const maxAgeMs = Number(process.env.AGENTRY_BRIDGE_ANTIGRAVITY_PENDING_MAX_AGE_MS || 30 * 60 * 1000);
+  const now = Date.now();
+  for (const [key, pending] of antigravityPendingInteractions) {
+    if (now - (pending.createdAt || 0) > maxAgeMs) antigravityPendingInteractions.delete(key);
+  }
+}
+
+function getLatestUserText(fullHistoryPrompt = "") {
+  const text = String(fullHistoryPrompt || "");
+  const flatMatches = [...text.matchAll(/^=== USER ===\n([\s\S]*?)(?=\n\n=== (?:ASSISTANT|USER) ===|\s*$)/gm)];
+  if (flatMatches.length) return flatMatches[flatMatches.length - 1][1].trim();
+  const matches = [...text.matchAll(/^User:\s*([\s\S]*?)(?=\n(?:Assistant|User|System):|\s*$)/gm)];
+  if (!matches.length) return text.trim();
+  return matches[matches.length - 1][1].trim();
+}
+
+function parseChoiceIds(text, questions) {
+  const tokens = String(text || "").match(/\d+/g) || [];
+  if (!tokens.length) return null;
+  if (questions.length > 1 && tokens.length < questions.length) return null;
+
+  const ids = [];
+  for (let index = 0; index < questions.length; index += 1) {
+    const q = questions[index];
+    const id = tokens[index];
+    if (!id || !(q.options || []).some(option => option.id === id)) return null;
+    ids.push(id);
+  }
+  return ids;
+}
+
+function buildAntigravityAskQuestionResponses(request, userText) {
+  const questions = request?.askQuestion?.questions || [];
+  const choiceIds = parseChoiceIds(userText, questions);
+  return questions.map((question, index) => {
+    const response = {
+      question: question.question,
+      options: question.options || [],
+    };
+    if (choiceIds?.[index]) response.selectedOptionIds = [choiceIds[index]];
+    else response.writeInResponse = userText;
+    return response;
+  });
+}
+
+async function continueAntigravityPendingInteraction({ endpoint, pending, userText }) {
+  if (!pending?.cascadeId || !pending?.request) return null;
+  let interaction = null;
+  if (pending.request.askQuestion) {
+    interaction = {
+      trajectoryId: pending.trajectoryId,
+      stepIndex: pending.stepIndex,
+      askQuestion: {
+        responses: buildAntigravityAskQuestionResponses(pending.request, userText),
+      },
+    };
+  }
+  if (!interaction) return null;
+  await callAntigravityAppRpc(endpoint, "HandleCascadeUserInteraction", {
+    cascadeId: pending.cascadeId,
+    interaction,
+  });
+  return waitForAntigravityCascade(endpoint, pending.cascadeId);
+}
+
+async function streamAntigravityApp({ res, id, model, prompt, fullHistoryPrompt, workspaceConfig = {}, conversationFp }) {
   const endpoint = await discoverAntigravityAppEndpoint();
   if (!endpoint) throw new Error("Antigravity App local RPC server was not found.");
+
+  cleanupAntigravityPendingInteractions();
+  const pending = conversationFp ? antigravityPendingInteractions.get(conversationFp) : null;
+  if (pending) {
+    const latestUserText = prompt || getLatestUserText(fullHistoryPrompt);
+    console.error(`[bridge][antigravity-app] continuing pending interaction ${pending.cascadeId}`);
+    const result = await continueAntigravityPendingInteraction({ endpoint, pending, userText: latestUserText });
+    if (result?.pending) antigravityPendingInteractions.set(conversationFp, result.pending);
+    else if (conversationFp) antigravityPendingInteractions.delete(conversationFp);
+    writeDelta(res, id, model, result?.text || "");
+    writeDone(res, id, model, "stop");
+    return;
+  }
 
   const selected = await selectAntigravityAppModel(endpoint);
   const cascadeId = randomUUID();
@@ -711,8 +831,9 @@ async function streamAntigravityApp({ res, id, model, fullHistoryPrompt, workspa
     },
     waitForLsClientInit: true,
   });
-  const text = await waitForAntigravityCascade(endpoint, cascadeId);
-  writeDelta(res, id, model, text || "");
+  const result = await waitForAntigravityCascade(endpoint, cascadeId);
+  if (result.pending && conversationFp) antigravityPendingInteractions.set(conversationFp, result.pending);
+  writeDelta(res, id, model, result.text || "");
   writeDone(res, id, model, "stop");
 }
 
@@ -804,10 +925,10 @@ async function streamAntigravityCli({ res, id, model, fullHistoryPrompt, workspa
   });
 }
 
-async function streamAntigravity({ res, id, model, fullHistoryPrompt, workspaceConfig = {} }) {
+async function streamAntigravity({ res, id, model, prompt, fullHistoryPrompt, workspaceConfig = {}, conversationFp }) {
   if (process.env.AGENTRY_BRIDGE_ANTIGRAVITY_APP_RPC !== "0") {
     try {
-      await streamAntigravityApp({ res, id, model, fullHistoryPrompt, workspaceConfig });
+      await streamAntigravityApp({ res, id, model, prompt, fullHistoryPrompt, workspaceConfig, conversationFp });
       return;
     } catch (err) {
       console.error(`[bridge][antigravity-app-fallback] ${err.message}`);
@@ -889,7 +1010,7 @@ const server = createServer(async (req, res) => {
           if (backend === "claude") await streamClaude({ res: fakeRes, id, model, prompt, systemPrompt, conversationFp, workspaceConfig });
           else if (backend === "codex") await streamCodex({ res: fakeRes, id, model, prompt, systemPrompt, conversationFp, workspaceConfig });
           else if (backend === "gemini") await streamGemini({ res: fakeRes, id, model, fullHistoryPrompt, workspaceConfig });
-          else if (backend === "antigravity") await streamAntigravity({ res: fakeRes, id, model, fullHistoryPrompt, workspaceConfig });
+          else if (backend === "antigravity") await streamAntigravity({ res: fakeRes, id, model, prompt, fullHistoryPrompt, workspaceConfig, conversationFp });
         } catch (err) {
           console.error(`[bridge][ERROR non-stream] ${err.message}`);
           textBuf += `\n[bridge:error] ${err.message}`;
@@ -921,7 +1042,7 @@ const server = createServer(async (req, res) => {
         if (backend === "claude") await streamClaude({ res, id, model, prompt, systemPrompt, conversationFp, workspaceConfig });
         else if (backend === "codex") await streamCodex({ res, id, model, prompt, systemPrompt, conversationFp, workspaceConfig });
         else if (backend === "gemini") await streamGemini({ res, id, model, fullHistoryPrompt, workspaceConfig });
-        else if (backend === "antigravity") await streamAntigravity({ res, id, model, fullHistoryPrompt, workspaceConfig });
+        else if (backend === "antigravity") await streamAntigravity({ res, id, model, prompt, fullHistoryPrompt, workspaceConfig, conversationFp });
         else {
           writeDelta(res, id, model, `[bridge] unknown backend for model ${model}`);
           writeDone(res, id, model);
