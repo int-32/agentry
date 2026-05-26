@@ -24,6 +24,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
+import { pathToFileURL } from "node:url";
 import { randomUUID, createHash } from "node:crypto";
 import YAML from "js-yaml";
 
@@ -438,7 +439,7 @@ async function streamGemini({ res, id, model, fullHistoryPrompt, workspaceConfig
 }
 
 // ── Antigravity App RPC / CLI fallback ──
-// Antigravity App 的本地 language_server 暴露 Connect JSON RPC，可直接指定 App 侧可用模型。
+// Antigravity App 的本地 language_server 暴露 Connect JSON RPC，可指定 App 侧可用模型并走 cascade executor。
 // agy 1.x 的 --print 模式没有公开模型选择参数，且会固定走 CLI 默认模型；仅保留作兜底。
 const ANTIGRAVITY_RPC_SERVICE = "exa.language_server_pb.LanguageServerService";
 const ANTIGRAVITY_APP_MODEL_LABELS = (process.env.AGENTRY_BRIDGE_ANTIGRAVITY_MODEL_LABELS || "")
@@ -568,17 +569,150 @@ async function selectAntigravityAppModel(endpoint) {
   throw new Error("Antigravity App did not return any callable models.");
 }
 
-async function streamAntigravityApp({ res, id, model, fullHistoryPrompt }) {
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function maybeWorkspaceRoot(raw) {
+  const value = cleanPath(raw);
+  if (!value || value === "未设置" || value === "not set") return "";
+  if (!path.isAbsolute(value)) return "";
+  try {
+    const stat = fs.statSync(value);
+    if (stat.isDirectory()) return value;
+    if (stat.isFile()) return path.dirname(value);
+  } catch {}
+  return "";
+}
+
+function extractWorkspaceRootsFromPrompt(prompt) {
+  const roots = [];
+  const add = (value) => {
+    const root = maybeWorkspaceRoot(value);
+    if (root && !roots.includes(root)) roots.push(root);
+  };
+
+  for (const match of String(prompt || "").matchAll(/(?:当前工作目录|Current working directory)\s*[:：]\s*([^\r\n]+)/gi)) {
+    add(match[1]);
+  }
+  for (const match of String(prompt || "").matchAll(/^\s*-\s*(\/[^\r\n]+)/gm)) {
+    add(match[1]);
+  }
+  for (const match of String(prompt || "").matchAll(/\/Users\/[^\s`"'<>，。；：、)）\]}]+/g)) {
+    add(match[0]);
+  }
+
+  return roots.slice(0, 8);
+}
+
+function antigravityWorkspaceUris(workspaceConfig = {}, prompt = "") {
+  const roots = [];
+  const add = (value) => {
+    const root = maybeWorkspaceRoot(value);
+    if (root && !roots.includes(root)) roots.push(root);
+  };
+
+  add(workspaceConfig.workspaceRoot);
+  for (const folder of workspaceConfig.workspaceFolders || []) add(folder);
+  for (const folder of extractWorkspaceRootsFromPrompt(prompt)) add(folder);
+
+  return roots.map(root => pathToFileURL(root).href);
+}
+
+function extractAntigravityResponseText(steps = []) {
+  for (let index = steps.length - 1; index >= 0; index -= 1) {
+    const response = steps[index]?.plannerResponse;
+    const text = response?.modifiedResponse || response?.response;
+    if (text) return text;
+  }
+  return "";
+}
+
+function summarizeAntigravityToolResult(steps = []) {
+  for (let index = steps.length - 1; index >= 0; index -= 1) {
+    const step = steps[index];
+    if (step?.listDirectory?.results) {
+      const names = step.listDirectory.results.map(item => item.isDir ? `${item.name}/` : item.name);
+      return names.join("\n");
+    }
+    if (step?.readFile?.content) return step.readFile.content;
+  }
+  return "";
+}
+
+function antigravityStepsStillRunning(steps = []) {
+  return steps.some(step => /PENDING|RUNNING|GENERATING/.test(String(step?.status || "")));
+}
+
+function antigravityStepsWaiting(steps = []) {
+  return steps.filter(step => /WAITING/.test(String(step?.status || "")));
+}
+
+async function waitForAntigravityCascade(endpoint, cascadeId) {
+  const timeoutMs = Number(process.env.AGENTRY_BRIDGE_ANTIGRAVITY_CASCADE_TIMEOUT_MS || 180_000);
+  const deadline = Date.now() + timeoutMs;
+  let lastText = "";
+  let waitingSince = 0;
+  let lastSteps = [];
+
+  while (Date.now() < deadline) {
+    const result = await callAntigravityAppRpc(endpoint, "GetCascadeTrajectorySteps", { cascadeId });
+    const steps = result?.steps || [];
+    lastSteps = steps;
+    const text = extractAntigravityResponseText(steps);
+    if (text) lastText = text;
+
+    const running = antigravityStepsStillRunning(steps);
+    const waiting = antigravityStepsWaiting(steps);
+    if (lastText && !running && waiting.length === 0) return lastText;
+
+    if (waiting.length > 0) {
+      waitingSince ||= Date.now();
+      if (Date.now() - waitingSince > 10_000) {
+        const names = waiting.map(step => step.type).filter(Boolean).join(", ");
+        return lastText || `Antigravity executor is waiting for approval or workspace access: ${names || "unknown step"}`;
+      }
+    } else {
+      waitingSince = 0;
+    }
+
+    await sleep(1_000);
+  }
+
+  const fallback = lastText || summarizeAntigravityToolResult(lastSteps);
+  if (fallback) return fallback;
+  throw new Error(`Antigravity cascade timed out after ${timeoutMs}ms.`);
+}
+
+async function streamAntigravityApp({ res, id, model, fullHistoryPrompt, workspaceConfig = {} }) {
   const endpoint = await discoverAntigravityAppEndpoint();
   if (!endpoint) throw new Error("Antigravity App local RPC server was not found.");
 
   const selected = await selectAntigravityAppModel(endpoint);
-  console.error(`[bridge][antigravity-app] using ${selected.label} (${selected.model}) via ${endpoint.baseUrl}`);
-  const result = await callAntigravityAppRpc(endpoint, "GetModelResponse", {
-    prompt: fullHistoryPrompt,
-    model: selected.model,
+  const cascadeId = randomUUID();
+  const workspaceUris = antigravityWorkspaceUris(workspaceConfig, fullHistoryPrompt);
+  console.error(`[bridge][antigravity-app] using ${selected.label} (${selected.model}) via ${endpoint.baseUrl} workspaceUris=${workspaceUris.length}`);
+
+  await callAntigravityAppRpc(endpoint, "StartCascade", {
+    cascadeId,
+    source: 1,
+    waitForLsClientInit: true,
+    workspaceUris,
+    requestedModel: selected.model,
   });
-  writeDelta(res, id, model, result.response || "");
+  await callAntigravityAppRpc(endpoint, "SendUserCascadeMessage", {
+    cascadeId,
+    items: [{ text: fullHistoryPrompt }],
+    cascadeConfig: {
+      plannerConfig: {
+        requestedModel: { model: selected.model },
+      },
+      conversationHistoryConfig: { enabled: false },
+    },
+    waitForLsClientInit: true,
+  });
+  const text = await waitForAntigravityCascade(endpoint, cascadeId);
+  writeDelta(res, id, model, text || "");
   writeDone(res, id, model, "stop");
 }
 
@@ -673,7 +807,7 @@ async function streamAntigravityCli({ res, id, model, fullHistoryPrompt, workspa
 async function streamAntigravity({ res, id, model, fullHistoryPrompt, workspaceConfig = {} }) {
   if (process.env.AGENTRY_BRIDGE_ANTIGRAVITY_APP_RPC !== "0") {
     try {
-      await streamAntigravityApp({ res, id, model, fullHistoryPrompt });
+      await streamAntigravityApp({ res, id, model, fullHistoryPrompt, workspaceConfig });
       return;
     } catch (err) {
       console.error(`[bridge][antigravity-app-fallback] ${err.message}`);
