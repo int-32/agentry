@@ -319,6 +319,7 @@ export class SessionCoordinator {
    * @param {(agentId) => object|null} deps.getAgentById
    * @param {() => object} deps.listAgents - 列出所有 agent
    * @param {(cwd: string) => Promise<void>} [deps.onBeforeSessionCreate]
+   * @param {(cwd: string, opts: { reload?: boolean, emitEvent?: boolean, force?: boolean })} [deps.syncWorkspaceSkillPaths]
    */
   constructor(deps) {
     this._d = deps;
@@ -906,6 +907,13 @@ export class SessionCoordinator {
 
     // 如果已在 map 中，切指针
     const existing = this._sessions.get(sessionPath);
+    const syncWorkspaceSkills = async () => {
+      await this._d.syncWorkspaceSkillPaths?.(
+        this._session?.sessionManager?.getCwd?.() ?? process.cwd(),
+        { reload: true, emitEvent: false },
+      );
+    };
+
     if (existing) {
       if (this._session && this._session !== existing.session) {
         const oldSp = this._session.sessionManager?.getSessionFile?.();
@@ -925,6 +933,7 @@ export class SessionCoordinator {
       existing.lastTouchedAt = Date.now();
       const targetAgent = this._d.getAgentById(existing.agentId) || this._d.getAgent();
       targetAgent.setMemoryEnabled(memoryEnabled);
+      await syncWorkspaceSkills();
       return existing.session;
     }
 
@@ -952,6 +961,7 @@ export class SessionCoordinator {
       agent: this._d.getAgent(),
       agentId: targetAgentId || this._d.getActiveAgentId(),
     });
+    await syncWorkspaceSkills();
     return result.session;
   }
 

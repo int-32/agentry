@@ -192,6 +192,7 @@ export class AgentryEngine {
       emitEvent: (e, sp) => this._emitEvent(e, sp),
       emitDevLog: (t, l) => this.emitDevLog(t, l),
       getHomeCwd: (agentId) => this.getHomeCwd(agentId),
+      syncWorkspaceSkillPaths: (cwd, opts) => this.syncWorkspaceSkillPaths(cwd, opts),
       agentIdFromSessionPath: (p) => this.agentIdFromSessionPath(p),
       switchAgentOnly: (id) => this._agentMgr.switchAgentOnly(id),
       getConfig: () => this.config,
@@ -482,9 +483,7 @@ export class AgentryEngine {
     return this._sessionCoord.createSession(mgr, cwd, mem, model, opts);
   }
   async switchSession(p) {
-    const result = await this._sessionCoord.switchSession(p);
-    await this.syncWorkspaceSkillPaths(this.cwd, { reload: true, emitEvent: false });
-    return result;
+    return this._sessionCoord.switchSession(p);
   }
   /** @deprecated Phase 2: 使用 promptSession(path, text, opts) */
   async prompt(text, opts) { return this._sessionCoord.prompt(text, opts); }
