@@ -209,6 +209,9 @@ export class AgentManager {
         const chatModel = typeof chatRef === "object"
           ? { id: chatRef.id, provider: chatRef.provider }
           : (chatRef ? { id: chatRef } : null);
+        const homeFolder = typeof cfg.desk?.home_folder === "string" && cfg.desk.home_folder.trim()
+          ? cfg.desk.home_folder.trim()
+          : null;
         agents.push({
           id: entry.name,
           name: cfg.agent?.name || entry.name,
@@ -216,6 +219,7 @@ export class AgentManager {
           identity,
           hasAvatar,
           chatModel,
+          homeFolder,
           memoryMasterEnabled: cfg.memory?.enabled !== false,
         });
       } catch {}

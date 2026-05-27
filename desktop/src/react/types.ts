@@ -52,6 +52,7 @@ export interface Agent {
   hasAvatar?: boolean;
   memoryMasterEnabled?: boolean;
   chatModel?: { id?: string; provider?: string } | null;
+  homeFolder?: string | null;
 }
 
 export interface SessionStream {

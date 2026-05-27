@@ -1,12 +1,3 @@
-- [2026-05-19 18:00] 首次发现 HeartBeat/Genta 不存在，已创建目录；快速阅读 package.json、README.md、PLUGINS.md，并记录工作区定向摘要 workspace-orientation-2026-05-19.md；未发现需要通知用户的异常。
-- [2026-05-19 20:06] 依据 jian.md 执行 EARS/BDD/TDD 文档体系巡检；修正 docs/specs/README.md 与 AUTHORING.md 中残留的 SPEC.md/单 BDD 旧规则，确认全局规格、4 个 feature spec、lib/channels 与 lib/task-orchestration 三件套及测试路径无缺失；无需通知用户。
-- [2026-05-19 22:06] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；发现并修复 lib/channels/BDD.md 缺少 AG-BDD-CHANNEL-004、lib/task-orchestration/BDD.md 缺少 AG-BDD-TASK-003/005 的本地场景；复核本地 ID 一致，无需通知用户。
-- [2026-05-20 00:07] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；复核 docs/specs、feature spec、lib/channels 与 lib/task-orchestration 三件套、代码/测试路径和 ID 引用，未发现需修正问题；已追加 jian.md 执行记录，无需通知用户。
-- [2026-05-20 02:06] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、feature spec、lib/channels 与 lib/task-orchestration 三件套、代码/测试路径和 ID 引用，未发现需修正或通知用户的问题；已追加 jian.md 执行记录。
-- [2026-05-20 04:06] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、feature spec、lib/channels 与 lib/task-orchestration 三件套、代码/测试路径和 ID 引用，未发现需修正或通知用户的问题；已追加 jian.md 执行记录。
-- [2026-05-20 06:07] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、feature spec、lib/channels 与 lib/task-orchestration 三件套、显式路径与 ID 互引；未发现需修正或通知用户的问题；已追加 jian.md 执行记录。
-- [2026-05-20 08:07] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、feature spec、lib/channels 与 lib/task-orchestration 三件套、显式路径与 ID 互引；未发现需修正或通知用户的问题；已追加 jian.md 执行记录。
-- [2026-05-20 10:06] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、feature spec、lib/channels 与 lib/task-orchestration 三件套、显式路径与 ID 互引；未发现需修正或通知用户的问题；已追加 jian.md 执行记录。
 - [2026-05-20 12:06] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、feature spec、lib/channels 与 lib/task-orchestration 三件套、旧规则残留、显式路径与 ID 互引；未发现需修正或通知用户的问题；已追加 jian.md 执行记录。
 - [2026-05-20 14:06] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、feature spec、lib/channels 与 lib/task-orchestration 三件套、旧规则残留、显式路径与 ID 互引；仅发现模板占位路径，无需修正或通知用户；已追加 jian.md 执行记录。
 - [2026-05-20 16:06] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、feature spec、templates、lib/channels 与 lib/task-orchestration 三件套、旧规则残留、显式路径与 ID 互引；仅发现模板占位测试路径，无需修正或通知用户；已追加 jian.md 执行记录。
@@ -48,3 +39,12 @@
 - [2026-05-26 08:00] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、features 索引、lib/channels、lib/task-orchestration、desktop task board 与 plugins/image-gen 本地三件套、旧规则残留、Markdown 链接、具体测试路径及近期 session/model 变更路径映射；未发现需修正或通知用户的问题；已追加 jian.md 执行记录。
 - [2026-05-26 10:14] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、features 索引、lib/channels、lib/task-orchestration、desktop task board 与 plugins/image-gen 本地三件套、旧规则残留、Markdown 链接、测试引用及近期 session/model/media 映射；未发现需修正或通知用户的问题；已追加 jian.md 执行记录。
 - [2026-05-26 12:00] 查看自主活动目录并参考近期巡检记录；近期已连续完成 EARS/BDD/TDD 文档体系巡检，本轮工作区新增清单仍与既有基线一致，未发现新的异常、待办或需通知用户事项；巡检完毕，无需行动。
+- [2026-05-26 14:00] 查看自主活动目录并参考近期巡检记录；近期已连续完成 EARS/BDD/TDD 文档体系巡检，本轮工作区新增清单仍与既有基线一致，未发现新的异常、待办或需通知用户事项；巡检完毕，无需行动。
+- [2026-05-26 16:00] 查看自主活动目录并参考近期巡检记录；近期已连续完成 EARS/BDD/TDD 文档体系巡检，本轮工作区新增清单仍与既有基线一致，未发现新的异常、待办或需通知用户事项；巡检完毕，无需行动。
+- [2026-05-26 18:00] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、features 索引、lib/channels、lib/task-orchestration、desktop task board 与 plugins/image-gen 本地三件套、旧规则残留、Markdown 链接、显式测试文件引用和 ID 概览；未发现需修正或通知用户的问题；已追加 jian.md 执行记录。
+- [2026-05-26 20:08] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、features 索引、lib/channels、lib/task-orchestration、desktop task board 与 plugins/image-gen 本地三件套、旧规则残留、Markdown 链接、测试引用和 ID 概览；未发现需修正或通知用户的问题；已追加 jian.md 执行记录。
+- [2026-05-26 22:00] 查看自主活动目录并参考近期巡检记录；工作区新增清单仍与既有基线一致，上一轮刚完成 EARS/BDD/TDD 文档体系巡检，未发现新的异常、待办或需通知用户事项；巡检完毕，无需行动。
+- [2026-05-27 00:00] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、features 索引、lib/channels、lib/task-orchestration、desktop task board 与 plugins/image-gen 本地三件套、旧规则残留、Markdown 链接、测试文件引用和 ID 概览；未发现需修正或通知用户的问题；已追加 jian.md 执行记录。
+- [2026-05-27 02:00] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、features 索引、lib/channels、lib/task-orchestration、desktop task board 与 plugins/image-gen 本地三件套、旧规则残留和 Markdown 链接；未发现需修正或通知用户的问题；已追加 jian.md 执行记录。
+- [2026-05-27 06:00] 查看自主活动目录并参考近期巡检记录；工作区无文件变动，上一轮刚完成 EARS/BDD/TDD 文档体系巡检，未发现新的异常、待办或需通知用户事项；巡检完毕，无需行动。
+- [2026-05-27 08:00] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、features 索引、lib/channels、lib/task-orchestration、desktop task board 与 plugins/image-gen 本地三件套、旧规则残留、Markdown 链接、显式测试/代码路径和 ID 概览；仅发现模板占位 tests/example.test.js，无需修正或通知用户；已追加 jian.md 执行记录。

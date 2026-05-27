@@ -108,6 +108,8 @@ function getPluginToolSummaries(engine) {
 }
 
 function emitAgentConfigAppEvents(engine, agentId, { globalFields, agentPartial, providersChanged }) {
+  emitAppEvent(engine, "agent-config-changed", { agentId });
+
   if (
     providersChanged
     || hasOwn(agentPartial, "api")

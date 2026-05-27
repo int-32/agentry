@@ -272,6 +272,8 @@ describe("AgentManager.createAgent default skills.enabled", () => {
       [
         "agent:",
         "  name: Memory Off",
+        "desk:",
+        "  home_folder: /workspace/memory-off",
         "memory:",
         "  enabled: false",
       ].join("\n"),
@@ -291,5 +293,7 @@ describe("AgentManager.createAgent default skills.enabled", () => {
 
     expect(agents.find(a => a.id === "memory-off").memoryMasterEnabled).toBe(false);
     expect(agents.find(a => a.id === "memory-on").memoryMasterEnabled).toBe(true);
+    expect(agents.find(a => a.id === "memory-off").homeFolder).toBe("/workspace/memory-off");
+    expect(agents.find(a => a.id === "memory-on").homeFolder).toBeNull();
   });
 });

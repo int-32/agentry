@@ -121,7 +121,15 @@ describe('WelcomeScreen workspace picker', () => {
     useStore.setState({
       agents: [
         { id: 'hana', name: 'Agentry', yuan: 'hanako', isPrimary: true, memoryMasterEnabled: true },
-        { id: 'artist', name: 'Artist', yuan: 'ming', isPrimary: false, memoryMasterEnabled: true },
+        {
+          id: 'artist',
+          name: 'Artist',
+          yuan: 'ming',
+          isPrimary: false,
+          memoryMasterEnabled: true,
+          homeFolder: '/workspace/ArtistHome',
+          chatModel: { id: 'artist-chat', provider: 'deepseek' },
+        },
       ],
       currentAgentId: 'hana',
       selectedAgentId: null,
@@ -141,7 +149,7 @@ describe('WelcomeScreen workspace picker', () => {
     expect(useStore.getState().homeFolder).toBe('/workspace/ArtistHome');
     expect(useStore.getState().deskBasePath).toBe('/workspace/ArtistHome');
     expect(useStore.getState().workspaceFolders).toEqual([]);
-    expect(hanaFetchMock).toHaveBeenCalledWith('/api/agents/artist/config');
+    expect(hanaFetchMock).not.toHaveBeenCalledWith('/api/agents/artist/config');
     expect(hanaFetchMock).toHaveBeenCalledWith('/api/models/set', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ modelId: 'artist-chat', provider: 'deepseek' }),

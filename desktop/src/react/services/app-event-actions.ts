@@ -6,6 +6,7 @@ import { loadModels } from '../utils/ui-helpers';
 import { activateWorkspaceDesk } from '../stores/desk-actions';
 import { loadChannels } from '../stores/channel-actions';
 import { applyEditorTypography } from '../editor/typography';
+import { invalidateAgentConfigCache } from '../utils/agent-config-cache';
 // @ts-expect-error — shared JS module
 import { mergeWorkspaceHistory } from '../../../../shared/workspace-history.js';
 
@@ -80,6 +81,10 @@ function handleAgentWorkspaceChanged(data: any): void {
 
 export function handleAppEvent(type: string, data: any = {}): void {
   switch (type) {
+    case 'agent-config-changed':
+      invalidateAgentConfigCache(data?.agentId || null);
+      loadAgents();
+      break;
     case 'agent-switched': {
       const myVersion = ++_agentSwitchVersion;
 
@@ -141,6 +146,7 @@ export function handleAppEvent(type: string, data: any = {}): void {
       });
       break;
     case 'models-changed': {
+      invalidateAgentConfigCache(data?.agentId || null);
       loadModels();
       // 模型配置变更可能改变 contextWindow（用户把 1M 模型改成 256k 等），
       // 主动补发一次 context_usage 让 ContextRing 立即吃到新分母。
@@ -152,9 +158,11 @@ export function handleAppEvent(type: string, data: any = {}): void {
     }
     case 'agent-created':
     case 'agent-deleted':
+      invalidateAgentConfigCache(data?.agentId || null);
       loadAgents();
       break;
     case 'agent-updated': {
+      invalidateAgentConfigCache(data?.agentId || null);
       const currentAgentId = useStore.getState().currentAgentId;
       if (data.agentId && data.agentId !== currentAgentId) {
         loadAgents();
@@ -169,6 +177,7 @@ export function handleAppEvent(type: string, data: any = {}): void {
       break;
     }
     case 'memory-master-changed': {
+      invalidateAgentConfigCache(data?.agentId || null);
       const state = useStore.getState();
       if (!data.agentId) break;
       const enabled = data.enabled !== false;
@@ -187,6 +196,7 @@ export function handleAppEvent(type: string, data: any = {}): void {
       break;
     }
     case 'agent-workspace-changed':
+      invalidateAgentConfigCache(data?.agentId || null);
       handleAgentWorkspaceChanged(data);
       break;
     case 'theme-changed':

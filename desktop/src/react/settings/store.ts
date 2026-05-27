@@ -12,6 +12,7 @@ export interface Agent {
   isPrimary: boolean;
   hasAvatar?: boolean;
   memoryMasterEnabled?: boolean;
+  homeFolder?: string | null;
 }
 
 export interface SkillInfo {

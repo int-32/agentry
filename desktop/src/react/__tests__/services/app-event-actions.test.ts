@@ -13,6 +13,7 @@ const mockLoadModels = vi.fn(async () => {});
 const mockActivateWorkspaceDesk = vi.fn(async () => {});
 const mockLoadChannels = vi.fn(async () => {});
 const mockApplyEditorTypography = vi.fn();
+const mockInvalidateAgentConfigCache = vi.fn();
 
 vi.mock('../../stores', () => ({
   useStore: {
@@ -54,6 +55,10 @@ vi.mock('../../editor/typography', () => ({
   applyEditorTypography: mockApplyEditorTypography,
 }));
 
+vi.mock('../../utils/agent-config-cache', () => ({
+  invalidateAgentConfigCache: mockInvalidateAgentConfigCache,
+}));
+
 function jsonResponse(body: unknown): Response {
   return { json: async () => body } as unknown as Response;
 }
@@ -75,6 +80,7 @@ describe('handleAppEvent', () => {
     mockActivateWorkspaceDesk.mockReset();
     mockLoadChannels.mockReset();
     mockApplyEditorTypography.mockReset();
+    mockInvalidateAgentConfigCache.mockReset();
     vi.resetModules();
 
     (globalThis as Record<string, unknown>).window = {
@@ -143,9 +149,19 @@ describe('handleAppEvent', () => {
   it('models-changed reloads models', async () => {
     const { handleAppEvent } = await import('../../services/app-event-actions');
 
-    handleAppEvent('models-changed');
+    handleAppEvent('models-changed', { agentId: 'agent-a' });
 
+    expect(mockInvalidateAgentConfigCache).toHaveBeenCalledWith('agent-a');
     expect(mockLoadModels).toHaveBeenCalledTimes(1);
+  });
+
+  it('agent-config-changed invalidates the welcome agent config cache and refreshes agents', async () => {
+    const { handleAppEvent } = await import('../../services/app-event-actions');
+
+    handleAppEvent('agent-config-changed', { agentId: 'agent-a' });
+
+    expect(mockInvalidateAgentConfigCache).toHaveBeenCalledWith('agent-a');
+    expect(mockLoadAgents).toHaveBeenCalledTimes(1);
   });
 
   it('models-changed requests context usage through the injected callback', async () => {

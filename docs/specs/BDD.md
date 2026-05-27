@@ -34,7 +34,7 @@ Feature: <功能名>
 | Feature | 规格文件 | 主要代码面 |
 | --- | --- | --- |
 | Agent 会话上下文 | [agent-session-context.md](./features/agent-session-context.md) | `core/`, `server/routes/chat.js`, `server/routes/sessions.js`, `desktop/src/react/stores/`, `desktop/src/react/services/` |
-| 供应商与模型设置 | [provider-model-settings.md](./features/provider-model-settings.md) | `core/provider-registry.js`, `server/routes/providers.js`, `desktop/src/react/settings/` |
+| 供应商与模型设置 | [provider-model-settings.md](./features/provider-model-settings.md) | `core/provider-registry.js`, `server/routes/providers.js`, `server/routes/agents.js`, `desktop/src/react/settings/`, `desktop/src/react/services/app-event-actions.ts` |
 | 频道与多 Agent 协作 | [channels-and-agent-collaboration.md](./features/channels-and-agent-collaboration.md) | `lib/channels/`, `hub/channel-router.js`, `server/routes/channels.js`, `desktop/src/react/components/channels/` |
 | 任务编排图 | [task-orchestration.md](./features/task-orchestration.md) | `lib/task-orchestration/`, `lib/tools/task-orchestrate-tool.js`, `server/routes/tasks.js`, `desktop/src/react/components/tasks/` |
 | 媒体生成插件 | [media-generation.md](./features/media-generation.md) | `plugins/image-gen/`, `tests/image-gen-*.test.js` |

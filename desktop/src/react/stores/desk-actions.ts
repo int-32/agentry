@@ -103,12 +103,14 @@ export async function activateWorkspaceDesk(root: string | null | undefined, opt
   const nextSubdir = sameRoot
     ? (latest.deskCurrentPath || '')
     : (saved?.deskCurrentPath || '');
+  const nextTreeFilesByPath = saved?.deskTreeFilesByPath || { '': [] };
+  const cachedFiles = nextTreeFilesByPath[nextSubdir] || [];
 
   useStore.setState({
     deskBasePath: normalized,
     deskCurrentPath: nextSubdir,
-    deskFiles: [],
-    deskTreeFilesByPath: saved?.deskTreeFilesByPath || {},
+    deskFiles: cachedFiles,
+    deskTreeFilesByPath: nextTreeFilesByPath,
     deskExpandedPaths: saved?.deskExpandedPaths || [],
     deskDirtyTreePaths: [],
     deskSelectedPath: saved?.deskSelectedPath || '',

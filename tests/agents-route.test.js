@@ -169,6 +169,7 @@ describe("agents route", () => {
 
     expect(res.status).toBe(200);
     expect(engine.updateConfig).toHaveBeenCalledWith({});
+    expectAppEvent(engine.emitEvent, "agent-config-changed", { agentId });
     expectAppEvent(engine.emitEvent, "models-changed", { agentId });
   });
 
@@ -222,6 +223,7 @@ describe("agents route", () => {
       skills: { enabled: ["writer"] },
     }), { agentId });
     expect(engine.setMemoryMasterEnabled).toHaveBeenCalledWith(agentId, false);
+    expectAppEvent(engine.emitEvent, "agent-config-changed", { agentId });
     expectAppEvent(engine.emitEvent, "models-changed", { agentId });
     expectAppEvent(engine.emitEvent, "agent-updated", {
       agentId,
@@ -238,6 +240,44 @@ describe("agents route", () => {
     });
     expectAppEvent(engine.emitEvent, "locale-changed", { locale: "en-US" });
     expectAppEvent(engine.emitEvent, "skills-changed", { agentId });
+  });
+
+  it("emits agent-config-changed for config updates without specialized events", async () => {
+    const agentId = "hana";
+    const agentDir = path.join(tempRoot, agentId);
+    fs.mkdirSync(agentDir, { recursive: true });
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agentry\n", "utf-8");
+
+    const { createAgentsRoute } = await import("../server/routes/agents.js");
+    const app = new Hono();
+    const engine = {
+      agentsDir: tempRoot,
+      currentAgentId: agentId,
+      providerRegistry: {
+        saveProvider: vi.fn(),
+        removeProvider: vi.fn(),
+        getAllProvidersRaw: vi.fn(() => ({})),
+        get: vi.fn(() => null),
+      },
+      onProviderChanged: vi.fn().mockResolvedValue(undefined),
+      updateConfig: vi.fn().mockResolvedValue(undefined),
+      invalidateAgentListCache: vi.fn(),
+      listAgents: vi.fn(() => []),
+      emitEvent: vi.fn(),
+    };
+
+    app.route("/api", createAgentsRoute(engine));
+
+    const res = await app.request(`/api/agents/${agentId}/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        desk: { heartbeat_interval: 42 },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expectAppEvent(engine.emitEvent, "agent-config-changed", { agentId });
   });
 
   it("editing another agent config can clear saved provider credentials", async () => {
