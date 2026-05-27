@@ -854,34 +854,6 @@ export class AgentryEngine {
     });
   }
 
-  /** 合并自动发现 + 用户配置的外部路径（去重） */
-  _mergeExternalPaths(userConfiguredPaths, extraPaths = []) {
-    const refreshResult = this._workspaceService().refreshDiscoveredExternalPaths(this._discoveredExternalPaths || []);
-    this._discoveredExternalPaths = refreshResult.paths;
-    return this._workspaceService().mergeExternalPaths(
-      userConfiguredPaths,
-      extraPaths,
-      refreshResult.paths,
-    );
-  }
-
-  _getWorkspaceExternalSkillPaths(cwd) {
-    return this._workspaceService().getWorkspaceExternalSkillPaths(cwd);
-  }
-
-  _getResolvedExternalSkillPaths(cwd) {
-    const pluginPaths = this._pluginManager?.getSkillPaths?.() || [];
-    return this._workspaceService().getResolvedWorkspaceExternalSkillPaths({
-      cwd,
-      configuredPaths: this._prefs.getExternalSkillPaths(),
-      pluginPaths,
-    });
-  }
-
-  _sameExternalSkillPaths(a = [], b = []) {
-    return this._workspaceService().sameExternalSkillPaths(a, b);
-  }
-
   async syncWorkspaceSkillPaths(cwd = null, { reload = true, emitEvent = false, force = false } = {}) {
     if (!this._skills) return false;
     return this._workspaceService().syncWorkspaceSkillPaths({
@@ -989,7 +961,11 @@ export class AgentryEngine {
 
     // 解析外部兼容技能路径
     this._discoveredExternalPaths = this._workspaceService().getWellKnownSkillPaths(os.homedir());
-    const externalPaths = this._getResolvedExternalSkillPaths(null);
+    const externalPaths = this._workspaceService().getResolvedWorkspaceExternalSkillPaths({
+      cwd: null,
+      configuredPaths: this._prefs.getExternalSkillPaths(),
+      pluginPaths: this._pluginManager?.getSkillPaths?.() || [],
+    });
 
     this._skills = new SkillManager({ skillsDir, externalPaths });
     this._coreExtensionFactories = [
