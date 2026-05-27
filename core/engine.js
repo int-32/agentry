@@ -668,7 +668,6 @@ export class AgentryEngine {
   getUtilityApi() { return this._configCoord.getUtilityApi(); }
   setUtilityApi(p) { return this._configCoord.setUtilityApi(p); }
   resolveUtilityConfig(options) { return this._configCoord.resolveUtilityConfig(options); }
-  resolveUtilityConfigForAgent(agentId) { return this.resolveUtilityConfig({ agentId }); }
   readAgentOrder() { return this._configCoord.readAgentOrder(); }
   saveAgentOrder(o) { return this._configCoord.saveAgentOrder(o); }
   async syncModelsAndRefresh() { return this._configCoord.syncAndRefresh(); }
