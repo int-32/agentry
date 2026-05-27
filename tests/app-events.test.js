@@ -28,6 +28,19 @@ describe("app-events", () => {
     expect(engine.emitEvent).not.toHaveBeenCalled();
   });
 
+  it("emitAppEvent ignores unknown event types", () => {
+    const engine = { emitEvent: vi.fn() };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    emitAppEvent(engine, "agent-exported", {});
+
+    expect(engine.emitEvent).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      "[app-events] ignore unknown event type: agent-exported",
+    );
+    warn.mockRestore();
+  });
+
   it("emitAppEvent defaults missing payload to empty object", () => {
     const engine = { emitEvent: vi.fn() };
 
@@ -170,5 +183,16 @@ describe("app-events", () => {
     expect(toAppEventWsMessage({ type: "desk_changed" })).toBeNull();
     expect(toAppEventWsMessage({ type: "app_event" })).toBeNull();
     expect(toAppEventWsMessage({ type: "app_event", event: { type: "" } })).toBeNull();
+  });
+
+  it("toAppEventWsMessage filters unknown event types", () => {
+    expect(toAppEventWsMessage({
+      type: "app_event",
+      event: {
+        type: "agent-exported",
+        payload: { id: "1" },
+        source: "settings",
+      },
+    })).toBeNull();
   });
 });

@@ -1,3 +1,5 @@
+import { isKnownAppEventType } from "../shared/app-events.js";
+
 function isPlainObject(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value);
@@ -20,6 +22,10 @@ function normalizeSource(source) {
 
 export function emitAppEvent(engine, type, payload = undefined) {
   if (typeof type !== "string" || !type) return;
+  if (!isKnownAppEventType(type)) {
+    console.warn(`[app-events] ignore unknown event type: ${type}`);
+    return;
+  }
   const normalizedPayload = normalizePayload(payload, type);
   if (!normalizedPayload) return;
 
@@ -35,7 +41,13 @@ export function emitAppEvent(engine, type, payload = undefined) {
 
 export function toAppEventWsMessage(event) {
   if (event?.type !== "app_event") return null;
-  if (typeof event.event?.type !== "string" || !event.event.type) return null;
+  if (
+    typeof event.event?.type !== "string" ||
+    !event.event.type ||
+    !isKnownAppEventType(event.event.type)
+  ) {
+    return null;
+  }
   const payload = normalizePayload(event.event.payload, event.event.type);
   if (!payload) return null;
   const source = normalizeSource(event.event.source);
