@@ -26,6 +26,8 @@
     "start": "npm run build:preload && npm run build:renderer && npm run build:theme && node scripts/launch.js electron",
     "start:dev": "npm run build:preload && npm run build:renderer && npm run build:theme && node scripts/launch.js electron-dev",
     "start:vite": "npm run build:preload && node scripts/launch.js electron-vite",
+    "logs:tail": "node scripts/tail-logs.mjs",
+    "logs:agent-watch": "node scripts/tail-logs.mjs --agent-watch",
     "dev:renderer": "vite --config vite.config.ts",
     "build:renderer": "vite build --config vite.config.ts",
     "build:theme": "vite build --config vite.config.theme.js",

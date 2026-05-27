@@ -56,6 +56,7 @@ function createWorkspaceWatchRegistry({
   watch,
   notifySubscriber,
   debounceMs = 80,
+  idleCloseMs = 30_000,
   onError,
 } = {}) {
   if (typeof watch !== "function") {
@@ -65,9 +66,15 @@ function createWorkspaceWatchRegistry({
     throw new Error("createWorkspaceWatchRegistry: notifySubscriber function required");
   }
 
-  // rootKey -> { rootPath, watcher, subscribers:Set<number>, debounceTimers:Map<string, Timer> }
+  // rootKey -> { rootPath, watcher, subscribers:Set<number>, debounceTimers:Map<string, Timer>, idleCloseTimer?: Timer }
   const entries = new Map();
   const rootsBySubscriber = new Map(); // subscriberId -> Set<rootKey>
+
+  function cancelIdleClose(entry) {
+    if (!entry.idleCloseTimer) return;
+    clearTimeout(entry.idleCloseTimer);
+    entry.idleCloseTimer = null;
+  }
 
   function bindSubscriber(rootKey, subscriberId) {
     let roots = rootsBySubscriber.get(subscriberId);
@@ -86,10 +93,23 @@ function createWorkspaceWatchRegistry({
   }
 
   function closeEntry(rootKey, entry) {
+    cancelIdleClose(entry);
     for (const timer of entry.debounceTimers.values()) clearTimeout(timer);
     entry.debounceTimers.clear();
     safeCloseWatcher(entry.watcher);
     entries.delete(rootKey);
+  }
+
+  function scheduleIdleClose(rootKey, entry) {
+    cancelIdleClose(entry);
+    for (const timer of entry.debounceTimers.values()) clearTimeout(timer);
+    entry.debounceTimers.clear();
+    entry.idleCloseTimer = setTimeout(() => {
+      const current = entries.get(rootKey);
+      if (!current || current.subscribers.size > 0) return;
+      closeEntry(rootKey, current);
+    }, idleCloseMs);
+    entry.idleCloseTimer?.unref?.();
   }
 
   function scheduleNotify(entry, eventType, changedPath) {
@@ -137,6 +157,7 @@ function createWorkspaceWatchRegistry({
       watcher,
       subscribers: new Set(),
       debounceTimers: new Map(),
+      idleCloseTimer: null,
     };
     watcher.on("all", (eventType, changedPath) => {
       if (
@@ -160,6 +181,7 @@ function createWorkspaceWatchRegistry({
   function watchWorkspace(rootPath, subscriberId) {
     try {
       const entry = ensureEntry(rootPath);
+      cancelIdleClose(entry);
       entry.subscribers.add(subscriberId);
       bindSubscriber(entry.rootKey, subscriberId);
       return true;
@@ -178,7 +200,7 @@ function createWorkspaceWatchRegistry({
     entry.subscribers.delete(subscriberId);
     unbindSubscriber(rootKey, subscriberId);
     if (entry.subscribers.size === 0) {
-      closeEntry(rootKey, entry);
+      scheduleIdleClose(rootKey, entry);
     }
     return true;
   }

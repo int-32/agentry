@@ -89,6 +89,22 @@ console.log("[server] ① ensureFirstRun 完成");
 // ── 初始化 Debug 日志 ──
 const dlog = initDebugLog(path.join(agentryHome, "logs"));
 
+function startServerPerfObserver() {
+  const intervalMs = 250;
+  let expected = Date.now() + intervalMs;
+  const timer = setInterval(() => {
+    const now = Date.now();
+    const delay = now - expected;
+    expected = now + intervalMs;
+    if (delay > 500) {
+      dlog.warn("perf", `server.eventLoopLag ${Math.round(delay)}ms`);
+    }
+  }, intervalMs);
+  timer.unref?.();
+}
+
+startServerPerfObserver();
+
 // 读取版本号
 let appVersion = "?";
 try {
@@ -182,6 +198,16 @@ app.use("*", async (c, next) => {
   if (token !== SERVER_TOKEN) return c.json({ error: "forbidden" }, 403);
 
   await next();
+});
+
+app.use("*", async (c, next) => {
+  const started = Date.now();
+  await next();
+  const duration = Date.now() - started;
+  if (duration > 500) {
+    const url = new URL(c.req.url);
+    dlog.warn("perf", `server.route ${duration}ms method=${c.req.method} path=${url.pathname}`);
+  }
 });
 
 // 全局错误处理

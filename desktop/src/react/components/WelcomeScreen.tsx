@@ -17,7 +17,7 @@ import { openSettingsModal } from '../stores/settings-modal-actions';
 import type { Agent } from '../types';
 import { AgentAvatar, refreshAgentAvatarVersion, resolveAgentDisplayInfo, type AgentDisplayInfo } from '../utils/agent-display';
 import { readAgentConfigCache, writeAgentConfigCache } from '../utils/agent-config-cache';
-import { logAsyncPerf, logPerf, markPerf } from '../utils/perf';
+import { beginPerfTrace, endPerfTrace, logAsyncPerf, logNextFramePerf, logPerf, logPerfEvent, markPerf } from '../utils/perf';
 import styles from './Welcome.module.css';
 // @ts-expect-error — shared JS module
 import { buildWorkspacePickerItems } from '../../../../shared/workspace-history.js';
@@ -62,11 +62,14 @@ const AGENT_DESK_FILE_LOAD_DELAY_MS = 350;
 
 async function loadAgentConfig(agentId: string): Promise<any> {
   const cached = readAgentConfigCache(agentId);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) {
+    logPerfEvent('welcome.agent.config', { agent: agentId, source: 'cache' });
+    return cached;
+  }
   const config = await logAsyncPerf(
     'welcome.agent.config',
     () => hanaFetch(`/api/agents/${encodeURIComponent(agentId)}/config`).then(r => r.json()),
-    { agent: agentId },
+    { agent: agentId, source: 'fetch' },
   );
   if (!config?.error) writeAgentConfigCache(agentId, config);
   return config;
@@ -115,42 +118,59 @@ function scheduleDeferredDeskFileLoad(callback: () => void): () => void {
   };
 }
 
-function applyAgentWorkspaceSelection(agentId: string, homeFolder: string | null, version: number, selectionVersionRef: MutableRefObject<number>): () => void {
+function applyAgentWorkspaceSelection(agentId: string, homeFolder: string | null, version: number, selectionVersionRef: MutableRefObject<number>, traceId: string): () => void {
   if (version !== selectionVersionRef.current) return () => {};
   useStore.setState({
     homeFolder,
     selectedFolder: homeFolder,
     workspaceFolders: [],
   });
-  return scheduleAgentDeskLoad(agentId, homeFolder, version, selectionVersionRef);
+  logNextFramePerf('welcome.agent.frame', { agent: agentId, trace: traceId, traceLabel: 'welcome.agent.switch', phase: 'workspace-applied' });
+  return scheduleAgentDeskLoad(agentId, homeFolder, version, selectionVersionRef, traceId);
 }
 
-function scheduleAgentDeskLoad(agentId: string, homeFolder: string | null, version: number, selectionVersionRef: MutableRefObject<number>): () => void {
+function scheduleAgentDeskLoad(agentId: string, homeFolder: string | null, version: number, selectionVersionRef: MutableRefObject<number>, traceId: string): () => void {
   const start = markPerf('welcome.agent.desk');
+  logPerfEvent('welcome.agent.desk', { agent: agentId, root: homeFolder || '', phase: 'activate-start' });
   let cancelled = false;
   let cancelDeferredLoad: (() => void) | null = null;
+  let activeDeskFilesRequest: AbortController | null = null;
   void activateWorkspaceDesk(homeFolder, { reload: false })
     .then(() => {
-      logPerf('welcome.agent.desk', start, { agent: agentId, root: homeFolder || '' });
+      logPerf('welcome.agent.desk', start, { agent: agentId, root: homeFolder || '', phase: 'activated' });
       if (cancelled) return;
       if (version !== selectionVersionRef.current) return;
+      if (!homeFolder) {
+        logPerfEvent('welcome.agent.deskFiles', { agent: agentId, phase: 'skip-empty-root' });
+        endPerfTrace(traceId, { agent: agentId, phase: 'complete-empty-root' });
+        return;
+      }
+      const deferStart = markPerf('welcome.agent.deskFiles.defer');
       cancelDeferredLoad = scheduleDeferredDeskFileLoad(() => {
         if (version !== selectionVersionRef.current) return;
+        activeDeskFilesRequest = new AbortController();
+        logPerf('welcome.agent.deskFiles.defer', deferStart, { agent: agentId, root: homeFolder || '', trace: traceId, traceLabel: 'welcome.agent.switch', phase: 'start-load' });
         const subdir = useStore.getState().deskCurrentPath || '';
         void logAsyncPerf(
           'welcome.agent.deskFiles',
-          () => loadDeskFiles(subdir, homeFolder),
-          { agent: agentId, root: homeFolder || '', subdir },
-        );
+          () => loadDeskFiles(subdir, homeFolder, { signal: activeDeskFilesRequest?.signal }),
+          { agent: agentId, root: homeFolder || '', subdir, trace: traceId, traceLabel: 'welcome.agent.switch', phase: 'load' },
+        ).finally(() => {
+          activeDeskFilesRequest = null;
+          endPerfTrace(traceId, { agent: agentId, phase: 'complete' });
+        });
       });
     })
     .catch((err) => {
-      logPerf('welcome.agent.desk', start, { agent: agentId, failed: true });
+      logPerf('welcome.agent.desk', start, { agent: agentId, failed: true, phase: 'activate' });
+      endPerfTrace(traceId, { agent: agentId, phase: 'failed' });
       console.warn('[welcome] activate agent desk failed:', err);
     });
   return () => {
     cancelled = true;
     cancelDeferredLoad?.();
+    activeDeskFilesRequest?.abort();
+    logPerfEvent('welcome.agent.switch.trace', { agent: agentId, trace: traceId, phase: 'cancelled' });
   };
 }
 
@@ -163,7 +183,7 @@ function addAgentModelUnavailableToast(agentId: string, chatModel: { id: string;
   );
 }
 
-function applyAgentChatModel(agentId: string, chatModel: { id: string; provider: string } | null, version: number, selectionVersionRef: MutableRefObject<number>): void {
+function applyAgentChatModel(agentId: string, chatModel: { id: string; provider: string } | null, version: number, selectionVersionRef: MutableRefObject<number>, traceId?: string): void {
   if (!chatModel) return;
   void logAsyncPerf(
     'welcome.agent.model',
@@ -193,7 +213,7 @@ function applyAgentChatModel(agentId: string, chatModel: { id: string; provider:
         addAgentModelUnavailableToast(agentId, chatModel);
       }
     },
-    { agent: agentId, model: chatModel.id, provider: chatModel.provider },
+    { agent: agentId, model: chatModel.id, provider: chatModel.provider, trace: traceId, traceLabel: traceId ? 'welcome.agent.switch' : undefined },
   ).catch(() => {});
 }
 
@@ -313,10 +333,12 @@ function AgentChips({ agents, selectedId, selectionVersionRef }: {
 
   const handleClick = useCallback((agentId: string) => {
     const version = ++selectionVersionRef.current;
+    const traceId = beginPerfTrace('welcome.agent.switch', { agent: agentId, version });
     const started = markPerf('welcome.agent.switch');
     useStore.setState({ selectedAgentId: agentId });
+    logNextFramePerf('welcome.agent.frame', { agent: agentId, trace: traceId, traceLabel: 'welcome.agent.switch', phase: 'selected' });
     const agent = agents.find(a => a.id === agentId) || null;
-    logPerf('welcome.agent.switch', started, { agent: agentId, phase: 'selected' });
+    logPerf('welcome.agent.switch', started, { agent: agentId, phase: 'selected', trace: traceId });
 
     if (commitTimerRef.current != null) window.clearTimeout(commitTimerRef.current);
     deskLoadCancelRef.current?.();
@@ -324,15 +346,17 @@ function AgentChips({ agents, selectedId, selectionVersionRef }: {
     commitTimerRef.current = window.setTimeout(() => {
       commitTimerRef.current = null;
       if (version !== selectionVersionRef.current) return;
+      logPerf('welcome.agent.switch', started, { agent: agentId, phase: 'commit', trace: traceId });
 
       const chatModelFromList = agent?.chatModel?.id && agent.chatModel?.provider
         ? { id: agent.chatModel.id, provider: agent.chatModel.provider }
         : null;
 
       if (hasAgentHomeFolderSummary(agent)) {
+        logPerfEvent('welcome.agent.config', { agent: agentId, source: 'agent-list' });
         const homeFolder = normalizeWorkspacePath(agent?.homeFolder);
-        deskLoadCancelRef.current = applyAgentWorkspaceSelection(agentId, homeFolder, version, selectionVersionRef);
-        applyAgentChatModel(agentId, chatModelFromList, version, selectionVersionRef);
+        deskLoadCancelRef.current = applyAgentWorkspaceSelection(agentId, homeFolder, version, selectionVersionRef, traceId);
+        applyAgentChatModel(agentId, chatModelFromList, version, selectionVersionRef, traceId);
         return;
       }
 
@@ -342,14 +366,16 @@ function AgentChips({ agents, selectedId, selectionVersionRef }: {
           if (config?.error) throw new Error(String(config.error));
 
           const homeFolder = normalizeWorkspacePath(config?.desk?.home_folder);
-          deskLoadCancelRef.current = applyAgentWorkspaceSelection(agentId, homeFolder, version, selectionVersionRef);
+          deskLoadCancelRef.current = applyAgentWorkspaceSelection(agentId, homeFolder, version, selectionVersionRef, traceId);
 
           const chatModel = readConfigChatModel(config) || chatModelFromList;
-          applyAgentChatModel(agentId, chatModel, version, selectionVersionRef);
+          applyAgentChatModel(agentId, chatModel, version, selectionVersionRef, traceId);
         })
         .catch(() => {
           if (version !== selectionVersionRef.current) return;
-          applyAgentChatModel(agentId, chatModelFromList, version, selectionVersionRef);
+          logPerfEvent('welcome.agent.config', { agent: agentId, source: 'fetch', failed: true });
+          applyAgentChatModel(agentId, chatModelFromList, version, selectionVersionRef, traceId);
+          endPerfTrace(traceId, { agent: agentId, phase: 'config-failed' });
         });
     }, AGENT_SWITCH_COMMIT_DELAY_MS);
   }, [agents, selectionVersionRef]);

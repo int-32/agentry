@@ -89,10 +89,11 @@ describe("workspace-watch-registry", () => {
     expect(options.ignored("/workspace/src/App.tsx")).toBe(false);
   });
 
-  it("removes only the current subscriber and closes the watcher after the last subscriber leaves", () => {
+  it("removes only the current subscriber and closes the watcher after an idle delay", () => {
     const registry = createWorkspaceWatchRegistry({
       watch: watchMock,
       notifySubscriber: () => {},
+      idleCloseMs: 100,
     });
 
     registry.watchWorkspace("/workspace", 1);
@@ -102,6 +103,29 @@ describe("workspace-watch-registry", () => {
     expect(watchers.get("/workspace").close).not.toHaveBeenCalled();
 
     expect(registry.unwatchWorkspace("/workspace", 2)).toBe(true);
+    expect(watchers.get("/workspace").close).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(99);
+    expect(watchers.get("/workspace").close).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
     expect(watchers.get("/workspace").close).toHaveBeenCalledOnce();
+  });
+
+  it("reuses an idle watcher when the workspace is watched again before close", () => {
+    const registry = createWorkspaceWatchRegistry({
+      watch: watchMock,
+      notifySubscriber: () => {},
+      idleCloseMs: 100,
+    });
+
+    registry.watchWorkspace("/workspace", 1);
+    const watcher = watchers.get("/workspace");
+    expect(registry.unwatchWorkspace("/workspace", 1)).toBe(true);
+
+    vi.advanceTimersByTime(50);
+    registry.watchWorkspace("/workspace", 2);
+    vi.advanceTimersByTime(100);
+
+    expect(watchMock).toHaveBeenCalledTimes(1);
+    expect(watcher.close).not.toHaveBeenCalled();
   });
 });

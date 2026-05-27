@@ -165,7 +165,13 @@ export function deskCurrentDir(): string | null {
 
 // ── 文件操作 ──
 
-export async function loadDeskFiles(subdir?: string, overrideDir?: string | null): Promise<void> {
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'AbortError';
+}
+
+export async function loadDeskFiles(subdir?: string, overrideDir?: string | null, options: {
+  signal?: AbortSignal;
+} = {}): Promise<void> {
   const s = useStore.getState();
   if (!hasServerConnection(s)) return;
   if (subdir !== undefined) s.setDeskCurrentPath(subdir);
@@ -181,8 +187,12 @@ export async function loadDeskFiles(subdir?: string, overrideDir?: string | null
     const curPath = subdir !== undefined ? subdir : s.deskCurrentPath;
     if (curPath) params.set('subdir', curPath);
     const qs = params.toString() ? `?${params}` : '';
-    const res = await hanaFetch(`/api/desk/files${qs}`);
+    const url = `/api/desk/files${qs}`;
+    const res = options.signal
+      ? await hanaFetch(url, { signal: options.signal })
+      : await hanaFetch(url);
     const data = await res.json();
+    if (options.signal?.aborted) return;
     if (myVersion !== _deskLoadVersion) return;
     if (data.error) throw new Error(String(data.error));
     const st = useStore.getState();
@@ -193,6 +203,7 @@ export async function loadDeskFiles(subdir?: string, overrideDir?: string | null
     loadJianContent();
     updateDeskContextBtn();
   } catch (err) {
+    if (options.signal?.aborted || isAbortError(err)) return;
     console.error('[jian-desk] load failed:', err);
     if (myVersion !== _deskLoadVersion) return;
     const st = useStore.getState();

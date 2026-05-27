@@ -23,6 +23,7 @@ import { configureAppEventActions, handleAppEvent, readConfigCwdHistory, readCon
 import { configureWsMessageHandler } from './services/ws-message-handler';
 import { applyEditorTypography } from './editor/typography';
 import { createLocalServerConnection, hasServerConnection, mergeServerIdentity } from './services/server-connection';
+import { initPerfObservers } from './utils/perf';
 // @ts-expect-error — shared JS module
 import { errorBus as _errorBus } from '../../../shared/error-bus.js';
 // @ts-expect-error — shared JS module
@@ -76,6 +77,7 @@ export async function initApp(): Promise<void> {
   const serverToken = await platform.getServerToken();
   const activeServerConnection = createLocalServerConnection({ serverPort, serverToken });
   useStore.setState({ serverPort, serverToken, activeServerConnection });
+  initPerfObservers();
 
   if (!activeServerConnection) {
     setStatus('status.serverNotReady', false);
