@@ -564,10 +564,11 @@ describe("sessions route", () => {
       }),
       getAgent: vi.fn((id) => (id === "hanako" ? { agentName: "Agentry" } : null)),
     };
+    const sessionPath = "/tmp/agents/hanako/sessions/main.jsonl";
 
     app.route("/api", createSessionsRoute(engine));
 
-    const res = await app.request("/api/sessions/messages");
+    const res = await app.request(`/api/sessions/messages?path=${encodeURIComponent(sessionPath)}`);
     const data = await res.json();
 
     expect(res.status).toBe(200);
@@ -597,10 +598,11 @@ describe("sessions route", () => {
       agentsDir: "/tmp/agents",
       deferredResults: null,
     };
+    const sessionPath = "/tmp/agents/hana/sessions/main.jsonl";
 
     app.route("/api", createSessionsRoute(engine));
 
-    const res = await app.request("/api/sessions/messages");
+    const res = await app.request(`/api/sessions/messages?path=${encodeURIComponent(sessionPath)}`);
     const data = await res.json();
 
     expect(res.status).toBe(200);
@@ -618,6 +620,23 @@ describe("sessions route", () => {
         timestamp: "2026-05-07T05:43:00.000Z",
       },
     ]);
+  });
+
+  it("requires path query when fetching messages", async () => {
+    const { createSessionsRoute } = await import("../server/routes/sessions.js");
+    const app = new Hono();
+    const engine = {
+      agentsDir: "/tmp/agents",
+      deferredResults: null,
+    };
+
+    app.route("/api", createSessionsRoute(engine));
+
+    const res = await app.request("/api/sessions/messages");
+    const data = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(data.error).toContain("path");
   });
 
   it("returns a lightweight index of all displayable user turns", async () => {
@@ -912,10 +931,11 @@ describe("sessions route", () => {
         return null;
       }),
     };
+    const sessionPath = "/tmp/agents/hanako/sessions/main.jsonl";
 
     app.route("/api", createSessionsRoute(engine));
 
-    const res = await app.request("/api/sessions/messages");
+    const res = await app.request(`/api/sessions/messages?path=${encodeURIComponent(sessionPath)}`);
     const data = await res.json();
 
     expect(res.status).toBe(200);
@@ -976,10 +996,11 @@ describe("sessions route", () => {
       }),
       getAgent: vi.fn((id) => (id === "hanako" ? { agentName: "Agentry" } : null)),
     };
+    const sessionPath = path.join(agentsDir, "hanako", "sessions", "main.jsonl");
 
     app.route("/api", createSessionsRoute(engine));
 
-    const res = await app.request("/api/sessions/messages");
+    const res = await app.request(`/api/sessions/messages?path=${encodeURIComponent(sessionPath)}`);
     const data = await res.json();
 
     expect(res.status).toBe(200);
@@ -1028,10 +1049,11 @@ describe("sessions route", () => {
       }),
       getAgent: vi.fn((id) => (id === "hanako" ? { agentName: "Agentry" } : null)),
     };
+    const sessionPath = "/tmp/agents/hanako/sessions/main.jsonl";
 
     app.route("/api", createSessionsRoute(engine));
 
-    const res = await app.request("/api/sessions/messages");
+    const res = await app.request(`/api/sessions/messages?path=${encodeURIComponent(sessionPath)}`);
     const data = await res.json();
 
     expect(res.status).toBe(200);
@@ -1082,10 +1104,11 @@ describe("sessions route", () => {
       }),
       getAgent: vi.fn((id) => (id === "hanako" ? { agentName: "Agentry" } : null)),
     };
+    const sessionPath = "/tmp/agents/hanako/sessions/main.jsonl";
 
     app.route("/api", createSessionsRoute(engine));
 
-    const res = await app.request("/api/sessions/messages");
+    const res = await app.request(`/api/sessions/messages?path=${encodeURIComponent(sessionPath)}`);
     const data = await res.json();
 
     expect(res.status).toBe(200);

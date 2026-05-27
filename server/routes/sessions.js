@@ -346,10 +346,13 @@ export function createSessionsRoute(engine) {
     }
   });
 
-  // 获取 session 的消息（支持 ?path= 指定 session，否则读焦点 session）
+  // 获取 session 的消息（仅支持通过 ?path= 显式指定 session）
   route.get("/sessions/messages", async (c) => {
     try {
       const queryPath = c.req.query("path") || null;
+      if (!queryPath) {
+        return c.json({ error: t("error.missingParam", { param: "path" }) }, 400);
+      }
       if (queryPath && !isValidSessionPath(queryPath, engine.agentsDir)) {
         return c.json({ error: "Invalid session path" }, 403);
       }
@@ -478,7 +481,7 @@ export function createSessionsRoute(engine) {
         }
       }
 
-      const resolvedSessionPath = queryPath || engine.currentSessionPath || null;
+      const resolvedSessionPath = queryPath;
       patchSessionFileLifecycleBlocks(slicedBlocks, engine, resolvedSessionPath);
       const sessionFiles = listSessionRegistryFiles(engine, resolvedSessionPath);
 
