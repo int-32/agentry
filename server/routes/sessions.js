@@ -101,6 +101,11 @@ export function createSessionsRoute(engine) {
     };
   }
 
+  function getAgentConfigForHistory(agentId) {
+    if (!agentId) return engine.config || {};
+    return engine.getAgent?.(agentId)?.config || {};
+  }
+
   async function discardSessionRuntimeOrClose(sessionPath, reason) {
     if (!sessionPath) return false;
     if (typeof engine.discardSessionRuntime === "function") {
@@ -605,8 +610,13 @@ export function createSessionsRoute(engine) {
 
       // 记住工作目录 + 更新历史
       if (cwd) {
-        const history = mergeWorkspaceHistory(engine.config.cwd_history, [cwd]);
-        await engine.updateConfig({ last_cwd: cwd, cwd_history: history });
+        const targetAgentId = newAgentId || agentId || body.currentAgentId || engine.currentAgentId || null;
+        const targetConfig = getAgentConfigForHistory(targetAgentId);
+        const history = mergeWorkspaceHistory(targetConfig.cwd_history, [cwd]);
+        await engine.updateConfig(
+          { last_cwd: cwd, cwd_history: history },
+          targetAgentId ? { agentId: targetAgentId } : {},
+        );
       }
 
       console.log("[sessions] session 创建完成");

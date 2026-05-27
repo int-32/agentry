@@ -59,6 +59,7 @@ describe('desk-actions workspace roots', () => {
       workspaceFolders: [],
       pendingNewSession: true,
       currentSessionPath: null,
+      currentAgentId: 'hana',
     } as never);
   });
 
@@ -152,7 +153,7 @@ describe('desk-actions workspace roots', () => {
       '/api/config/workspaces/recent',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ path: '/workspace/Desktop' }),
+        body: JSON.stringify({ path: '/workspace/Desktop', agentId: 'hana' }),
       }),
     );
 

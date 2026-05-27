@@ -116,8 +116,17 @@ export function createConfigRoute(engine) {
       if (!folder) return c.json({ error: "path must be a non-empty string" }, 400);
       const stat = await fs.stat(folder).catch(() => null);
       if (!stat?.isDirectory()) return c.json({ error: "path must be an existing directory" }, 400);
-      const cwdHistory = mergeWorkspaceHistory(engine.config.cwd_history, [folder]);
-      await engine.updateConfig({ cwd_history: cwdHistory });
+      const agentId = typeof body?.agentId === "string" && body.agentId.trim()
+        ? body.agentId.trim()
+        : null;
+      const targetAgent = agentId ? engine.getAgent?.(agentId) : null;
+      if (agentId && !targetAgent) return c.json({ error: `agent ${agentId} not found` }, 404);
+      const sourceConfig = targetAgent?.config || engine.config || {};
+      const cwdHistory = mergeWorkspaceHistory(sourceConfig.cwd_history, [folder]);
+      await engine.updateConfig(
+        { cwd_history: cwdHistory },
+        agentId ? { agentId } : {},
+      );
       return c.json({ ok: true, cwd_history: cwdHistory });
     } catch (err) {
       return c.json({ error: err.message }, 500);

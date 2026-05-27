@@ -148,6 +148,59 @@ describe("sessions route", () => {
     expect(data.workspaceFolders).toEqual([extra]);
   });
 
+  it("writes new session cwd history to the returned agent instead of the focus agent", async () => {
+    const { createSessionsRoute } = await import("../server/routes/sessions.js");
+    const app = new Hono();
+    const cwd = path.join(tmpDir, "target-workspace");
+    const previousTargetCwd = path.join(tmpDir, "previous-target-workspace");
+    const focusConfig = { cwd_history: [path.join(tmpDir, "focus-workspace")] };
+    const targetConfig = { cwd_history: [previousTargetCwd] };
+
+    const engine = {
+      currentAgentId: "focus",
+      config: focusConfig,
+      cwd,
+      memoryEnabled: true,
+      planMode: false,
+      memoryModelUnavailableReason: null,
+      createSession: vi.fn(),
+      createSessionForAgent: vi.fn(async () => ({
+        sessionPath: "/tmp/agents/target/sessions/new.jsonl",
+        agentId: "target",
+      })),
+      persistSessionMeta: vi.fn(),
+      updateConfig: vi.fn(async () => {}),
+      getAgent: vi.fn((id) => {
+        if (id === "target") return { agentName: "Target", config: targetConfig };
+        if (id === "focus") return { agentName: "Focus", config: focusConfig };
+        return null;
+      }),
+      getSessionWorkspaceFolders: vi.fn(() => []),
+    };
+
+    app.route("/api", createSessionsRoute(engine));
+
+    const res = await app.request("/api/sessions/new", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agentId: "target", currentAgentId: "focus", cwd }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(engine.createSession).not.toHaveBeenCalled();
+    expect(engine.createSessionForAgent).toHaveBeenCalledWith(
+      "target",
+      cwd,
+      true,
+      undefined,
+      { workspaceFolders: [] },
+    );
+    expect(engine.updateConfig).toHaveBeenCalledWith(
+      { last_cwd: cwd, cwd_history: [cwd, previousTargetCwd] },
+      { agentId: "target" },
+    );
+  });
+
   it("includes pinnedAt in the session list response", async () => {
     const { createSessionsRoute } = await import("../server/routes/sessions.js");
     const app = new Hono();

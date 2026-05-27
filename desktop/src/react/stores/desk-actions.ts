@@ -709,11 +709,13 @@ export async function applyFolder(folder: string): Promise<void> {
 async function persistWorkspaceHistory(folder: string): Promise<void> {
   const s = useStore.getState();
   if (!hasServerConnection(s)) return;
+  const body: { path: string; agentId?: string } = { path: folder };
+  if (s.currentAgentId) body.agentId = s.currentAgentId;
   try {
     const res = await hanaFetch('/api/config/workspaces/recent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: folder }),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (data.error) throw new Error(String(data.error));

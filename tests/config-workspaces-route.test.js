@@ -41,7 +41,40 @@ describe("config workspace routes", () => {
     expect(data.cwd_history).toEqual([nextWorkspace, oldWorkspace]);
     expect(engine.updateConfig).toHaveBeenCalledWith({
       cwd_history: [nextWorkspace, oldWorkspace],
+    }, {});
+  });
+
+  it("persists a selected workspace into the explicit agent workspace history", async () => {
+    const { createConfigRoute } = await import("../server/routes/config.js");
+    const focusWorkspace = path.join(tmpDir, "focus");
+    const targetOldWorkspace = path.join(tmpDir, "target-old");
+    const nextWorkspace = path.join(tmpDir, "next");
+    fs.mkdirSync(focusWorkspace);
+    fs.mkdirSync(targetOldWorkspace);
+    fs.mkdirSync(nextWorkspace);
+    const focusConfig = { cwd_history: [focusWorkspace] };
+    const targetConfig = { cwd_history: [targetOldWorkspace] };
+    const engine = {
+      config: focusConfig,
+      getAgent: vi.fn((id) => (id === "target" ? { id, config: targetConfig } : null)),
+      updateConfig: vi.fn(async () => {}),
+    };
+    const app = new Hono();
+    app.route("/api", createConfigRoute(engine));
+
+    const res = await app.request("/api/config/workspaces/recent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: nextWorkspace, agentId: "target" }),
     });
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.cwd_history).toEqual([nextWorkspace, targetOldWorkspace]);
+    expect(engine.updateConfig).toHaveBeenCalledWith(
+      { cwd_history: [nextWorkspace, targetOldWorkspace] },
+      { agentId: "target" },
+    );
   });
 
   it("exposes and creates the default onboarding workspace", async () => {
