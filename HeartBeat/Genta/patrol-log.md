@@ -1,5 +1,3 @@
-- [2026-05-20 12:06] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、feature spec、lib/channels 与 lib/task-orchestration 三件套、旧规则残留、显式路径与 ID 互引；未发现需修正或通知用户的问题；已追加 jian.md 执行记录。
-- [2026-05-20 14:06] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、feature spec、lib/channels 与 lib/task-orchestration 三件套、旧规则残留、显式路径与 ID 互引；仅发现模板占位路径，无需修正或通知用户；已追加 jian.md 执行记录。
 - [2026-05-20 16:06] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、feature spec、templates、lib/channels 与 lib/task-orchestration 三件套、旧规则残留、显式路径与 ID 互引；仅发现模板占位测试路径，无需修正或通知用户；已追加 jian.md 执行记录。
 - [2026-05-20 18:06] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、feature spec、templates、lib/channels 与 lib/task-orchestration 三件套、旧规则残留、显式路径与 ID 互引；仅发现模板占位路径，无需修正或通知用户；已追加 jian.md 执行记录。
 - [2026-05-20 20:18] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、feature spec、templates、lib/channels 与 lib/task-orchestration 三件套、旧规则残留、显式测试路径和 ID 互引；仅发现模板占位测试路径，无需修正或通知用户；已追加 jian.md 执行记录。
@@ -48,3 +46,6 @@
 - [2026-05-27 02:00] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、features 索引、lib/channels、lib/task-orchestration、desktop task board 与 plugins/image-gen 本地三件套、旧规则残留和 Markdown 链接；未发现需修正或通知用户的问题；已追加 jian.md 执行记录。
 - [2026-05-27 06:00] 查看自主活动目录并参考近期巡检记录；工作区无文件变动，上一轮刚完成 EARS/BDD/TDD 文档体系巡检，未发现新的异常、待办或需通知用户事项；巡检完毕，无需行动。
 - [2026-05-27 08:00] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、features 索引、lib/channels、lib/task-orchestration、desktop task board 与 plugins/image-gen 本地三件套、旧规则残留、Markdown 链接、显式测试/代码路径和 ID 概览；仅发现模板占位 tests/example.test.js，无需修正或通知用户；已追加 jian.md 执行记录。
+- [2026-05-27 16:00] 查看自主活动目录并参考近期巡检记录；工作区新增清单仍与既有基线一致，上一轮已完成 EARS/BDD/TDD 文档体系巡检，未发现新的异常、待办或需通知用户事项；巡检完毕，无需行动。
+- [2026-05-27 18:00] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核 docs/specs、features 索引、lib/channels、lib/task-orchestration、desktop task board 与 plugins/image-gen 本地三件套、旧规则残留、Markdown 链接和 ID 概览；未发现需修正或通知用户的问题；已追加 jian.md 与 docs/jian.md 执行记录。
+- [2026-05-27 20:00] 按 jian.md 执行 EARS/BDD/TDD 文档体系巡检；查看自主活动目录，复核新增 AGENTS.md、docs/specs、features 索引、lib/channels、lib/task-orchestration、desktop task board 与 plugins/image-gen 本地三件套、Markdown 链接、旧规则残留和显式路径；未发现需修正或通知用户的问题；已追加 jian.md 与 docs/jian.md 执行记录。
