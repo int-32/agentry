@@ -1,65 +1,58 @@
 import { describe, expect, it, vi } from "vitest";
 import { AgentryEngine } from "../core/engine.js";
 
-/**
- * 针对 AgentryEngine.syncWorkspaceSkillPaths 的最小单测。
- *
- * syncWorkspaceSkillPaths 在"externalPaths 列表没变"时默认短路 return false，不 reload
- * 也不 emit。上传/删除 workspace skill 的场景（dirPath 不变，内容变）必须用 force: true
- * 绕过这个短路，否则会和 chokidar watcher 的 dot-ignore bug 叠加成用户看不到变化的 bug。
- */
 describe("AgentryEngine.syncWorkspaceSkillPaths", () => {
-  function makeFakeEngine(initialPaths) {
+  function makeFakeEngine({ currentPaths = [] } = {}) {
     const engine = Object.create(AgentryEngine.prototype);
-    const skills = {
-      _externalPaths: initialPaths,
-      setExternalPaths: vi.fn((paths) => { skills._externalPaths = paths; }),
+    const workspaceService = {
+      syncWorkspaceSkillPaths: vi.fn().mockResolvedValue(false),
     };
-    engine._skills = skills;
-    engine._getResolvedExternalSkillPaths = vi.fn(() => initialPaths);
-    engine.reloadSkills = vi.fn().mockResolvedValue(undefined);
-    engine._emitEvent = vi.fn();
+    engine._skills = { _externalPaths: currentPaths };
+    engine._prefs = { getExternalSkillPaths: vi.fn(() => []) };
+    engine._pluginManager = { getSkillPaths: vi.fn(() => []) };
+    engine._discoveredExternalPaths = [];
+    engine._workspaceService = () => workspaceService;
     return engine;
   }
 
-  it("externalPaths 没变化时默认短路，不调用 reload / emit", async () => {
-    const paths = [{ dirPath: "/x", label: "Agents", scope: "workspace" }];
-    const engine = makeFakeEngine(paths);
-
-    const result = await engine.syncWorkspaceSkillPaths("/cwd", {
-      reload: true,
-      emitEvent: true,
-    });
-
-    expect(result).toBe(false);
-    expect(engine._skills.setExternalPaths).not.toHaveBeenCalled();
-    expect(engine.reloadSkills).not.toHaveBeenCalled();
-    expect(engine._emitEvent).not.toHaveBeenCalled();
-  });
-
-  it("force: true 会绕过短路强制 reload + emit，用于 workspace skill 文件变化", async () => {
-    const paths = [{ dirPath: "/x", label: "Agents", scope: "workspace" }];
-    const engine = makeFakeEngine(paths);
-
-    const result = await engine.syncWorkspaceSkillPaths("/cwd", {
-      reload: true,
+  it("delegates to workspace service and passes workspace skill inputs", async () => {
+    const engine = makeFakeEngine({ currentPaths: [] });
+    const cwd = "/workspace";
+    const result = await engine.syncWorkspaceSkillPaths(cwd, {
+      reload: false,
       emitEvent: true,
       force: true,
     });
+    const svc = engine._workspaceService();
 
-    expect(result).toBe(true);
-    expect(engine._skills.setExternalPaths).toHaveBeenCalledWith(paths);
-    expect(engine.reloadSkills).toHaveBeenCalledTimes(1);
-    expect(engine._emitEvent).toHaveBeenCalledWith({ type: "skills-changed" }, null);
+    expect(result).toBe(false);
+    expect(svc.syncWorkspaceSkillPaths).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cwd,
+        pluginPaths: [],
+        configuredPaths: [],
+        discoveredPaths: [],
+        currentPaths: [],
+        reload: false,
+        emitEvent: true,
+        force: true,
+      }),
+    );
   });
 
-  it("force: true 但 reload: false 只触发 setExternalPaths，不触发 reload", async () => {
-    const paths = [{ dirPath: "/x", label: "Agents", scope: "workspace" }];
-    const engine = makeFakeEngine(paths);
+  it("returns false directly when skills not initialized", async () => {
+    const engine = makeFakeEngine({ currentPaths: [] });
+    engine._skills = null;
+    const result = await engine.syncWorkspaceSkillPaths("/workspace");
+    expect(result).toBe(false);
+  });
 
-    await engine.syncWorkspaceSkillPaths("/cwd", { reload: false, force: true });
+  it("passes through service result", async () => {
+    const engine = makeFakeEngine({ currentPaths: [] });
+    const svc = engine._workspaceService();
+    svc.syncWorkspaceSkillPaths.mockResolvedValue(true);
+    const result = await engine.syncWorkspaceSkillPaths("/workspace");
 
-    expect(engine._skills.setExternalPaths).toHaveBeenCalled();
-    expect(engine.reloadSkills).not.toHaveBeenCalled();
+    expect(result).toBe(true);
   });
 });

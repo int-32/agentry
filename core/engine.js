@@ -20,22 +20,12 @@ import { migrateToProvidersYaml } from "./migrate-providers.js";
 import { migrateProviderMediaConfig } from "./provider-media-config.js";
 import { runMigrations } from "./migrations.js";
 import { findModel } from "../shared/model-ref.js";
-import { resolveWorkspaceSkillPaths } from "../shared/workspace-skill-paths.js";
 import { resolveHanaPiAgentDir, resolveHanaPiProjectDir } from "../shared/agentry-runtime-paths.js";
 import { PluginManager } from "./plugin-manager.js";
 import { PluginDevService } from "./plugin-dev-service.js";
 import { createPluginDevTools } from "./plugin-dev-tools.js";
 import { DefaultResourceLoader, SettingsManager } from "../lib/pi-sdk/index.js";
 import { loadLocale } from "../server/i18n.js";
-
-/** 已知的外部 AI 工具技能目录（相对 $HOME） */
-export const WELL_KNOWN_SKILL_PATHS = [
-  { suffix: ".claude/skills",     label: "Claude Code" },
-  { suffix: ".codex/skills",      label: "Codex" },
-  { suffix: ".openclaw/skills",   label: "OpenClaw" },
-  { suffix: ".pi/agent/skills",   label: "Pi" },
-  { suffix: ".agents/skills",     label: "Agents" },
-];
 
 function findUniqueModelById(models, id) {
   if (!id || !Array.isArray(models)) return null;
@@ -91,7 +81,7 @@ import { normalizeProviderContextMessages, normalizeProviderPayload } from "./pr
 import { VisionBridge } from "./vision-bridge.js";
 import { SessionCoordinator } from "./session-coordinator.js";
 import { ConfigCoordinator, SHARED_MODEL_KEYS } from "./config-coordinator.js";
-import { createWorkspaceService } from "./workspace-service.js";
+import { WELL_KNOWN_SKILL_PATHS, createWorkspaceService } from "./workspace-service.js";
 import { ChannelManager } from "./channel-manager.js";
 import {
   summarizeTitle as _summarizeTitle,
@@ -129,6 +119,8 @@ import {
   getSkillNameTranslationCachePath,
   translateSkillNamesWithCache,
 } from "../lib/skills/skill-name-translation-cache.js";
+
+export { WELL_KNOWN_SKILL_PATHS };
 
 export class AgentryEngine {
   /**
@@ -869,60 +861,48 @@ export class AgentryEngine {
 
   /** 合并自动发现 + 用户配置的外部路径（去重） */
   _mergeExternalPaths(userConfiguredPaths, extraPaths = []) {
-    // 每次合并时重新检测目录是否存在（不依赖初始化快照）
     for (const d of this._discoveredExternalPaths || []) {
       d.exists = fs.existsSync(d.dirPath);
     }
-    const discovered = (this._discoveredExternalPaths || [])
-      .filter(d => d.exists)
-      .map(d => ({ dirPath: d.dirPath, label: d.label }));
-    const userParsed = (userConfiguredPaths || []).map(p => ({
-      dirPath: path.resolve(p),
-      label: path.basename(path.dirname(p)),
-    }));
-    const merged = [...discovered];
-    const seen = new Set(merged.map(m => m.dirPath));
-    for (const up of [...userParsed, ...extraPaths]) {
-      if (seen.has(up.dirPath)) continue;
-      merged.push(up);
-      seen.add(up.dirPath);
-    }
-    return merged;
+    return this._workspaceService().mergeExternalPaths(
+      userConfiguredPaths,
+      extraPaths,
+      this._discoveredExternalPaths,
+    );
   }
 
   _getWorkspaceExternalSkillPaths(cwd) {
-    return resolveWorkspaceSkillPaths(cwd);
+    return this._workspaceService().getWorkspaceExternalSkillPaths(cwd);
   }
 
   _getResolvedExternalSkillPaths(cwd) {
     const pluginPaths = this._pluginManager?.getSkillPaths?.() || [];
-    const workspacePaths = this._getWorkspaceExternalSkillPaths(cwd);
-    return this._mergeExternalPaths(this._prefs.getExternalSkillPaths(), [
-      ...pluginPaths,
-      ...workspacePaths,
-    ]);
+    return this._workspaceService().getResolvedWorkspaceExternalSkillPaths({
+      cwd,
+      configuredPaths: this._prefs.getExternalSkillPaths(),
+      pluginPaths,
+    });
   }
 
   _sameExternalSkillPaths(a = [], b = []) {
-    if (a.length !== b.length) return false;
-    return a.every((entry, index) => {
-      const other = b[index];
-      return entry?.dirPath === other?.dirPath
-        && entry?.label === other?.label
-        && (entry?.scope || "") === (other?.scope || "");
-    });
+    return this._workspaceService().sameExternalSkillPaths(a, b);
   }
 
   async syncWorkspaceSkillPaths(cwd = null, { reload = true, emitEvent = false, force = false } = {}) {
     if (!this._skills) return false;
-    const resolved = this._getResolvedExternalSkillPaths(cwd);
-    const changed = !this._sameExternalSkillPaths(this._skills._externalPaths || [], resolved);
-    if (!changed && !force) return false;
-
-    this._skills.setExternalPaths(resolved);
-    if (reload) await this.reloadSkills();
-    if (emitEvent) this._emitEvent({ type: "skills-changed" }, null);
-    return true;
+    return this._workspaceService().syncWorkspaceSkillPaths({
+      cwd,
+      pluginPaths: this._pluginManager?.getSkillPaths?.() || [],
+      configuredPaths: this._prefs?.getExternalSkillPaths?.() || [],
+      discoveredPaths: this._discoveredExternalPaths,
+      currentPaths: this._skills._externalPaths || [],
+      reload,
+      emitEvent,
+      force,
+      setExternalPaths: (paths) => this._skills.setExternalPaths(paths),
+      reloadSkills: () => this.reloadSkills(),
+      emitSkillsChanged: () => this._emitEvent({ type: "skills-changed" }, null),
+    });
   }
 
   // ════════════════════════════

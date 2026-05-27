@@ -8,6 +8,7 @@
 
 import fs from "fs";
 import path from "path";
+import { resolveWorkspaceSkillPaths as resolveWorkspaceSkillPathsCore } from "../shared/workspace-skill-paths.js";
 
 function asAgentList(value) {
   if (value instanceof Map) return [...value.values()];
@@ -47,6 +48,22 @@ function pushExisting(values, value) {
   if (typeof value === "string" && value.trim()) values.push(value);
 }
 
+export const WELL_KNOWN_SKILL_PATHS = [
+  { suffix: ".claude/skills",     label: "Claude Code" },
+  { suffix: ".codex/skills",      label: "Codex" },
+  { suffix: ".openclaw/skills",   label: "OpenClaw" },
+  { suffix: ".pi/agent/skills",   label: "Pi" },
+  { suffix: ".agents/skills",     label: "Agents" },
+];
+
+function toWorkspaceSkillPathEntry(dirPath, label) {
+  return { dirPath: path.resolve(dirPath), label };
+}
+
+function resolveUserDefinedSkillPaths(configuredPaths) {
+  return (configuredPaths || []).map((p) => toWorkspaceSkillPathEntry(p, path.basename(path.dirname(p))));
+}
+
 export class WorkspaceService {
   constructor(deps = {}) {
     this._d = deps;
@@ -77,6 +94,93 @@ export class WorkspaceService {
 
   getDefaultDeskCwd() {
     return this.getHomeFolder(this._getActiveAgentId()) || null;
+  }
+
+  // ════════════════════════════
+  //  Skill Paths
+  // ════════════════════════════
+
+  getWellKnownSkillPaths(homeDir) {
+    if (typeof homeDir !== "string" || !homeDir.trim()) return [];
+    return WELL_KNOWN_SKILL_PATHS.map((entry) => ({
+      dirPath: path.resolve(homeDir, entry.suffix),
+      label: entry.label,
+      exists: fs.existsSync(path.resolve(homeDir, entry.suffix)),
+    }));
+  }
+
+  getWorkspaceExternalSkillPaths(cwd) {
+    return resolveWorkspaceSkillPathsCore(cwd);
+  }
+
+  mergeExternalSkillPaths(configuredPaths, extraPaths = [], discoveredPaths = []) {
+    const discovered = (discoveredPaths || [])
+      .filter((entry) => entry && entry.exists)
+      .map((entry) => toWorkspaceSkillPathEntry(entry.dirPath, entry.label));
+
+    const merged = [...discovered];
+    const seen = new Set(merged.map((entry) => entry.dirPath));
+    const userParsed = resolveUserDefinedSkillPaths(configuredPaths || []);
+    for (const up of [...userParsed, ...extraPaths]) {
+      if (!up?.dirPath || seen.has(up.dirPath)) continue;
+      merged.push(up);
+      seen.add(up.dirPath);
+    }
+    return merged;
+  }
+
+  sameExternalSkillPaths(a = [], b = []) {
+    if (a.length !== b.length) return false;
+    return a.every((entry, index) => {
+      const other = b[index];
+      return entry?.dirPath === other?.dirPath
+        && entry?.label === other?.label
+        && (entry?.scope || "") === (other?.scope || "");
+    });
+  }
+
+  getResolvedWorkspaceExternalSkillPaths({
+    cwd,
+    pluginPaths = [],
+    configuredPaths = [],
+    discoveredPaths = [],
+  }) {
+    const workspacePaths = this.getWorkspaceExternalSkillPaths(cwd);
+    return this.mergeExternalSkillPaths(configuredPaths, [...pluginPaths, ...workspacePaths], discoveredPaths);
+  }
+
+  async syncWorkspaceSkillPaths({
+    cwd = null,
+    pluginPaths = [],
+    configuredPaths = [],
+    discoveredPaths = [],
+    currentPaths = [],
+    reload = true,
+    emitEvent = false,
+    force = false,
+    setExternalPaths,
+    reloadSkills,
+    emitSkillsChanged,
+  }) {
+    const resolved = this.getResolvedWorkspaceExternalSkillPaths({
+      cwd,
+      pluginPaths,
+      configuredPaths,
+      discoveredPaths,
+    });
+    const changed = !this.sameExternalSkillPaths(currentPaths || [], resolved);
+    if (!changed && !force) return false;
+
+    if (typeof setExternalPaths === "function") {
+      setExternalPaths(resolved);
+    }
+    if (reload && typeof reloadSkills === "function") {
+      await reloadSkills();
+    }
+    if (emitEvent && typeof emitSkillsChanged === "function") {
+      emitSkillsChanged();
+    }
+    return true;
   }
 
   isApprovedWorkspaceDir(dir) {

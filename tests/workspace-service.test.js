@@ -109,4 +109,86 @@ describe("WorkspaceService", () => {
     expect(service.isApprovedDeskDir(path.join(otherHistory, "drafts"))).toBe(true);
     expect(service.isApprovedDeskDir(privateDir)).toBe(false);
   });
+
+  it("merges configured, discovered, workspace, and plugin skill paths with de-dupe", () => {
+    const service = new WorkspaceService({});
+    service.getWorkspaceExternalSkillPaths = vi.fn(() => [
+      { dirPath: "/workspace/.agents/skills", label: ".agents" },
+      { dirPath: "/workspace/.claude/skills", label: ".claude" },
+    ]);
+
+    const discovered = [
+      { dirPath: "/discovered/pi", label: "Pi", exists: true },
+      { dirPath: "/discovered/claude", label: "Claude", exists: false },
+    ];
+    const resolved = service.mergeExternalSkillPaths(
+      ["/u/project/extra", "/u/project/pi"],
+      [{ dirPath: "/plugin/skills", label: "Plugin" }, { dirPath: "/workspace/.agents/skills", label: "Workspace duplicate" }],
+      discovered,
+    );
+
+    expect(resolved).toMatchObject([
+      { dirPath: "/discovered/pi", label: "Pi" },
+      { dirPath: path.resolve("/u/project/extra"), label: "project" },
+      { dirPath: path.resolve("/u/project/pi"), label: "project" },
+      { dirPath: "/plugin/skills", label: "Plugin" },
+      { dirPath: "/workspace/.agents/skills", label: "Workspace duplicate" },
+    ]);
+    expect(resolved.some((entry) => entry.dirPath === "/discovered/claude")).toBe(false);
+    expect(resolved.filter((entry) => entry.dirPath === "/workspace/.agents/skills").length).toBe(1);
+  });
+
+  it("sameExternalSkillPaths keeps path + label + scope identity", () => {
+    const service = new WorkspaceService({});
+    const a = [{ dirPath: "/x", label: "A", scope: "workspace" }];
+    const b = [{ dirPath: "/x", label: "A", scope: "workspace" }];
+    const c = [{ dirPath: "/x", label: "A", scope: "agent" }];
+    expect(service.sameExternalSkillPaths(a, b)).toBe(true);
+    expect(service.sameExternalSkillPaths(a, c)).toBe(false);
+  });
+
+  it("syncWorkspaceSkillPaths mirrors engine short-circuit + force behavior", async () => {
+    const service = new WorkspaceService({});
+    service.getWorkspaceExternalSkillPaths = vi.fn(() => []);
+    const configured = path.join(tempRoot || os.tmpdir(), "configured");
+    const sameEntry = {
+      dirPath: path.resolve(configured),
+      label: path.basename(path.dirname(configured)),
+    };
+    const setExternalPaths = vi.fn();
+    const reloadSkills = vi.fn().mockResolvedValue(undefined);
+    const emitSkillsChanged = vi.fn();
+
+    const result = await service.syncWorkspaceSkillPaths({
+      cwd: "/workspace",
+      configuredPaths: [configured],
+      currentPaths: [sameEntry],
+      reload: true,
+      emitEvent: true,
+      setExternalPaths,
+      reloadSkills,
+      emitSkillsChanged,
+    });
+
+    expect(result).toBe(false);
+    expect(setExternalPaths).not.toHaveBeenCalled();
+    expect(reloadSkills).not.toHaveBeenCalled();
+    expect(emitSkillsChanged).not.toHaveBeenCalled();
+
+    const forcedResult = await service.syncWorkspaceSkillPaths({
+      cwd: "/workspace",
+      configuredPaths: [configured],
+      currentPaths: [sameEntry],
+      force: true,
+      reload: true,
+      emitEvent: true,
+      setExternalPaths,
+      reloadSkills,
+      emitSkillsChanged,
+    });
+    expect(forcedResult).toBe(true);
+    expect(setExternalPaths).toHaveBeenCalledWith([sameEntry]);
+    expect(reloadSkills).toHaveBeenCalledTimes(1);
+    expect(emitSkillsChanged).toHaveBeenCalledTimes(1);
+  });
 });
