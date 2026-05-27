@@ -109,6 +109,21 @@ export class WorkspaceService {
     }));
   }
 
+  refreshDiscoveredExternalPaths(discoveredPaths = []) {
+    const entries = [];
+    let newDirAppeared = false;
+    for (const entry of discoveredPaths || []) {
+      if (!entry || !entry.dirPath) continue;
+      const refreshed = {
+        ...entry,
+        exists: fs.existsSync(entry.dirPath),
+      };
+      if (refreshed.exists && !entry.exists) newDirAppeared = true;
+      entries.push(refreshed);
+    }
+    return { paths: entries, newDirAppeared };
+  }
+
   getWorkspaceExternalSkillPaths(cwd) {
     return resolveWorkspaceSkillPathsCore(cwd);
   }

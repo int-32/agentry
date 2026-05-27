@@ -163,6 +163,26 @@ describe("WorkspaceService", () => {
     expect(result).toEqual(expected);
   });
 
+  it("refreshes discovered external paths and reports newly appeared directories", () => {
+    const home = makeDir("refresh-home");
+    const appears = path.join(home, "appears");
+    const missing = path.join(home, "missing");
+    fs.mkdirSync(appears, { recursive: true });
+    const service = new WorkspaceService({});
+    const input = [
+      { dirPath: appears, label: "Appears", exists: false },
+      { dirPath: missing, label: "Missing", exists: true },
+    ];
+
+    const result = service.refreshDiscoveredExternalPaths(input);
+
+    expect(result.newDirAppeared).toBe(true);
+    expect(result.paths).toEqual([
+      { dirPath: appears, label: "Appears", exists: true },
+      { dirPath: missing, label: "Missing", exists: false },
+    ]);
+  });
+
   it("syncWorkspaceSkillPaths mirrors engine short-circuit + force behavior", async () => {
     const service = new WorkspaceService({});
     service.getWorkspaceExternalSkillPaths = vi.fn(() => []);

@@ -828,14 +828,11 @@ export class AgentryEngine {
 
   /** 获取外部技能路径配置（供 API 使用） */
   getExternalSkillPaths() {
-    // 刷新 exists 状态，检测运行期间新增的目录
-    let newDirAppeared = false;
-    for (const d of this._discoveredExternalPaths || []) {
-      const nowExists = fs.existsSync(d.dirPath);
-      if (nowExists && !d.exists) newDirAppeared = true;
-      d.exists = nowExists;
-    }
+    const refreshResult = this._workspaceService().refreshDiscoveredExternalPaths(this._discoveredExternalPaths || []);
+    this._discoveredExternalPaths = refreshResult.paths;
+
     // 运行期间有新目录出现：重新集成到 SkillManager（watcher + 扫描）
+    const newDirAppeared = refreshResult.newDirAppeared;
     if (newDirAppeared) {
       this.syncWorkspaceSkillPaths(this.currentSessionPath ? this.cwd : null, {
         reload: true,
@@ -859,13 +856,12 @@ export class AgentryEngine {
 
   /** 合并自动发现 + 用户配置的外部路径（去重） */
   _mergeExternalPaths(userConfiguredPaths, extraPaths = []) {
-    for (const d of this._discoveredExternalPaths || []) {
-      d.exists = fs.existsSync(d.dirPath);
-    }
+    const refreshResult = this._workspaceService().refreshDiscoveredExternalPaths(this._discoveredExternalPaths || []);
+    this._discoveredExternalPaths = refreshResult.paths;
     return this._workspaceService().mergeExternalPaths(
       userConfiguredPaths,
       extraPaths,
-      this._discoveredExternalPaths,
+      refreshResult.paths,
     );
   }
 
