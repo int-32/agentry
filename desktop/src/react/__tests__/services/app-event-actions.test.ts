@@ -164,6 +164,54 @@ describe('handleAppEvent', () => {
     expect(mockLoadAgents).toHaveBeenCalledTimes(1);
   });
 
+  it('agent-config-changed refreshes desk cache state for current agent workspace changes', async () => {
+    Object.assign(mockState, {
+      currentAgentId: 'agent-a',
+      homeFolder: '/old-home',
+      selectedFolder: '/old-home',
+      workspaceFolders: ['/old-home/project'],
+      cwdHistory: ['/old-home'],
+      deskBasePath: '/old-home',
+      pendingNewSession: true,
+      currentSessionPath: null,
+    });
+
+    const { handleAppEvent } = await import('../../services/app-event-actions');
+    handleAppEvent('agent-config-changed', {
+      agentId: 'agent-a',
+      desk: { home_folder: '/new-home' },
+      cwd_history: ['/new-home', '/recent'],
+    });
+
+    expect(mockState.homeFolder).toBe('/new-home');
+    expect(mockState.selectedFolder).toBe('/new-home');
+    expect(mockState.workspaceFolders).toEqual([]);
+    expect(mockState.cwdHistory).toEqual(['/old-home']);
+    expect(mockActivateWorkspaceDesk).toHaveBeenCalledWith('/new-home');
+  });
+
+  it('agent-config-changed ignores workspace refresh for non-current agent config changes', async () => {
+    Object.assign(mockState, {
+      currentAgentId: 'agent-a',
+      homeFolder: '/current-home',
+      selectedFolder: '/current-home',
+      deskBasePath: '/current-home',
+      pendingNewSession: true,
+      currentSessionPath: null,
+    });
+
+    const { handleAppEvent } = await import('../../services/app-event-actions');
+
+    handleAppEvent('agent-config-changed', {
+      agentId: 'agent-b',
+      desk: { home_folder: '/other-home' },
+    });
+
+    expect(mockState.homeFolder).toBe('/current-home');
+    expect(mockState.selectedFolder).toBe('/current-home');
+    expect(mockActivateWorkspaceDesk).not.toHaveBeenCalled();
+  });
+
   it('models-changed requests context usage through the injected callback', async () => {
     Object.assign(mockState, { currentSessionPath: '/session/a.jsonl' });
     const requestContextUsage = vi.fn();

@@ -79,11 +79,38 @@ function handleAgentWorkspaceChanged(data: any): void {
   }
 }
 
+function hasWorkspaceChange(data: any): boolean {
+  if (!data || typeof data !== 'object') return false;
+  if (Object.prototype.hasOwnProperty.call(data, 'home_folder')
+    || Object.prototype.hasOwnProperty.call(data, 'homeFolder')
+    || Object.prototype.hasOwnProperty.call(data, 'deskHome')
+  ) {
+    return true;
+  }
+  if (data.desk && typeof data.desk === 'object'
+    && Object.prototype.hasOwnProperty.call(data.desk, 'home_folder')) {
+    return true;
+  }
+  if (Object.prototype.hasOwnProperty.call(data, 'workspace') && typeof data.workspace === 'string') {
+    return true;
+  }
+  return false;
+}
+
 export function handleAppEvent(type: string, data: any = {}): void {
   switch (type) {
     case 'agent-config-changed':
       invalidateAgentConfigCache(data?.agentId || null);
       loadAgents();
+      if (
+        data?.agentId && data.agentId === useStore.getState().currentAgentId
+        && hasWorkspaceChange(data)
+      ) {
+        handleAgentWorkspaceChanged({
+          ...data,
+          homeFolder: readConfigHomeFolder(data),
+        });
+      }
       break;
     case 'agent-switched': {
       const myVersion = ++_agentSwitchVersion;
