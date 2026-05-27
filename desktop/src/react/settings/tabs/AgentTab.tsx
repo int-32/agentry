@@ -103,6 +103,19 @@ export function AgentTab() {
   const availableTools = hasAvailableToolsField ? settingsConfig?.availableTools : undefined;
   const pluginTools = Array.isArray(settingsConfig?.pluginTools) ? settingsConfig.pluginTools : [];
 
+  const saveExperienceCategories = async (next: ExpCategory[]) => {
+    const previous = expCategories;
+    setExpCategories(next);
+    const content = await putExperience({ getSettingsAgentId, showToast }, next);
+    if (content === null) {
+      setExpCategories(previous);
+      return;
+    }
+    if (settingsConfig) {
+      set({ settingsConfig: { ...settingsConfig, _experience: content } });
+    }
+  };
+
   const saveAgent = async () => {
     try {
       const agentId = getSettingsAgentId()!;
@@ -374,13 +387,11 @@ export function AgentTab() {
                   category={cat}
                   onSave={(updated) => {
                     const next = expCategories.map(c => c.name === cat.name ? updated : c);
-                    setExpCategories(next);
-                    putExperience({ getSettingsAgentId, showToast }, next);
+                    void saveExperienceCategories(next);
                   }}
                   onDelete={() => {
                     const next = expCategories.filter(c => c.name !== cat.name);
-                    setExpCategories(next);
-                    putExperience({ getSettingsAgentId, showToast }, next);
+                    void saveExperienceCategories(next);
                   }}
                 />
               ))}

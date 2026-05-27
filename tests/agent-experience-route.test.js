@@ -85,4 +85,48 @@ describe("agents route: experience toggle", () => {
     expect(stored).toContain("Keep context boundaries explicit");
     expect(stored).not.toContain("overwrite");
   });
+
+  it("deletes omitted experience categories and preserves entry newlines", async () => {
+    engine.getAgent.mockReturnValue({
+      id: agentId,
+      experienceEnabled: true,
+      tools: [],
+    });
+    fs.writeFileSync(
+      path.join(agentDir, "experience", "shell.md"),
+      "<!-- experience-title: c2hlbGw -->\n1. Avoid option-looking printf strings.\n",
+      "utf-8",
+    );
+
+    const res = await app.request(`/api/agents/${agentId}/experience`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "# shell\n1. Keep shell.\n2. Keep newline.\n" }),
+    });
+    expect(res.status).toBe(200);
+
+    const files = fs.readdirSync(path.join(agentDir, "experience")).sort();
+    expect(files).toEqual(["shell.md"]);
+    const stored = fs.readFileSync(path.join(agentDir, "experience", "shell.md"), "utf-8");
+    expect(stored).toContain("1. Keep shell.\n2. Keep newline.");
+    expect(stored).not.toContain("Keep shell.,2.");
+  });
+
+  it("clears stored experience files when the last category is deleted", async () => {
+    engine.getAgent.mockReturnValue({
+      id: agentId,
+      experienceEnabled: true,
+      tools: [],
+    });
+
+    const res = await app.request(`/api/agents/${agentId}/experience`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "" }),
+    });
+    expect(res.status).toBe(200);
+
+    expect(fs.readdirSync(path.join(agentDir, "experience"))).toEqual([]);
+    expect(fs.readFileSync(path.join(agentDir, "experience.md"), "utf-8")).toBe("");
+  });
 });

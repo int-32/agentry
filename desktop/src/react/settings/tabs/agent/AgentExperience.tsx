@@ -32,9 +32,10 @@ export function serializeExperience(cats: ExpCategory[]): string {
 export async function putExperience(
   store: { getSettingsAgentId: () => string | null; showToast: (msg: string, type: 'success' | 'error') => void },
   cats: ExpCategory[],
-) {
+): Promise<string | null> {
   try {
     const agentId = store.getSettingsAgentId();
+    if (!agentId) throw new Error('missing agent id');
     const content = serializeExperience(cats);
     const res = await hanaFetch(`/api/agents/${agentId}/experience`, {
       method: 'PUT',
@@ -42,10 +43,12 @@ export async function putExperience(
       body: JSON.stringify({ content }),
     });
     const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    if (res.ok === false || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+    return content;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     store.showToast(t('settings.saveFailed') + ': ' + msg, 'error');
+    return null;
   }
 }
 
