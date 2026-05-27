@@ -254,6 +254,24 @@ describe("skills route", () => {
     expect(engine.getAllSkills).toHaveBeenCalledWith(agentId);
   });
 
+  it("rejects skill bundles listing when agentId query is invalid", async () => {
+    const { createSkillsRoute } = await import("../server/routes/skills.js");
+    const app = new Hono();
+    const engine = {
+      agentryHome: tempRoot,
+      agentsDir: tempRoot,
+      getAllSkills: vi.fn(),
+      emitEvent: vi.fn(),
+    };
+
+    app.route("/api", createSkillsRoute(engine));
+
+    const res = await app.request("/api/skills/bundles?agentId=unknown");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "agent not found" });
+    expect(engine.getAllSkills).not.toHaveBeenCalled();
+  });
+
   it("creates, updates, and deletes skill bundles through the skills route", async () => {
     const { createSkillsRoute } = await import("../server/routes/skills.js");
     const app = new Hono();
