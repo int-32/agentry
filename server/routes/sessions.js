@@ -652,6 +652,13 @@ export function createSessionsRoute(engine) {
       if (!isActiveSessionPath(sessionPath, engine.agentsDir)) {
         return c.json({ error: "Invalid session path" }, 403);
       }
+      // 从 sessionPath 解析 agentId，避免依赖 engine 焦点指针的时序
+      const switchedAgentId = engine.agentIdFromSessionPath(sessionPath);
+      if (!switchedAgentId) {
+        return c.json({ error: "Cannot resolve agentId from session path" }, 400);
+      }
+      const switchedAgent = engine.getAgent(switchedAgentId);
+
       // 切换前挂起浏览器（保存当前 session 的浏览器状态）
       const bm = BrowserManager.instance();
       const suspendPath = oldSessionPath;
@@ -665,10 +672,6 @@ export function createSessionsRoute(engine) {
       await bm.resumeForSession(sessionPath);
 
       const session = engine.getSessionByPath(sessionPath);
-
-      // 从 sessionPath 解析 agentId，避免依赖 engine 焦点指针的时序
-      const switchedAgentId = engine.agentIdFromSessionPath(sessionPath) || engine.currentAgentId;
-      const switchedAgent = engine.getAgent(switchedAgentId);
 
       // switchSession 已同步设置焦点到目标 session。
       // cwd/planMode/model 是 session 级状态，此时读焦点是安全的。

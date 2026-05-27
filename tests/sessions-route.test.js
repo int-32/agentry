@@ -107,6 +107,33 @@ describe("sessions route", () => {
     expect(data.browserUrl).toBe("https://after.example.com"); // per-session URL
   });
 
+  it("rejects session switch when agentId cannot be resolved from session path", async () => {
+    const { createSessionsRoute } = await import("../server/routes/sessions.js");
+    const app = new Hono();
+
+    const engine = {
+      agentsDir: "/tmp/agents",
+      isSessionStreaming: vi.fn(() => false),
+      switchSession: vi.fn(async (sessionPath) => {}),
+      getSessionByPath: vi.fn(() => ({ messages: [] })),
+      getAgent: vi.fn(),
+      agentIdFromSessionPath: vi.fn(() => null),
+    };
+
+    app.route("/api", createSessionsRoute(engine));
+
+    const res = await app.request("/api/sessions/switch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "/tmp/agents/a/sessions/new.jsonl", currentSessionPath: "/tmp/agents/a/sessions/old.jsonl" }),
+    });
+    const data = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(data).toEqual({ error: "Cannot resolve agentId from session path" });
+    expect(engine.switchSession).not.toHaveBeenCalled();
+  });
+
   it("passes workspaceFolders when creating a new session and returns the normalized scope", async () => {
     const { createSessionsRoute } = await import("../server/routes/sessions.js");
     const app = new Hono();
