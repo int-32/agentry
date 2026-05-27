@@ -737,7 +737,7 @@ describe("DELETE /skills/:name — per-agent target selection", () => {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   });
 
-  it("backward-compat: 无 agentId query 时仍走 resolveAgent fallback 删除用户级 skill", async () => {
+  it("DELETE without explicit agentId returns agentId is required", async () => {
     const engine = buildEngine({ agents: ["agent-a"], currentAgentId: "agent-a" });
     writeUserSkill("my-skill");
 
@@ -746,10 +746,10 @@ describe("DELETE /skills/:name — per-agent target selection", () => {
     app.route("/api", createSkillsRoute(engine));
 
     const res = await app.request("/api/skills/my-skill", { method: "DELETE" });
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
-    expect(fs.existsSync(path.join(skillsDir, "my-skill"))).toBe(false);
-    expect(engine.reloadSkills).toHaveBeenCalled();
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "agentId is required" });
+    expect(fs.existsSync(path.join(skillsDir, "my-skill"))).toBe(true);
+    expect(engine.reloadSkills).not.toHaveBeenCalled();
   });
 
   it("显式 agentId: learned skill 在指定 agent 的 learned-skills 目录被删除", async () => {

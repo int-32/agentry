@@ -16,7 +16,6 @@ import { saveConfig } from "../../lib/memory/config-loader.js";
 import { sanitizeSkillName } from "../../lib/tools/install-skill.js";
 import { t } from "../i18n.js";
 import { safeCopyDir } from "../../shared/safe-fs.js";
-import { resolveAgent } from "../utils/resolve-agent.js";
 import { validateId, agentExists } from "../utils/validation.js";
 import { registerSessionFileFromRequest } from "../../lib/session-files/session-file-response.js";
 import { createSkillSourceIdentity } from "../../lib/skills/skill-file-identity.js";
@@ -445,23 +444,17 @@ export function createSkillsRoute(engine) {
       }
 
       // SkillsTab 的 per-agent selector 会显式带上 agentId,此时必须严格按该 agent
-      // 定位 learned-skills 目录,不能 fallback 到焦点 agent(#419 cross-agent 串删)。
-      // 历史调用方(无 query 参数)仍走 resolveAgent 保持兼容。
+      // 定位 learned-skills 目录,不能 fallback 到焦点 agent (#419 cross-agent 串删)。
       const queryAgentId = c.req.query("agentId");
-      let targetAgentId;
-      let agentDir;
-      if (queryAgentId) {
-        if (!validateId(queryAgentId) || !agentExists(engine, queryAgentId)) {
-          return c.json({ error: "agent not found" }, 404);
-        }
-        targetAgentId = queryAgentId;
-        agentDir = engine.getAgent(queryAgentId)?.agentDir
-          || path.join(engine.agentsDir, queryAgentId);
-      } else {
-        const resolved = resolveAgent(engine, c);
-        agentDir = resolved?.agentDir;
-        targetAgentId = agentDir ? path.basename(agentDir) : "";
+      if (!queryAgentId) {
+        return c.json({ error: "agentId is required" }, 400);
       }
+      if (!validateId(queryAgentId) || !agentExists(engine, queryAgentId)) {
+        return c.json({ error: "agent not found" }, 404);
+      }
+      const targetAgentId = queryAgentId;
+      const agentDir = engine.getAgent(queryAgentId)?.agentDir
+        || path.join(engine.agentsDir, queryAgentId);
 
       // 外部技能不可删除（用该 agent 的视角查 readonly 即可，与 enabled 无关）
       const allSkills = targetAgentId ? engine.getAllSkills(targetAgentId) : [];
