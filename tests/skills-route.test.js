@@ -541,6 +541,108 @@ describe("skills route", () => {
       },
     });
   });
+
+  it("can install to a specific agent via explicit query and keeps that agent in sync", async () => {
+    const { createSkillsRoute } = await import("../server/routes/skills.js");
+    const app = new Hono();
+    const agentId = "agent-a";
+    const agentDir = path.join(tempRoot, "agents", agentId);
+    const userSkillsDir = path.join(tempRoot, "user-skills");
+    const srcDir = path.join(tempRoot, "incoming-skill");
+    const srcSessionPath = "/sessions/install-source.jsonl";
+
+    fs.mkdirSync(agentDir, { recursive: true });
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "skills:\n  enabled:\n    - legacy-skill\n", "utf-8");
+    fs.mkdirSync(srcDir, { recursive: true });
+    fs.writeFileSync(path.join(srcDir, "SKILL.md"), "---\nname: sample-skill\n---\n# Sample\n", "utf-8");
+
+    const registerSessionFile = vi.fn(({ sessionPath, filePath, label, origin, storageKind }) => ({
+      id: "sf_skill_source",
+      sessionPath,
+      filePath,
+      realPath: filePath,
+      displayName: label,
+      filename: path.basename(filePath),
+      label,
+      ext: "",
+      mime: "inode/directory",
+      size: null,
+      kind: "directory",
+      origin,
+      storageKind,
+      createdAt: 1,
+    }));
+    const updateConfig = vi.fn().mockResolvedValue(undefined);
+    const emitEvent = vi.fn();
+    const engine = {
+      userSkillsDir,
+      agentsDir: path.join(tempRoot, "agents"),
+      registerSessionFile,
+      reloadSkills: vi.fn().mockResolvedValue(undefined),
+      emitEvent,
+      updateConfig,
+      getAllSkills: vi.fn(() => [{
+        name: "sample-skill",
+        enabled: false,
+        source: "user",
+      }]),
+    };
+
+    app.route("/api", createSkillsRoute(engine));
+
+    const res = await app.request(`/api/skills/install?agentId=${agentId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: srcDir, sessionPath: srcSessionPath }),
+    });
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(updateConfig).toHaveBeenCalledWith(
+      { skills: { enabled: ["legacy-skill", "sample-skill"] } },
+      { agentId },
+    );
+    expectAppEvent(emitEvent, "skills-changed", { agentId });
+    expect(data).toMatchObject({
+      ok: true,
+      skill: {
+        name: "sample-skill",
+      },
+    });
+  });
+
+  it("returns 404 when install is called with invalid explicit agentId", async () => {
+    const { createSkillsRoute } = await import("../server/routes/skills.js");
+    const app = new Hono();
+    const userSkillsDir = path.join(tempRoot, "user-skills");
+    const srcDir = path.join(tempRoot, "incoming-skill");
+
+    fs.mkdirSync(srcDir, { recursive: true });
+    fs.writeFileSync(path.join(srcDir, "SKILL.md"), "---\nname: sample-skill\n---\n# Sample\n", "utf-8");
+
+    const engine = {
+      userSkillsDir,
+      agentsDir: path.join(tempRoot, "agents"),
+      registerSessionFile: vi.fn(),
+      reloadSkills: vi.fn().mockResolvedValue(undefined),
+      emitEvent: vi.fn(),
+      updateConfig: vi.fn(),
+      getAllSkills: vi.fn(),
+    };
+
+    app.route("/api", createSkillsRoute(engine));
+
+    const res = await app.request("/api/skills/install?agentId=unknown", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: srcDir, sessionPath: "/sessions/install-source.jsonl" }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "agent not found" });
+    expect(engine.updateConfig).not.toHaveBeenCalled();
+    expect(engine.reloadSkills).not.toHaveBeenCalled();
+  });
 });
 
 describe("DELETE /skills/:name — per-agent target selection", () => {

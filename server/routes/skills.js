@@ -79,7 +79,7 @@ export function createSkillsRoute(engine) {
   }
 
   function resolveBundleSkillView(c) {
-    const agentId = c.req.query("agentId") || engine.currentAgentId || "";
+    const agentId = c.req.query("agentId");
     if (agentId) {
       if (!validateId(agentId) || !agentExists(engine, agentId)) {
         const err = new Error("agent not found");
@@ -263,6 +263,10 @@ export function createSkillsRoute(engine) {
     try {
       const body = await safeJson(c);
       const { path: srcPath, sessionPath } = body;
+      const agentId = c.req.query("agentId");
+      if (agentId && (!validateId(agentId) || !agentExists(engine, agentId))) {
+        return c.json({ error: "agent not found" }, 404);
+      }
       if (!srcPath || !path.isAbsolute(srcPath)) {
         return c.json({ error: t("error.skillNeedAbsolutePath") }, 400);
       }
@@ -368,7 +372,6 @@ export function createSkillsRoute(engine) {
       // 可选：如果传了 agentId 就顺便加入该 agent 的 enabled 列表（历史行为）。
       // 新布局下 SkillsTab 顶部"技能管理"区走全局安装（不传 agentId），只做
       // 文件注册；用户自己到 Agent 配置区打开开关。原则：全局的管全局的。
-      const agentId = c.req.query("agentId");
       if (agentId) {
         const configPath = path.join(engine.agentsDir, agentId, "config.yaml");
         if (fs.existsSync(configPath)) {
@@ -382,10 +385,9 @@ export function createSkillsRoute(engine) {
         }
       }
 
-      // 返回 skill 详情：有 agentId 就取该 agent 视角，没有就 fallback 到焦点
-      const viewAgentId = agentId || engine.currentAgentId || "";
-      const skill = viewAgentId
-        ? engine.getAllSkills(viewAgentId).find(s => s.name === safeName)
+      // 返回 skill 详情：仅当显式传入 agentId 时按该 agent 视角返回
+      const skill = agentId
+        ? engine.getAllSkills(agentId).find(s => s.name === safeName)
         : null;
       emitAppEvent(engine, "skills-changed", { agentId: agentId || null });
       return c.json({
