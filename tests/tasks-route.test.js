@@ -107,6 +107,99 @@ describe("tasks route", () => {
     expect(createRun).not.toHaveBeenCalled();
   });
 
+  it("uses explicit currentSessionPath for rootSessionPath and does not fallback to engine currentSessionPath", async () => {
+    const ledger = new TaskLedger();
+    const createRun = vi.fn((input) => {
+      return {
+        id: "run-task-1",
+        taskId: input.taskId,
+        title: input.title,
+        goal: input.goal,
+        status: "running",
+        rootSessionPath: input.rootSessionPath,
+        cwd: input.cwd,
+        createdByAgentId: input.createdByAgentId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        nodes: input.nodes.map(node => ({ ...node, status: "running" })),
+        edges: [],
+        events: [],
+      };
+    });
+    const app = buildApp({
+      taskLedger: ledger,
+      taskOrchestrator: { createRun },
+      listAgents: () => [{ id: "coder", name: "Coder" }],
+      currentSessionPath: "/tmp/engine-focus.jsonl",
+      cwd: "/tmp/work",
+    });
+
+    const res = await app.request("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "带显式会话路径的任务",
+        autoStart: true,
+        assignee: { type: "agent", id: "coder" },
+        currentSessionPath: "/tmp/explicit-session.jsonl",
+      }),
+    });
+
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(createRun).toHaveBeenCalledWith(expect.objectContaining({
+      rootSessionPath: "/tmp/explicit-session.jsonl",
+    }));
+    expect(data.run.rootSessionPath).toBe("/tmp/explicit-session.jsonl");
+
+    const ledgerTask = ledger.getTask(data.task.id);
+    expect(ledgerTask?.rootSessionPath).toBe("/tmp/explicit-session.jsonl");
+  });
+
+  it("defaults rootSessionPath to null when no explicit session path is provided", async () => {
+    const ledger = new TaskLedger();
+    const createRun = vi.fn((input) => ({
+      id: "run-task-2",
+      taskId: input.taskId,
+      title: input.title,
+      goal: input.goal,
+      status: "running",
+      rootSessionPath: input.rootSessionPath,
+      cwd: input.cwd,
+      createdByAgentId: input.createdByAgentId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      nodes: input.nodes.map(node => ({ ...node, status: "running" })),
+      edges: [],
+      events: [],
+    }));
+    const app = buildApp({
+      taskLedger: ledger,
+      taskOrchestrator: { createRun },
+      listAgents: () => [{ id: "coder", name: "Coder" }],
+      currentSessionPath: "/tmp/engine-focus.jsonl",
+      cwd: "/tmp/work",
+    });
+
+    const res = await app.request("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "不带会话路径的任务",
+        autoStart: true,
+        assignee: { type: "agent", id: "coder" },
+      }),
+    });
+
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(createRun).toHaveBeenCalledWith(expect.objectContaining({
+      rootSessionPath: null,
+    }));
+    expect(data.run.rootSessionPath).toBeNull();
+    expect(ledger.getTask(data.task.id)?.rootSessionPath).toBeNull();
+  });
+
   it("rejects creating a running task unless creation also starts a run", async () => {
     const ledger = new TaskLedger();
     const createRun = vi.fn();

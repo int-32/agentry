@@ -149,6 +149,7 @@ export function createTasksRoute(engine) {
       const title = asText(body.title || body.name);
       const bodyText = asText(body.body || body.description || body.notes);
       const goal = asText(body.goal || body.objective);
+      const explicitRootSessionPath = asText(body.rootSessionPath) || asText(body.currentSessionPath) || null;
       if (!title && !bodyText && !goal) return c.json({ error: "title, body, or goal is required" }, 400);
       const requestedStatus = asText(body.status, "todo");
       if (requestedStatus === "running" && body.autoStart !== true) {
@@ -166,7 +167,7 @@ export function createTasksRoute(engine) {
         source: { type: "manual", channel: "desktop" },
         assignee: body.assignee || null,
         priority: Number.isFinite(Number(body.priority)) ? Number(body.priority) : 0,
-        rootSessionPath: asText(body.rootSessionPath) || engine.currentSessionPath || null,
+        rootSessionPath: explicitRootSessionPath,
         cwd: asText(body.cwd) || engine.deskCwd || engine.cwd || null,
         contextRefs: Array.isArray(body.contextRefs) ? body.contextRefs : [],
       });
