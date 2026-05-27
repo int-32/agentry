@@ -23,6 +23,7 @@ const t = (key: string, vars?: Record<string, string | number>) => window.t?.(ke
 
 let _deskLoadVersion = 0;
 const _deskTreeLoadVersion = new Map<string, number>();
+const _deskTreeLoadInflight = new Map<string, Promise<void>>();
 
 // ── 路径工具 ──
 
@@ -270,10 +271,12 @@ export async function loadDeskTreeFiles(subdir = '', options: { force?: boolean;
   if (cached && !options.force) return;
 
   const key = deskTreeLoadKey(dir, normalizedSubdir);
+  const inflight = _deskTreeLoadInflight.get(key);
+  if (inflight) return inflight;
   const myVersion = (_deskTreeLoadVersion.get(key) || 0) + 1;
   _deskTreeLoadVersion.set(key, myVersion);
 
-  try {
+  const run = (async () => {
     const params = new URLSearchParams();
     if (dir) params.set('dir', dir);
     if (normalizedSubdir) params.set('subdir', normalizedSubdir);
@@ -286,11 +289,15 @@ export async function loadDeskTreeFiles(subdir = '', options: { force?: boolean;
     if (data.basePath) st.setDeskBasePath(data.basePath);
     st.setDeskTreeFiles(normalizedSubdir, data.files || []);
     if ((st.deskCurrentPath || '') === normalizedSubdir) st.setDeskFiles(data.files || []);
-  } catch (err) {
+  })().catch((err) => {
     console.error('[desk-tree] load failed:', err);
     if (_deskTreeLoadVersion.get(key) !== myVersion) return;
     useStore.getState().setDeskTreeFiles(normalizedSubdir, []);
-  }
+  }).finally(() => {
+    if (_deskTreeLoadInflight.get(key) === run) _deskTreeLoadInflight.delete(key);
+  });
+  _deskTreeLoadInflight.set(key, run);
+  return run;
 }
 
 export async function searchDeskFiles(query: string): Promise<DeskSearchResult[]> {

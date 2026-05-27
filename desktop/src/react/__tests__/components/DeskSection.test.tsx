@@ -167,7 +167,7 @@ describe('DeskSection workspace watching', () => {
     expect(screen.getByRole('tree')).toBeTruthy();
     fireEvent.click(screen.getByRole('treeitem', { name: /notes/ }));
 
-    expect(mocks.loadDeskTreeFiles).toHaveBeenCalledWith('notes');
+    expect(mocks.loadDeskTreeFiles).toHaveBeenCalledWith('notes', { force: true });
     expect(useStore.getState().deskExpandedPaths).toEqual(['notes']);
 
     act(() => {
@@ -183,6 +183,29 @@ describe('DeskSection workspace watching', () => {
     });
 
     expect(screen.getByText('chapter.md')).toBeTruthy();
+  });
+
+  it('refreshes a cached folder when it is collapsed and expanded again', async () => {
+    useStore.setState({
+      deskCurrentPath: '',
+      deskTreeFilesByPath: {
+        '': [{ name: 'notes', isDir: true }],
+        notes: [{ name: 'old.md', isDir: false }],
+      },
+      deskExpandedPaths: ['notes'],
+    } as never);
+    const { DeskSection } = await import('../../components/DeskSection');
+
+    render(<DeskSection />);
+    mocks.loadDeskTreeFiles.mockClear();
+
+    fireEvent.click(screen.getByRole('treeitem', { name: /notes/ }));
+    expect(useStore.getState().deskExpandedPaths).toEqual([]);
+    expect(mocks.loadDeskTreeFiles).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('treeitem', { name: /notes/ }));
+    expect(useStore.getState().deskExpandedPaths).toEqual(['notes']);
+    expect(mocks.loadDeskTreeFiles).toHaveBeenCalledWith('notes', { force: true });
   });
 
   it('starts an app file drag from tree rows so workspace files can be moved or attached', async () => {

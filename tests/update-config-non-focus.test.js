@@ -56,7 +56,7 @@ describe("updateConfig with agentId", () => {
     };
   }
 
-  it("returns only the requested agent explicit home folder", () => {
+  it("returns null when the requested agent has no explicit home folder", () => {
     const focusHome = makeTempDir("focus-home");
     const { focusAgent, targetAgent, deps } = makeDeps({
       getPrefs: () => ({
@@ -70,7 +70,7 @@ describe("updateConfig with agentId", () => {
     const coord = new ConfigCoordinator(deps);
 
     expect(coord.getExplicitHomeFolder("target")).toBeNull();
-    expect(coord.getHomeFolder("target")).not.toBe(focusHome);
+    expect(coord.getHomeFolder("target")).toBeNull();
   });
 
   it("传入 agentId 时刷新目标 agent 而非焦点 agent", async () => {

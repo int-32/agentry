@@ -405,6 +405,33 @@ describe('desk-actions workspace roots', () => {
     });
   });
 
+  it('deduplicates concurrent forced tree reloads for the same folder', async () => {
+    useStore.setState({
+      deskBasePath: '/workspace',
+      deskCurrentPath: '',
+      deskTreeFilesByPath: {
+        notes: [{ name: 'old.md', isDir: false }],
+      },
+    } as never);
+    const pending = deferred<Response>();
+    mockHanaFetch.mockReturnValueOnce(pending.promise);
+
+    const { loadDeskTreeFiles } = await import('../../stores/desk-actions');
+    const first = loadDeskTreeFiles('notes', { force: true });
+    const second = loadDeskTreeFiles('notes', { force: true });
+
+    expect(mockHanaFetch).toHaveBeenCalledTimes(1);
+    expect(mockHanaFetch).toHaveBeenCalledWith('/api/desk/files?dir=%2Fworkspace&subdir=notes');
+
+    pending.resolve(jsonResponse({
+      files: [{ name: 'new.md', isDir: false }],
+      basePath: '/workspace',
+    }));
+    await Promise.all([first, second]);
+
+    expect(useStore.getState().deskTreeFilesByPath.notes).toEqual([{ name: 'new.md', isDir: false }]);
+  });
+
   it('moves tree items by explicit source and destination subdirs without relying on the current folder', async () => {
     useStore.setState({
       deskBasePath: '/workspace',

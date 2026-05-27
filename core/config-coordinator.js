@@ -5,11 +5,10 @@
  * session meta 持久化、updateConfig 联动。
  * 不持有 engine 引用，通过构造器注入依赖。
  */
-import fs from "fs";
 import { createModuleLogger } from "../lib/debug-log.js";
 import { findModel, parseModelRef, requireModelRef } from "../shared/model-ref.js";
 import { t } from "../server/i18n.js";
-import { ensureDefaultWorkspace } from "../shared/default-workspace.js";
+import { createWorkspaceService } from "./workspace-service.js";
 
 const log = createModuleLogger("config");
 
@@ -117,6 +116,12 @@ export class ConfigCoordinator {
    */
   constructor(deps) {
     this._d = deps;
+    this._workspace = deps.workspaceService || createWorkspaceService({
+      getAgentById: deps.getAgentById,
+      getActiveAgentId: deps.getActiveAgentId,
+      getPrimaryAgentId: () => this._getPrimaryAgentId(),
+      getAgents: deps.getAgents,
+    });
   }
 
   // ── Home Folder ──
@@ -126,25 +131,15 @@ export class ConfigCoordinator {
    * @returns {string|null} 该 agent 自己显式绑定且仍存在的工作目录
    */
   getExplicitHomeFolder(agentId) {
-    const targetId = agentId || this._getPrimaryAgentId();
-    if (!targetId) return null;
-    const agent = this._d.getAgentById(targetId);
-    const folder = agent?.config?.desk?.home_folder;
-    if (folder && fs.existsSync(folder)) return folder;
-    return null;
+    return this._workspace.getExplicitHomeFolder(agentId);
   }
 
   /**
    * @param {string} [agentId] - 指定 agent；省略时查主 agent
-   * @returns {string} 工作目录（保证返回有效路径）
+   * @returns {string|null} 该 agent 自己显式绑定且仍存在的工作目录
    */
   getHomeFolder(agentId) {
-    const explicit = this.getExplicitHomeFolder(agentId);
-    if (explicit) return explicit;
-
-    // 显式默认工作区，避免把整个桌面暴露成工作目录。
-    // 不从别的 agent 继承 home_folder；跨 agent fallback 会让状态归属变成隐式焦点推导。
-    return ensureDefaultWorkspace();
+    return this._workspace.getHomeFolder(agentId);
   }
 
   /**
@@ -152,16 +147,9 @@ export class ConfigCoordinator {
    * @param {string|null} folder
    */
   setHomeFolder(agentId, folder) {
-    const agent = this._d.getAgentById(agentId);
-    if (!agent) {
+    if (!this._workspace.setHomeFolder(agentId, folder)) {
       log.warn(`setHomeFolder: agent ${agentId} not found`);
       return;
-    }
-    if (folder) {
-      agent.updateConfig({ desk: { home_folder: folder } });
-    } else {
-      // null 值触发 deepMerge 的 key 删除逻辑
-      agent.updateConfig({ desk: { home_folder: null } });
     }
     log.log(`setHomeFolder(${agentId}): ${folder || "(cleared)"}`);
   }

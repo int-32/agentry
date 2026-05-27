@@ -91,6 +91,7 @@ import { normalizeProviderContextMessages, normalizeProviderPayload } from "./pr
 import { VisionBridge } from "./vision-bridge.js";
 import { SessionCoordinator } from "./session-coordinator.js";
 import { ConfigCoordinator, SHARED_MODEL_KEYS } from "./config-coordinator.js";
+import { createWorkspaceService } from "./workspace-service.js";
 import { ChannelManager } from "./channel-manager.js";
 import {
   summarizeTitle as _summarizeTitle,
@@ -221,9 +222,21 @@ export class AgentryEngine {
     });
 
     // ── Config Coordinator ──
+    this._workspace = createWorkspaceService({
+      getAgentById: (id) => this._agentMgr.getAgent(id),
+      getActiveAgentId: () => this._agentMgr.activeAgentId,
+      getPrimaryAgentId: () => this._prefs.getPrimaryAgent(),
+      getAgents: () => this._agentMgr.agents,
+      getConfig: () => this.config,
+      getCurrentSessionPath: () => this.currentSessionPath,
+      getSessionWorkspaceFolders: (sessionPath) => this.getSessionWorkspaceFolders(sessionPath),
+      getDeskCwd: () => this.deskCwd,
+    });
+
     this._configCoord = new ConfigCoordinator({
       agentryHome,
       agentsDir: this.agentsDir,
+      workspaceService: this._workspace,
       getAgent: () => this.agent,
       getAgentById: (id) => this._agentMgr.getAgent(id),
       getActiveAgentId: () => this._agentMgr.activeAgentId,
@@ -1610,66 +1623,35 @@ export class AgentryEngine {
   }
 
   get defaultDeskCwd() {
-    return this.homeCwd || null;
-  }
-
-  _realPathForWorkspaceCheck(p) {
-    if (!p || typeof p !== "string") return null;
-    try {
-      return fs.realpathSync(p);
-    } catch {
-      try {
-        return fs.realpathSync(path.dirname(p));
-      } catch {
-        return null;
-      }
-    }
+    return this._workspaceService().getDefaultDeskCwd();
   }
 
   isApprovedWorkspaceDir(dir) {
-    const resolved = this._realPathForWorkspaceCheck(dir);
-    if (!resolved) return false;
-    const roots = [
-      this.homeCwd,
-      this.deskCwd,
-      ...this.getSessionWorkspaceFolders(this.currentSessionPath),
-    ].filter(Boolean);
-    return roots.some((root) => {
-      const base = this._realPathForWorkspaceCheck(root);
-      if (!base) return false;
-      return resolved === base || resolved.startsWith(base + path.sep);
-    });
-  }
-
-  _allAgentDeskRoots() {
-    const roots = [];
-    try {
-      for (const entry of this.listAgents()) {
-        const agent = this.getAgent(entry.id);
-        const cfg = agent?.config;
-        if (cfg?.desk?.home_folder) roots.push(cfg.desk.home_folder);
-        if (cfg?.last_cwd) roots.push(cfg.last_cwd);
-        if (Array.isArray(cfg?.cwd_history)) roots.push(...cfg.cwd_history);
-      }
-    } catch {}
-    return roots;
+    return this._workspaceService().isApprovedWorkspaceDir(dir);
   }
 
   isApprovedDeskDir(dir) {
-    const resolved = this._realPathForWorkspaceCheck(dir);
-    if (!resolved) return false;
-    const roots = [
-      this.homeCwd,
-      this.deskCwd,
-      ...this.getSessionWorkspaceFolders(this.currentSessionPath),
-      ...(Array.isArray(this.config?.cwd_history) ? this.config.cwd_history : []),
-      ...this._allAgentDeskRoots(),
-    ].filter(Boolean);
-    return roots.some((root) => {
-      const base = this._realPathForWorkspaceCheck(root);
-      if (!base) return false;
-      return resolved === base || resolved.startsWith(base + path.sep);
+    return this._workspaceService().isApprovedDeskDir(dir);
+  }
+
+  _workspaceService() {
+    if (this._workspace) return this._workspace;
+    this._workspace = createWorkspaceService({
+      getAgentById: (id) => this.getAgent?.(id) || null,
+      getActiveAgentId: () => this._agentMgr?.activeAgentId || null,
+      getPrimaryAgentId: () => this._prefs?.getPrimaryAgent?.() || null,
+      getAgents: () => {
+        if (this._agentMgr?.agents instanceof Map) return this._agentMgr.agents;
+        return typeof this.listAgents === "function"
+          ? this.listAgents().map(entry => this.getAgent?.(entry.id)).filter(Boolean)
+          : [];
+      },
+      getConfig: () => this.config || {},
+      getCurrentSessionPath: () => this.currentSessionPath || null,
+      getSessionWorkspaceFolders: (sessionPath) => this.getSessionWorkspaceFolders?.(sessionPath) || [],
+      getDeskCwd: () => this.deskCwd || null,
     });
+    return this._workspace;
   }
 
   // ════════════════════════════
