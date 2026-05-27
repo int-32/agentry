@@ -42,6 +42,7 @@ import {
   hasInlineProviderCredentialPatch,
 } from "./provider-credentials.js";
 import { mergeWorkspaceHistory } from "../../shared/workspace-history.js";
+import { createProviderSettingsService } from "../../core/provider-settings-service.js";
 
 // ── 工具函数 ──
 
@@ -176,6 +177,7 @@ function emitAgentConfigAppEvents(engine, agentId, { globalFields, agentPartial,
 
 export function createAgentsRoute(engine) {
   const route = new Hono();
+  const providerSettings = createProviderSettingsService(engine);
 
   // ════════════════════════════
   //  列表 / 创建 / 切换 / 删除 / 主助手
@@ -399,23 +401,7 @@ export function createAgentsRoute(engine) {
 
       // 供应商列表
       try {
-        const rawProviders = engine.providerRegistry.getAllProvidersRaw();
-        const providerEntries = {};
-        for (const [name, p] of Object.entries(rawProviders)) {
-          const entry = engine.providerRegistry.get(name);
-          providerEntries[name] = {
-            base_url: p.base_url || entry?.baseUrl || "",
-            api: p.api || entry?.api || "",
-            api_key: p.api_key || "",
-            models: p.models || [],
-            workspace_root: typeof p.workspace_root === "string" ? p.workspace_root : "",
-            workspace_folders: Array.isArray(p.workspace_folders)
-              ? p.workspace_folders.filter(item => typeof item === "string" && item.trim())
-              : [],
-            model_count: (p.models || []).length,
-          };
-        }
-        config.providers = providerEntries;
+        config.providers = providerSettings.getConfigProviders();
       } catch {
         config.providers = {};
       }
@@ -488,13 +474,7 @@ export function createAgentsRoute(engine) {
       // providers 块 → 全局 added-models.yaml
       let providersChanged = false;
       if (agentPartial.providers) {
-        for (const [name, data] of Object.entries(agentPartial.providers)) {
-          if (data === null) {
-            engine.providerRegistry.removeProvider(name);
-          } else {
-            engine.providerRegistry.saveProvider(name, data);
-          }
-        }
+        providerSettings.applyProvidersPatch(agentPartial.providers);
         delete agentPartial.providers;
         providersChanged = true;
       }
@@ -512,7 +492,7 @@ export function createAgentsRoute(engine) {
           if (!provName) {
             return c.json({ error: `${blockName}.provider is required when saving credentials` }, 400);
           }
-          engine.providerRegistry.saveProvider(provName, provUpdate);
+          providerSettings.saveProvider(provName, provUpdate);
           clearInlineProviderCredentialFields(block);
           providersChanged = true;
         }

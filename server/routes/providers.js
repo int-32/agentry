@@ -1,51 +1,18 @@
 /**
  * 供应商管理 REST 路由
  */
-import fs from "fs";
-import path from "path";
-import os from "os";
 import { Hono } from "hono";
 import { emitAppEvent } from "../app-events.js";
 import { safeJson } from "../hono-helpers.js";
-import { buildProviderAuthHeaders, probeProvider } from "../../lib/llm/provider-client.js";
-import { filterDiscoveredProviderModels } from "../../shared/provider-model-validation.js";
+import { probeProvider } from "../../lib/llm/provider-client.js";
 import { clearConfigCache } from "../../lib/memory/config-loader.js";
-import { lookupKnown } from "../../shared/known-models.js";
-
-// ── Models-cache helpers ──
-
-function getCachePath(engine) {
-  return path.join(engine.agentryHome, "models-cache.json");
-}
-
-function readModelsCache(engine) {
-  try {
-    return JSON.parse(fs.readFileSync(getCachePath(engine), "utf-8"));
-  } catch {
-    return {};
-  }
-}
-
-/** Atomic write: tmp + rename to avoid partial reads */
-function writeModelsCache(engine, cache) {
-  const target = getCachePath(engine);
-  const tmp = target + ".tmp." + process.pid;
-  fs.writeFileSync(tmp, JSON.stringify(cache, null, 2) + os.EOL);
-  fs.renameSync(tmp, target);
-}
+import { createProviderSettingsService } from "../../core/provider-settings-service.js";
+import { createProviderModelDiscoveryService } from "../../core/provider-model-discovery-service.js";
 
 export function createProvidersRoute(engine) {
   const route = new Hono();
-
-  // ── Cache helper: persist discovered models per-provider ──
-  function saveToCache(providerName, models) {
-    if (!providerName || !models?.length) return;
-    try {
-      const cache = readModelsCache(engine);
-      cache[providerName] = { models, fetchedAt: new Date().toISOString() };
-      writeModelsCache(engine, cache);
-    } catch { /* best-effort; cache miss is harmless */ }
-  }
+  const providerSettings = createProviderSettingsService(engine);
+  const modelDiscovery = createProviderModelDiscoveryService(engine, providerSettings);
 
   // ── Provider Summary ──
 
@@ -54,379 +21,15 @@ export function createProvidersRoute(engine) {
    * 前端新 ProvidersTab 的核心数据源
    */
   route.get("/providers/summary", async (c) => {
-    const rawProviders = engine.providerRegistry.getAllProvidersRaw();
-    // 补全凭证和模型列表（getAllProvidersRaw 返回的是 added-models.yaml 原始数据）
-    const providers = {};
-    for (const [name, p] of Object.entries(rawProviders)) {
-      const entry = engine.providerRegistry.get(name);
-      providers[name] = {
-        display_name: p.display_name || "",
-        base_url: p.base_url || entry?.baseUrl || "",
-        api_key: p.api_key || "",
-        api: p.api || entry?.api || "",
-        models: p.models || [],
-        config_error: p._config_error || null,
-      };
-    }
-
-    // ProviderRegistry 是 OAuth 判断的唯一权威
-    // 只有在 ProviderRegistry 中注册为 authType:"oauth" 的 provider 才是 OAuth provider
-    // Pi SDK 内置的危险 OAuth（anthropic/github-copilot 等）不在 Registry 中，不会泄露
-    const provRegistry = engine.providerRegistry;
-
-    // OAuth provider 登录状态（Pi SDK AuthStorage，key 是 authJsonKey）
-    const oauthProviders = engine.authStorage?.getOAuthProviders?.() || [];
-    const oauthLoginMap = new Map();
-    for (const p of oauthProviders) {
-      const cred = engine.authStorage.get(p.id);
-      oauthLoginMap.set(p.id, { name: p.name, loggedIn: cred?.type === "oauth" });
-    }
-
-    // OAuth 自定义模型
-    const oauthCustom = engine.preferences.getOAuthCustomModels();
-
-    const result = {};
-
-    // OAuth 登录信息查找（oauthLoginMap 用 authJsonKey 索引）
-    function getOAuthLoginInfo(name) {
-      if (oauthLoginMap.has(name)) return oauthLoginMap.get(name);
-      const authKey = provRegistry.getAuthJsonKey(name);
-      if (authKey !== name && oauthLoginMap.has(authKey)) return oauthLoginMap.get(authKey);
-      return null;
-    }
-
-    // 先处理 added-models.yaml 中的 provider（保持顺序）
-    for (const [name, p] of Object.entries(providers)) {
-      const entry = provRegistry.get(name);
-      const isOAuth = provRegistry.isOAuth(name);
-      const authType = provRegistry.getAuthType?.(name) || (isOAuth ? "oauth" : "api-key");
-      const oauthInfo = getOAuthLoginInfo(name);
-      // added-models.yaml 是模型列表的唯一信源
-      const rawModels = p.models || [];
-      const customModels = oauthCustom[name] || [];
-      const allowsMissingApiKey = !!p.base_url && provRegistry.allowsMissingApiKey?.(name, p.base_url);
-      const hasCredentials = !!(p.api_key || (isOAuth && oauthInfo?.loggedIn) || (!isOAuth && allowsMissingApiKey));
-      const missingFields = [];
-      if (!isOAuth) {
-        if (!p.base_url) missingFields.push("base_url");
-        if (!hasCredentials) missingFields.push("api_key");
-      }
-      if (rawModels.length === 0 && customModels.length === 0) missingFields.push("models");
-
-      result[name] = {
-        type: isOAuth ? "oauth" : "api-key",
-        auth_type: authType,
-        display_name: p.display_name || entry?.displayName || oauthInfo?.name || name,
-        base_url: p.base_url || "",
-        api: p.api || "",
-        api_key: p.api_key || "",
-        models: rawModels,
-        workspace_root: typeof p.workspace_root === "string" ? p.workspace_root : "",
-        workspace_folders: Array.isArray(p.workspace_folders)
-          ? p.workspace_folders.filter(item => typeof item === "string" && item.trim())
-          : [],
-        custom_models: customModels,
-        has_credentials: hasCredentials,
-        logged_in: isOAuth ? !!oauthInfo?.loggedIn : undefined,
-        supports_oauth: isOAuth,
-        is_coding_plan: name.endsWith("-coding"),
-        can_delete: !isOAuth || Object.prototype.hasOwnProperty.call(providers, name),
-        config_status: p.config_error ? "invalid" : (missingFields.length > 0 ? "needs_setup" : "ok"),
-        config_error: p.config_error || null,
-        missing_fields: missingFields,
-      };
-    }
-
-    // 追加 OAuth-only provider（有 auth.json 但没在 added-models.yaml 里）
-    // 遍历已注册的 OAuth plugin，用 authJsonKey 查 oauthLoginMap
-    for (const oauthId of provRegistry.getOAuthProviderIds()) {
-      if (result[oauthId]) continue;
-      const authKey = provRegistry.getAuthJsonKey(oauthId);
-      const loginInfo = oauthLoginMap.get(authKey);
-      if (!loginInfo) continue;
-      const customModels = oauthCustom[authKey] || oauthCustom[oauthId] || [];
-      result[oauthId] = {
-        type: "oauth",
-        auth_type: "oauth",
-        display_name: loginInfo.name || oauthId,
-        base_url: "",
-        api: "",
-        api_key: "",
-        models: [],
-        custom_models: customModels,
-        has_credentials: !!loginInfo.loggedIn,
-        logged_in: !!loginInfo.loggedIn,
-        supports_oauth: true,
-        is_coding_plan: false,
-        can_delete: false,
-        config_status: customModels.length > 0 && loginInfo.loggedIn ? "ok" : "needs_setup",
-        config_error: null,
-        missing_fields: customModels.length > 0 ? [] : ["models"],
-      };
-    }
-
-    // 追加 ProviderRegistry 中已声明但尚未出现的 provider（未配置状态）
-    // 让用户在设置页看到所有可用供应商，点击即可配置
-    if (provRegistry) {
-      for (const [id, entry] of provRegistry.getAll()) {
-        if (result[id]) continue;
-        if (entry.authType === "oauth") continue; // OAuth provider 走上面的白名单逻辑
-        result[id] = {
-          type: "api-key",
-          auth_type: entry.authType,
-          display_name: entry.displayName || id,
-          base_url: entry.baseUrl || "",
-          api: entry.api || "",
-          api_key: "",
-          models: [],
-          custom_models: [],
-          has_credentials: false,
-          logged_in: undefined,
-          supports_oauth: false,
-          is_coding_plan: id.endsWith("-coding"),
-          can_delete: false,
-          config_status: "needs_setup",
-          config_error: null,
-          missing_fields: [
-            ...(entry.authType === "none" ? [] : ["api_key"]),
-            "models",
-          ],
-        };
-      }
-    }
-
-    return c.json({ providers: result });
+    return c.json({ providers: providerSettings.getProviderSummary() });
   });
 
   // ── Fetch / Test ──
-
-  function stringList(value) {
-    if (!value) return [];
-    if (Array.isArray(value)) return value.flatMap(stringList);
-    if (typeof value === "string") return [value];
-    return [];
-  }
-
-  function lowerStrings(values) {
-    return values.map(v => String(v).trim().toLowerCase()).filter(Boolean);
-  }
-
-  function finiteNumber(...values) {
-    for (const value of values) {
-      if (typeof value === "number" && Number.isFinite(value)) return value;
-      if (typeof value === "string" && value.trim()) {
-        const parsed = Number(value);
-        if (Number.isFinite(parsed)) return parsed;
-      }
-    }
-    return null;
-  }
-
-  function hasImageOutputSignal(raw) {
-    const capabilityStrings = lowerStrings([
-      ...stringList(raw?.output),
-      ...stringList(raw?.outputs),
-      ...stringList(raw?.output_modalities),
-      ...stringList(raw?.outputModalities),
-      ...stringList(raw?.modalities?.output),
-      ...stringList(raw?.capabilities?.output),
-      ...stringList(raw?.capabilities?.outputs),
-      ...stringList(raw?.capabilities?.output_modalities),
-      ...stringList(raw?.capabilities?.outputModalities),
-      ...stringList(raw?.capabilities?.modalities?.output),
-    ]);
-    if (capabilityStrings.includes("image")) return true;
-    return raw?.supports_image_generation === true
-      || raw?.supportsImageGeneration === true
-      || raw?.image_generation === true
-      || raw?.imageGeneration === true
-      || raw?.capabilities?.image_generation === true
-      || raw?.capabilities?.imageGeneration === true;
-  }
-
-  function looksLikeImageGenerationId(id = "") {
-    const value = String(id).toLowerCase();
-    return value.includes("gpt-image")
-      || value.includes("dall-e")
-      || value.includes("seedream")
-      || value.includes("imagen")
-      || value.includes("stable-diffusion")
-      || value.includes("sdxl")
-      || value.includes("flux")
-      || value.includes("kolors")
-      || value.includes("jimeng")
-      || (/wan[\w.-]*image/.test(value));
-  }
-
-  function inferDiscoveredModelType(providerName, raw) {
-    const id = typeof raw === "object" && raw !== null ? raw.id : raw;
-    const explicitType = String(raw?.type || raw?.model_type || raw?.modelType || "").toLowerCase();
-    if (["image", "image_generation", "image-generation", "text-to-image", "image-generation-model"].includes(explicitType)) {
-      return "image";
-    }
-    if (lookupKnown(providerName, id)?.type === "image") return "image";
-    if (hasImageOutputSignal(raw)) return "image";
-    if (looksLikeImageGenerationId(id)) return "image";
-    return undefined;
-  }
-
-  function hasImageInputSignal(raw) {
-    const capabilityStrings = lowerStrings([
-      ...stringList(raw?.input),
-      ...stringList(raw?.inputs),
-      ...stringList(raw?.input_modalities),
-      ...stringList(raw?.inputModalities),
-      ...stringList(raw?.modalities?.input),
-      ...stringList(raw?.capabilities?.input),
-      ...stringList(raw?.capabilities?.inputs),
-      ...stringList(raw?.capabilities?.input_modalities),
-      ...stringList(raw?.capabilities?.inputModalities),
-      ...stringList(raw?.capabilities?.modalities?.input),
-    ]);
-    return capabilityStrings.includes("image")
-      || capabilityStrings.includes("vision")
-      || raw?.supports_image_input === true
-      || raw?.supportsImageInput === true
-      || raw?.supports_vision === true
-      || raw?.supportsVision === true
-      || raw?.vision === true
-      || raw?.image === true
-      || raw?.capabilities?.vision === true
-      || raw?.capabilities?.image === true
-      || raw?.capabilities?.image_input === true
-      || raw?.capabilities?.imageInput === true;
-  }
-
-  function hasVideoInputSignal(raw) {
-    const capabilityStrings = lowerStrings([
-      ...stringList(raw?.input),
-      ...stringList(raw?.inputs),
-      ...stringList(raw?.input_modalities),
-      ...stringList(raw?.inputModalities),
-      ...stringList(raw?.modalities?.input),
-      ...stringList(raw?.capabilities?.input),
-      ...stringList(raw?.capabilities?.inputs),
-      ...stringList(raw?.capabilities?.input_modalities),
-      ...stringList(raw?.capabilities?.inputModalities),
-      ...stringList(raw?.capabilities?.modalities?.input),
-    ]);
-    return capabilityStrings.includes("video")
-      || raw?.supports_video_input === true
-      || raw?.supportsVideoInput === true
-      || raw?.video === true
-      || raw?.capabilities?.video === true
-      || raw?.capabilities?.video_input === true
-      || raw?.capabilities?.videoInput === true;
-  }
-
-  function hasReasoningSignal(raw) {
-    return raw?.reasoning === true
-      || raw?.supports_reasoning === true
-      || raw?.supportsReasoning === true
-      || raw?.capabilities?.reasoning === true
-      || raw?.capabilities?.reasoning_effort === true
-      || raw?.capabilities?.reasoningEffort === true;
-  }
-
-  function withDiscoveredModelCapabilities(providerName, model, raw = model) {
-    const type = inferDiscoveredModelType(providerName, raw);
-    return {
-      ...model,
-      ...(type ? { type } : {}),
-      ...(hasImageInputSignal(raw) ? { image: true } : {}),
-      ...(hasVideoInputSignal(raw) ? { video: true } : {}),
-      ...(hasReasoningSignal(raw) ? { reasoning: true } : {}),
-    };
-  }
-
-  function normalizeRegistryModels(providerName, models) {
-    return models.map((model) => ({
-      id: model.id,
-      name: model.name || model.id,
-      context: finiteNumber(model.contextWindow, model.context),
-      maxOutput: finiteNumber(model.maxOutputTokens, model.maxOutput, model.maxTokens),
-    })).map((model, index) => withDiscoveredModelCapabilities(providerName, model, models[index]));
-  }
-
-  function normalizeRemoteModels(data, api, providerName) {
-    if (api === "anthropic-messages") {
-      return (data.data || []).map(m => withDiscoveredModelCapabilities(providerName, {
-        id: m.id,
-        name: m.display_name || m.id,
-        context: finiteNumber(m.max_input_tokens, m.input_token_limit, m.context_length),
-        maxOutput: finiteNumber(m.max_tokens, m.max_output_tokens, m.output_token_limit),
-      }, m));
-    }
-
-    if (api === "google-generative-ai") {
-      return (data.models || []).map(m => {
-        const id = m.baseModelId || String(m.name || "").replace(/^models\//, "");
-        return withDiscoveredModelCapabilities(providerName, {
-          id,
-          name: m.displayName || id,
-          context: finiteNumber(m.inputTokenLimit),
-          maxOutput: finiteNumber(m.outputTokenLimit),
-        }, m);
-      }).filter(m => m.id);
-    }
-
-    return (data.data || []).map(m => withDiscoveredModelCapabilities(providerName, {
-      id: m.id,
-      name: m.display_name || m.name || m.id,
-      context: finiteNumber(m.context_length, m.context_window, m.max_context_length, m.max_input_tokens, m.input_token_limit),
-      maxOutput: finiteNumber(m.max_completion_tokens, m.max_output_tokens, m.max_tokens, m.output_token_limit),
-    }, m));
-  }
-
-  function filterProviderModels(name, models, baseUrl = "") {
-    const { models: filtered, ignoredModels } = filterDiscoveredProviderModels(name, models, { baseUrl });
-    const payload = { models: filtered };
-    if (ignoredModels.length > 0) payload.ignoredModels = ignoredModels;
-    return payload;
-  }
 
   async function refreshProviderModels() {
     clearConfigCache();
     await engine.onProviderChanged();
     emitAppEvent(engine, "models-changed", { agentId: engine.currentAgentId || null });
-  }
-
-  /** Registry → defaults 两级 fallback，fetch-models 和 Anthropic 路径共用 */
-  function registryOrDefaultsFallback(name) {
-    if (!name) {
-      return { error: "name is required for model discovery fallback", models: [] };
-    }
-
-    // 尝试 Pi SDK registry（含内置 OAuth 模型 + models.json 模型，不经过 availableModels 白名单）
-    const registryModels = engine.getRegistryModelsForProvider(name);
-    if (registryModels.length > 0) {
-      const normalized = normalizeRegistryModels(name, registryModels);
-      const payload = filterProviderModels(name, normalized);
-      if (payload.models.length === 0 && payload.ignoredModels?.length > 0) {
-        return {
-          source: "registry",
-          error: `Registry only returned invalid model ids for provider "${name}": ${payload.ignoredModels.join(", ")}`,
-          models: [],
-          ignoredModels: payload.ignoredModels,
-        };
-      }
-      saveToCache(name, payload.models);
-      return { source: "registry", ...payload };
-    }
-
-    // 回退到 default-models.json（用 authJsonKey 兜底，如 openai-codex-oauth → openai-codex）
-    const authKey = engine.providerRegistry.getAuthJsonKey(name);
-    const defaults = engine.providerRegistry.getDefaultModels(name)
-      || engine.providerRegistry.getDefaultModels(authKey)
-      || [];
-    if (defaults.length > 0) {
-      const builtinModels = defaults.map(id => ({ id, name: id, context: null, maxOutput: null }));
-      const payload = filterProviderModels(name, builtinModels);
-      saveToCache(name, payload.models);
-      return { source: "builtin", ...payload };
-    }
-
-    return { error: `No models found for provider "${name}"`, models: [] };
   }
 
   /**
@@ -440,67 +43,8 @@ export function createProvidersRoute(engine) {
    * body: { name, base_url?, api?, api_key? }
    */
   route.post("/providers/fetch-models", async (c) => {
-    const body = await safeJson(c);
-    const { name, base_url, api: explicitApi, api_key } = body;
-    if (!name && !base_url) {
-      return c.json({ error: "name or base_url is required" }, 400);
-    }
-
-    // ── 1. 凭证解析：请求体 > resolveProviderCredentials（统一路径） ──
-    const saved = name ? engine.resolveProviderCredentials(name) : { api_key: "", base_url: "", api: "" };
-
-    const effectiveKey = api_key || saved.api_key || "";
-    const effectiveBaseUrl = base_url || saved.base_url || "";
-    const effectiveApi = explicitApi || saved.api || "";
-
-    // ── 2. 远程 list models（baseUrl 为空时跳过）──
-    if (effectiveBaseUrl) {
-      try {
-        const base = effectiveBaseUrl.replace(/\/+$/, "");
-        const url = effectiveApi === "anthropic-messages" ? `${base}/v1/models?limit=1000` : `${base}/models`;
-
-        let headers = { "Content-Type": "application/json" };
-        if (effectiveKey) {
-          if (!effectiveApi) {
-            return c.json({ error: "api is required when api_key is present", models: [] });
-          }
-          headers = buildProviderAuthHeaders(effectiveApi, effectiveKey);
-        }
-        const res = await fetch(url, {
-          headers,
-          signal: AbortSignal.timeout(15000),
-        });
-
-        // 401/403：凭证问题，直接返回错误，不 fallback
-        if (res.status === 401 || res.status === 403) {
-          return c.json({ error: `HTTP ${res.status}: ${res.statusText}`, models: [] });
-        }
-
-        if (res.ok) {
-          const data = await res.json();
-          const remoteModels = normalizeRemoteModels(data, effectiveApi, name);
-          const { models, ignoredModels } = filterDiscoveredProviderModels(name, remoteModels, {
-            baseUrl: effectiveBaseUrl,
-          });
-          if (models.length === 0 && ignoredModels.length > 0) {
-            return c.json({
-              error: `Remote catalog only returned invalid model ids for provider "${name}": ${ignoredModels.join(", ")}`,
-              models: [],
-              ignoredModels,
-            });
-          }
-          saveToCache(name, models);
-          return c.json(ignoredModels.length > 0 ? { models, ignoredModels } : { models });
-        }
-
-        // 404 / 其他 → 进入 step 3
-      } catch {
-        // 网络错误 → 进入 step 3
-      }
-    }
-
-    // ── 3. Registry + defaults fallback ──
-    return c.json(registryOrDefaultsFallback(name));
+    const result = await modelDiscovery.fetchModels(await safeJson(c));
+    return c.json(result.body, result.status);
   });
 
   /**
@@ -508,13 +52,7 @@ export function createProvidersRoute(engine) {
    * GET /api/providers/:name/discovered-models
    */
   route.get("/providers/:name/discovered-models", (c) => {
-    const providerName = c.req.param("name");
-    const cache = readModelsCache(engine);
-    const entry = cache[providerName];
-    if (!entry) return c.json({ models: [], fetchedAt: null });
-    const creds = engine.resolveProviderCredentials?.(providerName) || {};
-    const payload = filterProviderModels(providerName, entry.models || [], creds.base_url || "");
-    return c.json({ ...payload, fetchedAt: entry.fetchedAt || null });
+    return c.json(modelDiscovery.getCachedDiscoveredModels(c.req.param("name")));
   });
 
   /**
@@ -529,7 +67,7 @@ export function createProvidersRoute(engine) {
     const bodyKey = (body.api_key || "").replace(/[^\x20-\x7E]/g, "").trim();
 
     // ── 凭证解析：请求体 > resolveProviderCredentials（统一路径） ──
-    const saved = name ? engine.resolveProviderCredentials(name) : { api_key: "", base_url: "", api: "" };
+    const saved = name ? providerSettings.resolveProviderCredentials(name) : { api_key: "", base_url: "", api: "" };
 
     const api_key = bodyKey || saved.api_key || "";
     const base_url = body.base_url || saved.base_url || "";

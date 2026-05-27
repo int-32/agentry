@@ -26,55 +26,19 @@ import path from "node:path";
 import readline from "node:readline";
 import { pathToFileURL } from "node:url";
 import { randomUUID, createHash } from "node:crypto";
-import YAML from "js-yaml";
+import {
+  cleanWorkspacePath,
+  createCliProviderConfigLoader,
+  resolveBridgeAgentryHome,
+  resolveBridgeRuntimeConfig,
+} from "../../lib/bridge/local-cli-runtime-config.js";
 
 const PORT = parseInt(process.env.AGENTRY_BRIDGE_PORT || "51720", 10);
-const AGENTRY_HOME = process.env.AGENTRY_HOME
-  || process.env.HANA_HOME
-  || path.join(os.homedir(), ".agentry");
+const AGENTRY_HOME = resolveBridgeAgentryHome(process.env);
+const cliProviderConfigLoader = createCliProviderConfigLoader({ agentryHome: AGENTRY_HOME });
 
-let cliWorkspaceCache = { mtimeMs: 0, providers: {} };
 let antigravityAppCache = { checkedAt: 0, endpoint: null };
 const antigravityPendingInteractions = new Map();
-
-function cleanPath(value) {
-  if (typeof value !== "string") return "";
-  return value.trim();
-}
-
-function cleanPathList(value) {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set();
-  const out = [];
-  for (const item of value) {
-    const folder = cleanPath(item);
-    if (!folder || seen.has(folder)) continue;
-    seen.add(folder);
-    out.push(folder);
-  }
-  return out;
-}
-
-function loadCliProviderConfig(providerId) {
-  const configPath = path.join(AGENTRY_HOME, "added-models.yaml");
-  try {
-    const stat = fs.statSync(configPath);
-    if (cliWorkspaceCache.mtimeMs !== stat.mtimeMs) {
-      const raw = YAML.load(fs.readFileSync(configPath, "utf-8")) || {};
-      cliWorkspaceCache = {
-        mtimeMs: stat.mtimeMs,
-        providers: raw && typeof raw.providers === "object" && raw.providers ? raw.providers : {},
-      };
-    }
-  } catch {
-    cliWorkspaceCache = { mtimeMs: 0, providers: {} };
-  }
-  const cfg = cliWorkspaceCache.providers[providerId] || {};
-  return {
-    workspaceRoot: cleanPath(cfg.workspace_root || cfg.workspaceRoot),
-    workspaceFolders: cleanPathList(cfg.workspace_folders || cfg.workspaceFolders),
-  };
-}
 
 // ── conversation → backend session 映射 ──
 // Hanako 每轮发完整 messages 历史给 bridge，但 Claude / Codex SDK 之 query 之 prompt 只取最后一条
@@ -111,24 +75,6 @@ function lookupSession(fp, backend) {
   if (!entry || entry.backend !== backend) return null;
   entry.lastAccessed = Date.now();
   return entry.sessionId;
-}
-
-// ── 路由：按 model 名前缀选 backend ──
-function routeBackend(model) {
-  const m = (model || "").toLowerCase();
-  if (m.includes("codex") || m.includes("gpt-codex")) return "codex";
-  if (m.includes("antigravity") || m === "agy" || m.startsWith("agy-")) return "antigravity";
-  if (m.includes("gemini")) return "gemini";
-  // 默认 Claude
-  return "claude";
-}
-
-function cliProviderForBackend(backend) {
-  if (backend === "claude") return "cli-claude-code";
-  if (backend === "codex") return "cli-codex";
-  if (backend === "gemini") return "cli-gemini";
-  if (backend === "antigravity") return "cli-antigravity";
-  return null;
 }
 
 // ── 把 OpenAI 消息 content（string / 多模 array）拼成纯文本 ──
@@ -575,7 +521,7 @@ function sleep(ms) {
 }
 
 function maybeWorkspaceRoot(raw) {
-  const value = cleanPath(raw);
+  const value = cleanWorkspacePath(raw);
   if (!value || value === "未设置" || value === "not set") return "";
   if (!path.isAbsolute(value)) return "";
   try {
@@ -977,9 +923,7 @@ const server = createServer(async (req, res) => {
       const systemPrompt = extractSystemPrompt(payload.messages);
       const conversationFp = fingerprintConversation(model, systemPrompt, payload.messages);
       const id = `chatcmpl-${randomUUID()}`;
-      const backend = routeBackend(model);
-      const cliProviderId = cliProviderForBackend(backend);
-      const workspaceConfig = cliProviderId ? loadCliProviderConfig(cliProviderId) : {};
+      const { backend, workspaceConfig } = resolveBridgeRuntimeConfig(model, cliProviderConfigLoader);
       const wantStream = payload.stream === true;
       // CLI 后端走 approach A（history concat），SDK 后端走 B（SDK resume by sessionId）
       const fullHistoryPrompt = (backend === "gemini" || backend === "antigravity")

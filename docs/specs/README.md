@@ -15,6 +15,7 @@
 | [TDD.md](./TDD.md) | 测试策略、测试位置、验证命令 |
 | [GLOSSARY.md](./GLOSSARY.md) | 项目术语库，统一业务概念、页面区域和日常沟通称呼 |
 | [AUTHORING.md](./AUTHORING.md) | 混合放置、编写格式、同步流程和质量标准 |
+| [ARCHITECTURE_BOUNDARIES.md](./ARCHITECTURE_BOUNDARIES.md) | 项目级架构边界表，记录领域 owner、持久化源、读写入口、事件面和验证入口 |
 | [features/](./features/) | 重点功能的规格文件，按功能域拆分 |
 | [templates/feature-spec.md](./templates/feature-spec.md) | 新功能规格模板 |
 | [templates/module-readme.md](./templates/module-readme.md) | 模块目录 README 模板 |
