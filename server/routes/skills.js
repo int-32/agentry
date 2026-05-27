@@ -77,9 +77,16 @@ export function createSkillsRoute(engine) {
     };
   }
 
-  function resolveBundleSkillView(c) {
+  function resolveBundleSkillView(c, options = {}) {
+    const requireAgentId = options.requireAgentId === true;
     const agentId = c.req.query("agentId");
-    if (agentId) {
+    if (!agentId) {
+      if (requireAgentId) {
+        const err = new Error("agentId is required");
+        err.status = 400;
+        throw err;
+      }
+    } else {
       if (!validateId(agentId) || !agentExists(engine, agentId)) {
         const err = new Error("agent not found");
         err.status = 404;
@@ -88,6 +95,7 @@ export function createSkillsRoute(engine) {
       const skills = engine.getAllSkills(agentId) || [];
       return { agentId, skills, skillByName: new Map(skills.map(skill => [skill.name, skill])) };
     }
+
     let skills = [];
     try {
       skills = engine.getAllSkills?.() || [];
@@ -131,13 +139,14 @@ export function createSkillsRoute(engine) {
   route.post("/skills/bundles", async (c) => {
     try {
       const body = await safeJson(c);
-      const { skillByName } = resolveBundleSkillView(c);
+      const { agentId, skillByName } = resolveBundleSkillView(c, { requireAgentId: true });
       assertBundleSkillsInstalled(body.skillNames, skillByName);
       const bundle = createSkillBundle(engine, {
         name: body.name,
         skillNames: body.skillNames,
+        agentId,
       });
-      emitAppEvent(engine, "skills-changed", { agentId: null });
+      emitAppEvent(engine, "skills-changed", { agentId });
       return c.json({ ok: true, bundle: bundleForResponse(bundle, skillByName) });
     } catch (err) {
       return c.json({ error: err.message }, err.status || 500);
@@ -150,9 +159,9 @@ export function createSkillsRoute(engine) {
       if (!Array.isArray(body.bundleIds)) {
         return c.json({ error: "bundleIds must be an array" }, 400);
       }
-      const { skillByName } = resolveBundleSkillView(c);
+      const { agentId, skillByName } = resolveBundleSkillView(c, { requireAgentId: true });
       const store = reorderSkillBundles(engine, body.bundleIds);
-      emitAppEvent(engine, "skills-changed", { agentId: null });
+      emitAppEvent(engine, "skills-changed", { agentId });
       return c.json({ ok: true, bundles: store.bundles.map(bundle => bundleForResponse(bundle, skillByName)) });
     } catch (err) {
       const status = /^(bundleIds must|unknown skill bundle)/.test(err.message) ? 400 : 500;
@@ -163,7 +172,7 @@ export function createSkillsRoute(engine) {
   route.put("/skills/bundles/:id", async (c) => {
     try {
       const body = await safeJson(c);
-      const { skillByName } = resolveBundleSkillView(c);
+      const { agentId, skillByName } = resolveBundleSkillView(c, { requireAgentId: true });
       if (Array.isArray(body.skillNames)) {
         assertBundleSkillsInstalled(body.skillNames, skillByName);
       }
@@ -171,7 +180,7 @@ export function createSkillsRoute(engine) {
         name: body.name,
         skillNames: body.skillNames,
       });
-      emitAppEvent(engine, "skills-changed", { agentId: null });
+      emitAppEvent(engine, "skills-changed", { agentId });
       return c.json({ ok: true, bundle: bundleForResponse(bundle, skillByName) });
     } catch (err) {
       return c.json({ error: err.message }, err.status || (err.message === "skill bundle not found" ? 404 : 500));
@@ -180,9 +189,10 @@ export function createSkillsRoute(engine) {
 
   route.delete("/skills/bundles/:id", async (c) => {
     try {
+      const { agentId } = resolveBundleSkillView(c, { requireAgentId: true });
       const deleted = deleteSkillBundle(engine, c.req.param("id"));
       if (!deleted) return c.json({ error: "skill bundle not found" }, 404);
-      emitAppEvent(engine, "skills-changed", { agentId: null });
+      emitAppEvent(engine, "skills-changed", { agentId });
       return c.json({ ok: true });
     } catch (err) {
       return c.json({ error: err.message }, err.status || 500);

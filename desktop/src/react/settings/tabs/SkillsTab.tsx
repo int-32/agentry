@@ -225,8 +225,10 @@ export function SkillsTab() {
   };
 
   const submitDeleteBundle = async (bundle: SkillBundleInfo) => {
+    const agentId = skillsViewAgentIdRef.current;
+    if (!agentId) return;
     try {
-      const res = await hanaFetch(`/api/skills/bundles/${encodeURIComponent(bundle.id)}`, {
+      const res = await hanaFetch(`/api/skills/bundles/${encodeURIComponent(bundle.id)}?agentId=${encodeURIComponent(agentId)}`, {
         method: 'DELETE',
       });
       const data = await res.json();

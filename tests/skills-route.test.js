@@ -273,6 +273,11 @@ describe("skills route", () => {
   });
 
   it("creates, updates, and deletes skill bundles through the skills route", async () => {
+    const agentId = "agent-a";
+    const agentDir = path.join(tempRoot, agentId);
+    fs.mkdirSync(agentDir, { recursive: true });
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agent A\n", "utf-8");
+
     const { createSkillsRoute } = await import("../server/routes/skills.js");
     const app = new Hono();
     const engine = {
@@ -287,7 +292,7 @@ describe("skills route", () => {
 
     app.route("/api", createSkillsRoute(engine));
 
-    const createRes = await app.request("/api/skills/bundles", {
+    const createRes = await app.request(`/api/skills/bundles?agentId=${agentId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -302,10 +307,11 @@ describe("skills route", () => {
       name: "Writing Bundle",
       skillNames: ["writer"],
       source: "user",
+      agentId,
     });
-    expectAppEvent(engine.emitEvent, "skills-changed", { agentId: null });
+    expectAppEvent(engine.emitEvent, "skills-changed", { agentId });
 
-    const updateRes = await app.request("/api/skills/bundles/writing-bundle", {
+    const updateRes = await app.request(`/api/skills/bundles/writing-bundle?agentId=${agentId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -323,7 +329,7 @@ describe("skills route", () => {
       },
     });
 
-    const deleteRes = await app.request("/api/skills/bundles/writing-bundle", { method: "DELETE" });
+    const deleteRes = await app.request(`/api/skills/bundles/writing-bundle?agentId=${agentId}`, { method: "DELETE" });
     expect(deleteRes.status).toBe(200);
     expect(await deleteRes.json()).toEqual({ ok: true });
     const store = JSON.parse(fs.readFileSync(path.join(tempRoot, "skill-bundles.json"), "utf-8"));
@@ -331,6 +337,11 @@ describe("skills route", () => {
   });
 
   it("persists skill bundle ordering through the skills route", async () => {
+    const agentId = "agent-a";
+    const agentDir = path.join(tempRoot, agentId);
+    fs.mkdirSync(agentDir, { recursive: true });
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agent A\n", "utf-8");
+
     const { createSkillsRoute } = await import("../server/routes/skills.js");
     const app = new Hono();
     const engine = {
@@ -345,18 +356,18 @@ describe("skills route", () => {
 
     app.route("/api", createSkillsRoute(engine));
 
-    await app.request("/api/skills/bundles", {
+    await app.request(`/api/skills/bundles?agentId=${agentId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "First Bundle", skillNames: ["writer"] }),
     });
-    await app.request("/api/skills/bundles", {
+    await app.request(`/api/skills/bundles?agentId=${agentId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "Second Bundle", skillNames: ["reader"] }),
     });
 
-    const orderRes = await app.request("/api/skills/bundles/order", {
+    const orderRes = await app.request(`/api/skills/bundles/order?agentId=${agentId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bundleIds: ["second-bundle", "first-bundle"] }),
@@ -372,7 +383,51 @@ describe("skills route", () => {
     });
     const store = JSON.parse(fs.readFileSync(path.join(tempRoot, "skill-bundles.json"), "utf-8"));
     expect(store.bundles.map(bundle => bundle.id)).toEqual(["second-bundle", "first-bundle"]);
-    expectAppEvent(engine.emitEvent, "skills-changed", { agentId: null });
+    expectAppEvent(engine.emitEvent, "skills-changed", { agentId });
+  });
+
+  it("requires explicit agentId for bundle mutation endpoints", async () => {
+    const { createSkillsRoute } = await import("../server/routes/skills.js");
+    const app = new Hono();
+    const engine = {
+      agentryHome: tempRoot,
+      agentsDir: tempRoot,
+      emitEvent: vi.fn(),
+      getAllSkills: vi.fn(() => [{ name: "writer", enabled: false, source: "user" }]),
+    };
+
+    app.route("/api", createSkillsRoute(engine));
+
+    let res = await app.request("/api/skills/bundles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "No Agent Bundle",
+        skillNames: ["writer"],
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "agentId is required" });
+
+    res = await app.request("/api/skills/bundles/writing-bundle", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Should Fail" }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "agentId is required" });
+
+    res = await app.request("/api/skills/bundles/writing-bundle", { method: "DELETE" });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "agentId is required" });
+
+    res = await app.request("/api/skills/bundles/order", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bundleIds: ["first", "second"] }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "agentId is required" });
   });
 
   it("exports a skill bundle as a zip with only resolvable public skills", async () => {
@@ -461,6 +516,11 @@ describe("skills route", () => {
   });
 
   it("rejects bundle membership for skills that are not installed", async () => {
+    const agentId = "agent-a";
+    const agentDir = path.join(tempRoot, agentId);
+    fs.mkdirSync(agentDir, { recursive: true });
+    fs.writeFileSync(path.join(agentDir, "config.yaml"), "agent:\n  name: Agent A\n", "utf-8");
+
     const { createSkillsRoute } = await import("../server/routes/skills.js");
     const app = new Hono();
     const engine = {
@@ -472,7 +532,7 @@ describe("skills route", () => {
 
     app.route("/api", createSkillsRoute(engine));
 
-    const res = await app.request("/api/skills/bundles", {
+    const res = await app.request(`/api/skills/bundles?agentId=${agentId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

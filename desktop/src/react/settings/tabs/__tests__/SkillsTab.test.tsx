@@ -652,7 +652,7 @@ describe('SkillsTab — sticky skillsViewAgentId & toggleSkill race guard', () =
     fireEvent.click(screen.getByRole('button', { name: '打散' }));
     await flushMicrotasks(6);
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/skills/bundles/writing-bundle'),
+      expect.stringContaining('/api/skills/bundles/writing-bundle?agentId=agent-a'),
       expect.objectContaining({ method: 'DELETE' }),
     );
 
