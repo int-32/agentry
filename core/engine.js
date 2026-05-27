@@ -81,7 +81,7 @@ import { normalizeProviderContextMessages, normalizeProviderPayload } from "./pr
 import { VisionBridge } from "./vision-bridge.js";
 import { SessionCoordinator } from "./session-coordinator.js";
 import { ConfigCoordinator, SHARED_MODEL_KEYS } from "./config-coordinator.js";
-import { WELL_KNOWN_SKILL_PATHS, createWorkspaceService } from "./workspace-service.js";
+import { createWorkspaceService } from "./workspace-service.js";
 import { ChannelManager } from "./channel-manager.js";
 import {
   summarizeTitle as _summarizeTitle,
@@ -119,8 +119,6 @@ import {
   getSkillNameTranslationCachePath,
   translateSkillNamesWithCache,
 } from "../lib/skills/skill-name-translation-cache.js";
-
-export { WELL_KNOWN_SKILL_PATHS };
 
 export class AgentryEngine {
   /**
@@ -994,12 +992,7 @@ export class AgentryEngine {
     fs.mkdirSync(skillsDir, { recursive: true });
 
     // 解析外部兼容技能路径
-    const homeDir = os.homedir();
-    this._discoveredExternalPaths = WELL_KNOWN_SKILL_PATHS.map(w => ({
-      dirPath: path.join(homeDir, w.suffix),
-      label: w.label,
-      exists: fs.existsSync(path.join(homeDir, w.suffix)),
-    }));
+    this._discoveredExternalPaths = this._workspaceService().getWellKnownSkillPaths(os.homedir());
     const externalPaths = this._getResolvedExternalSkillPaths(null);
 
     this._skills = new SkillManager({ skillsDir, externalPaths });

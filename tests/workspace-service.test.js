@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { WorkspaceService } from "../core/workspace-service.js";
+import { WorkspaceService, WELL_KNOWN_SKILL_PATHS } from "../core/workspace-service.js";
 
 describe("WorkspaceService", () => {
   let tempRoot = null;
@@ -145,6 +145,22 @@ describe("WorkspaceService", () => {
     const c = [{ dirPath: "/x", label: "A", scope: "agent" }];
     expect(service.sameExternalSkillPaths(a, b)).toBe(true);
     expect(service.sameExternalSkillPaths(a, c)).toBe(false);
+  });
+
+  it("resolves well-known external skill paths for a home directory", () => {
+    const home = makeDir("home");
+    fs.mkdirSync(path.join(home, ".pi/agent/skills"), { recursive: true });
+    const service = new WorkspaceService({});
+
+    const result = service.getWellKnownSkillPaths(home);
+
+    const expected = WELL_KNOWN_SKILL_PATHS.map((entry) => ({
+      dirPath: path.resolve(home, entry.suffix),
+      label: entry.label,
+      exists: fs.existsSync(path.resolve(home, entry.suffix)),
+    }));
+
+    expect(result).toEqual(expected);
   });
 
   it("syncWorkspaceSkillPaths mirrors engine short-circuit + force behavior", async () => {
