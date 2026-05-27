@@ -1551,20 +1551,7 @@ export class AgentryEngine {
   // ════════════════════════════
 
   listDeskFiles() {
-    try {
-      const dir = this.homeCwd;
-      if (!dir || !fs.existsSync(dir)) return [];
-      return fs.readdirSync(dir, { withFileTypes: true })
-        .filter(e => !e.name.startsWith("."))
-        .map(e => {
-          const fp = path.join(dir, e.name);
-          let mtime = 0;
-          try { mtime = fs.statSync(fp).mtimeMs; } catch {}
-          return { name: e.name, isDir: e.isDirectory(), mtime };
-        });
-    } catch {
-      return [];
-    }
+    return this._workspaceService().listDeskFiles(this.homeCwd);
   }
 
   get defaultDeskCwd() {

@@ -69,6 +69,23 @@ export class WorkspaceService {
     this._d = deps;
   }
 
+  listDeskFiles(deskDir = null) {
+    const home = typeof deskDir === "string" && deskDir.trim() ? deskDir : this.getHomeFolder(this._getActiveAgentId());
+    try {
+      if (!home || !fs.existsSync(home)) return [];
+      return fs.readdirSync(home, { withFileTypes: true })
+        .filter((entry) => !entry.name.startsWith("."))
+        .map((entry) => {
+          const fp = path.join(home, entry.name);
+          let mtime = 0;
+          try { mtime = fs.statSync(fp).mtimeMs; } catch {}
+          return { name: entry.name, isDir: entry.isDirectory(), mtime };
+        });
+    } catch {
+      return [];
+    }
+  }
+
   getExplicitHomeFolder(agentId) {
     const targetId = agentId || this._getPrimaryAgentId();
     if (!targetId) return null;

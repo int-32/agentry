@@ -227,4 +227,35 @@ describe("WorkspaceService", () => {
     expect(reloadSkills).toHaveBeenCalledTimes(1);
     expect(emitSkillsChanged).toHaveBeenCalledTimes(1);
   });
+
+  it("lists non-hidden desk files with type and mtime", () => {
+    const home = makeDir("desk-home");
+    const visibleDir = path.join(home, "visible-dir");
+    fs.mkdirSync(visibleDir, { recursive: true });
+    fs.writeFileSync(path.join(home, "visible-file.md"), "hi");
+    fs.writeFileSync(path.join(home, ".hidden"), "secret");
+
+    const service = new WorkspaceService({
+      getActiveAgentId: () => "focus",
+      getAgentById: () => ({ config: { desk: { home_folder: home } } }),
+    });
+    const entries = service.listDeskFiles();
+
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "visible-dir", isDir: true }),
+        expect.objectContaining({ name: "visible-file.md", isDir: false }),
+      ]),
+    );
+    expect(entries.some((entry) => entry.name === ".hidden")).toBe(false);
+  });
+
+  it("returns an empty list for missing desk dir", () => {
+    const service = new WorkspaceService({
+      getActiveAgentId: () => "focus",
+      getAgentById: () => ({ config: { desk: { home_folder: "/does-not-exist" } } }),
+    });
+
+    expect(service.listDeskFiles()).toEqual([]);
+  });
 });
