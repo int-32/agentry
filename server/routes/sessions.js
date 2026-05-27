@@ -572,6 +572,7 @@ export function createSessionsRoute(engine) {
     try {
       const body = await safeJson(c);
       const { cwd, memoryEnabled, agentId, currentSessionPath: oldSessionPath } = body;
+      const explicitCurrentAgentId = body?.currentAgentId || null;
       const workspaceFolders = Array.isArray(body.workspaceFolders)
         ? body.workspaceFolders.filter(p => typeof p === "string" && p.trim())
         : [];
@@ -589,7 +590,7 @@ export function createSessionsRoute(engine) {
       }
 
       let newSessionPath, newAgentId;
-      if (agentId && agentId !== (body.currentAgentId || engine.currentAgentId)) {
+      if (agentId && explicitCurrentAgentId && agentId !== explicitCurrentAgentId) {
         ({ sessionPath: newSessionPath, agentId: newAgentId } = await engine.createSessionForAgent(
           agentId,
           cwd || undefined,
@@ -610,7 +611,7 @@ export function createSessionsRoute(engine) {
 
       // 记住工作目录 + 更新历史
       if (cwd) {
-        const targetAgentId = newAgentId || agentId || body.currentAgentId || engine.currentAgentId || null;
+        const targetAgentId = newAgentId || agentId || explicitCurrentAgentId || null;
         const targetConfig = getAgentConfigForHistory(targetAgentId);
         const history = mergeWorkspaceHistory(targetConfig.cwd_history, [cwd]);
         await engine.updateConfig(
