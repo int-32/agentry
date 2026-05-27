@@ -55,4 +55,32 @@ describe("AgentryEngine.syncWorkspaceSkillPaths", () => {
 
     expect(result).toBe(true);
   });
+
+  it("refreshes discovered external paths and triggers sync on new discovered directories", async () => {
+    const engine = makeFakeEngine({ currentPaths: [] });
+    Object.defineProperty(engine, "currentSessionPath", { value: "/sessions/current.jsonl", configurable: true });
+    Object.defineProperty(engine, "cwd", { value: "/tmp/cwd", configurable: true });
+    engine._discoveredExternalPaths = [{ dirPath: "/u/missing", label: "Missing", exists: false }];
+    engine._prefs.getExternalSkillPaths = vi.fn(() => ["/u/configured"]);
+    const svc = engine._workspaceService();
+    const refreshedPaths = [{ dirPath: "/u/missing", label: "Missing", exists: true }];
+    svc.refreshDiscoveredExternalPaths = vi.fn().mockReturnValue({
+      paths: refreshedPaths,
+      newDirAppeared: true,
+    });
+    engine.syncWorkspaceSkillPaths = vi.fn().mockResolvedValue(true);
+
+    const result = engine.getExternalSkillPaths();
+
+    expect(svc.refreshDiscoveredExternalPaths).toHaveBeenCalled();
+    expect(engine._discoveredExternalPaths).toEqual(refreshedPaths);
+    expect(engine.syncWorkspaceSkillPaths).toHaveBeenCalledWith("/tmp/cwd", {
+      reload: true,
+      emitEvent: true,
+    });
+    expect(result).toEqual({
+      configured: ["/u/configured"],
+      discovered: refreshedPaths,
+    });
+  });
 });
