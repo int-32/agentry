@@ -1128,10 +1128,26 @@ export class SessionCoordinator {
    * 如果新模型的上下文窗口容不下当前对话，先压缩/截断。
    *
    * @param {string} sessionPath
-   * @param {object} newModel - Pi SDK Model 对象
-   * @returns {Promise<{ adaptations: string[] }>}
+   * @param {object|string} newModel - Pi SDK Model 对象；或 modelId（兼容路径）
+   * @param {string} [provider] - modelId 模式下必填
+   * @returns {Promise<{ adaptations: string[], thinkingLevel?: string }>}
    */
-  async switchSessionModel(sessionPath, newModel) {
+  async switchSessionModel(sessionPath, newModel, provider) {
+    if (typeof newModel === "string") {
+      if (!provider) {
+        throw new Error(`switchSessionModel: provider required (modelId=${newModel})`);
+      }
+      const models = this._d.getModels?.() || {};
+      const modelId = newModel;
+      newModel = findModel(models.availableModels || [], modelId, provider);
+      if (!newModel) {
+        throw new Error(t("error.modelNotFound", { id: `${provider}/${modelId}` }));
+      }
+    }
+    if (!newModel || typeof newModel !== "object") {
+      throw new Error(`switchSessionModel: invalid model`);
+    }
+
     let entry = this._sessions.get(sessionPath);
     if (!entry) {
       await this.ensureSessionLoaded(sessionPath);

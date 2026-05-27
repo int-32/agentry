@@ -122,6 +122,109 @@ describe("SessionCoordinator.switchSessionModel", () => {
     expect(entry.modelProvider).toBe("test");
   });
 
+  it("resolves model by (modelId, provider) before switching", async () => {
+    const coord = new SessionCoordinator({
+      agentsDir: "/tmp/agents",
+      getAgent: () => ({ sessionDir: "/tmp/sessions" }),
+      getActiveAgentId: () => "hana",
+      getModels: () => ({
+        availableModels: [
+          { id: "old-model", provider: "test", contextWindow: 32000 },
+          { id: "new-model", provider: "test", contextWindow: 12000 },
+        ],
+      }),
+      getResourceLoader: () => null,
+      getSkills: () => null,
+      buildTools: () => ({ tools: [], customTools: [] }),
+      emitEvent: () => {},
+      getHomeCwd: () => "/tmp",
+      agentIdFromSessionPath: () => null,
+      switchAgentOnly: async () => {},
+      getConfig: () => ({}),
+      getPrefs: () => ({ getThinkingLevel: () => "medium" }),
+      getAgents: () => new Map(),
+      getActivityStore: () => null,
+      getAgentById: () => null,
+      listAgents: () => [],
+    });
+
+    const setModel = vi.fn(async () => {});
+    const entry = {
+      session: {
+        model: { id: "old-model", provider: "test", contextWindow: 32000 },
+        isCompacting: false,
+        getContextUsage: () => ({ tokens: 0 }),
+        agent: { state: { messages: [] } },
+        setModel,
+      },
+      modelId: "old-model",
+      modelProvider: "test",
+    };
+    coord.sessions.set("/tmp/session.jsonl", entry);
+
+    await coord.switchSessionModel("/tmp/session.jsonl", "new-model", "test");
+
+    expect(setModel).toHaveBeenCalledOnce();
+    expect(entry.modelId).toBe("new-model");
+    expect(entry.modelProvider).toBe("test");
+  });
+
+  it("rejects switchSessionModel without provider when using modelId", async () => {
+    const coord = new SessionCoordinator({
+      agentsDir: "/tmp/agents",
+      getAgent: () => ({ sessionDir: "/tmp/sessions" }),
+      getActiveAgentId: () => "hana",
+      getModels: () => ({ availableModels: [] }),
+      getResourceLoader: () => null,
+      getSkills: () => null,
+      buildTools: () => ({ tools: [], customTools: [] }),
+      emitEvent: () => {},
+      getHomeCwd: () => "/tmp",
+      agentIdFromSessionPath: () => null,
+      switchAgentOnly: async () => {},
+      getConfig: () => ({}),
+      getPrefs: () => ({ getThinkingLevel: () => "medium" }),
+      getAgents: () => new Map(),
+      getActivityStore: () => null,
+      getAgentById: () => null,
+      listAgents: () => [],
+    });
+
+    await expect(
+      coord.switchSessionModel("/tmp/session.jsonl", "new-model"),
+    ).rejects.toThrow("switchSessionModel: provider required (modelId=new-model)");
+  });
+
+  it("rejects session model switch when modelId/provider has no match", async () => {
+    const coord = new SessionCoordinator({
+      agentsDir: "/tmp/agents",
+      getAgent: () => ({ sessionDir: "/tmp/sessions" }),
+      getActiveAgentId: () => "hana",
+      getModels: () => ({
+        availableModels: [
+          { id: "old-model", provider: "test", contextWindow: 32000 },
+        ],
+      }),
+      getResourceLoader: () => null,
+      getSkills: () => null,
+      buildTools: () => ({ tools: [], customTools: [] }),
+      emitEvent: () => {},
+      getHomeCwd: () => "/tmp",
+      agentIdFromSessionPath: () => null,
+      switchAgentOnly: async () => {},
+      getConfig: () => ({}),
+      getPrefs: () => ({ getThinkingLevel: () => "medium" }),
+      getAgents: () => new Map(),
+      getActivityStore: () => null,
+      getAgentById: () => null,
+      listAgents: () => [],
+    });
+
+    await expect(
+      coord.switchSessionModel("/tmp/session.jsonl", "missing", "test"),
+    ).rejects.toThrow("test/missing");
+  });
+
   it("falls back from xhigh to high when switching to a model without max thinking support", async () => {
     const coord = new SessionCoordinator({
       agentsDir: "/tmp/agents",

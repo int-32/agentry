@@ -672,12 +672,7 @@ export class AgentryEngine {
   async syncModelsAndRefresh() { return this._configCoord.syncAndRefresh(); }
   setPendingModel(id, provider) { return this._configCoord.setPendingModel(id, provider); }
   async switchSessionModel(sessionPath, modelId, provider) {
-    if (!provider) {
-      throw new Error(`switchSessionModel: provider required (modelId=${modelId})`);
-    }
-    const model = findModel(this._models.availableModels, modelId, provider);
-    if (!model) throw new Error(t("error.modelNotFound", { id: `${provider}/${modelId}` }));
-    return this._sessionCoord.switchSessionModel(sessionPath, model);
+    return this._sessionCoord.switchSessionModel(sessionPath, modelId, provider);
   }
   async setDefaultModel(id, provider, opts) { return this._configCoord.setDefaultModel(id, provider, opts); }
   getThinkingLevel() { return this._configCoord.getThinkingLevel(); }
