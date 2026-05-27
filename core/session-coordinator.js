@@ -1832,6 +1832,22 @@ export class SessionCoordinator {
     return this._hibernatedSessionMeta.get(sessionPath)?.contextUsage || null;
   }
 
+  async compactDesktopSession(sessionPath) {
+    const session = this.getSessionByPath(sessionPath);
+    if (!session) throw new Error("compactDesktopSession: session not found");
+    if (session.isCompacting) throw new Error("compactDesktopSession: already compacting");
+
+    const before = session.getContextUsage?.() ?? null;
+    await session.compact();
+    const after = session.getContextUsage?.() ?? null;
+
+    return {
+      tokensBefore: before?.tokens ?? null,
+      tokensAfter: after?.tokens ?? null,
+      contextWindow: after?.contextWindow ?? before?.contextWindow ?? null,
+    };
+  }
+
   /**
    * 确保 sessionPath 已加载进 _sessions cache，但**不改 this._session（UI 焦点）**。
    *
