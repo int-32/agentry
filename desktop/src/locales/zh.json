@@ -89,7 +89,27 @@
     "searchingTitles": "正在搜索标题…",
     "searchingContent": "正在搜索正文…",
     "searchNoResults": "没有找到相关会话",
-    "searchFailed": "搜索失败"
+    "searchFailed": "搜索失败",
+    "view": {
+      "time": "按时间排序",
+      "project": "按项目排序",
+      "sort": "排序方式"
+    },
+    "projects": {
+      "title": "项目",
+      "more": "项目视图",
+      "create": "新建项目",
+      "newProject": "新建项目",
+      "newFolder": "新建文件夹",
+      "renameProject": "重命名项目",
+      "newProjectPrompt": "项目名称",
+      "newFolderPrompt": "文件夹名称",
+      "createAction": "创建",
+      "save": "保存",
+      "cancel": "取消",
+      "showMore": "展开显示",
+      "empty": "还没有项目"
+    }
   },
   "titlebar": {
     "currentChatTitle": "当前对话标题"

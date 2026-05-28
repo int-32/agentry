@@ -188,6 +188,34 @@ describe("sessions route", () => {
     expect(data[0].pinnedAt).toBe(pinnedAt);
   });
 
+  it("includes explicit projectId in the session list response", async () => {
+    const { createSessionsRoute } = await import("../server/routes/sessions.js");
+    const app = new Hono();
+
+    const engine = {
+      listSessions: vi.fn(async () => [{
+        path: "/tmp/agents/hana/sessions/a.jsonl",
+        title: "Project thread",
+        firstMessage: "hello",
+        modified: new Date("2026-05-28T07:00:00.000Z"),
+        messageCount: 2,
+        cwd: "/tmp/work",
+        agentId: "hana",
+        agentName: "Hana",
+        projectId: "project-hana",
+      }]),
+      rcState: null,
+    };
+
+    app.route("/api", createSessionsRoute(engine));
+
+    const res = await app.request("/api/sessions");
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data[0].projectId).toBe("project-hana");
+  });
+
   it("searches sessions without exposing the cached full transcript", async () => {
     const { createSessionsRoute } = await import("../server/routes/sessions.js");
     const app = new Hono();

@@ -15,10 +15,38 @@ import { switchSession, archiveSession, renameSession, pinSession } from '../sto
 import { updateKeyed } from '../stores/create-keyed-slice';
 import type { Session, Agent } from '../types';
 import { AgentAvatar, resolveAgentDisplayInfo } from '../utils/agent-display';
-import { buildSessionSections } from './session-sections';
+import {
+  autoProjectIdForCwd,
+  buildSessionProjectView,
+  buildSessionSections,
+  type SessionProjectCatalog,
+  type SessionProjectGroup,
+  type SessionViewMode,
+} from './session-sections';
 import { ContextMenu, type ContextMenuItem } from '../ui/ContextMenu';
 import { renderMarkdown } from '../utils/markdown';
 import styles from './SessionList.module.css';
+
+const SESSION_VIEW_MODE_KEY = 'hana-session-sidebar-view-mode';
+const SESSION_DRAG_MIME = 'application/x-hana-session-path';
+const PROJECT_DRAG_MIME = 'application/x-hana-project-id';
+
+const EMPTY_PROJECT_CATALOG: SessionProjectCatalog = { projects: [] };
+
+type SidebarDragState =
+  | { kind: 'session'; sessionPath: string }
+  | { kind: 'project'; projectId: string }
+  | null;
+
+type ProjectNameDialogState =
+  | { kind: 'create-project'; value: string }
+  | { kind: 'rename-project'; projectId: string; value: string }
+  | null;
+
+type ProjectActionMenuState = {
+  position: { x: number; y: number };
+  project: SessionProjectGroup;
+} | null;
 
 interface BrowserSessionState {
   url: string | null;
@@ -76,6 +104,7 @@ function normalizeSessionSearchResults(data: unknown): SessionSearchResult[] {
       agentId: typeof item.agentId === 'string' ? item.agentId : null,
       agentName: typeof item.agentName === 'string' ? item.agentName : null,
       cwd: typeof item.cwd === 'string' ? item.cwd : null,
+      projectId: typeof item.projectId === 'string' ? item.projectId : null,
       pinnedAt: typeof item.pinnedAt === 'string' ? item.pinnedAt : null,
       hasSummary: item.hasSummary === true,
       rcAttachment: null,
@@ -86,6 +115,35 @@ function normalizeSessionSearchResults(data: unknown): SessionSearchResult[] {
   });
 }
 
+function readInitialSessionViewMode(): SessionViewMode {
+  try {
+    return window.localStorage?.getItem(SESSION_VIEW_MODE_KEY) === 'project' ? 'project' : 'time';
+  } catch {
+    return 'time';
+  }
+}
+
+function normalizeProjectCatalog(data: unknown): SessionProjectCatalog {
+  const raw = data && typeof data === 'object' && !Array.isArray(data)
+    ? (data as { catalog?: unknown }).catalog
+    : null;
+  const catalog = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? raw as Partial<SessionProjectCatalog>
+    : EMPTY_PROJECT_CATALOG;
+  return {
+    projects: Array.isArray(catalog.projects) ? catalog.projects : [],
+  };
+}
+
+function dragSessionPath(event: React.DragEvent, state: SidebarDragState): string | null {
+  const fromState = state?.kind === 'session' ? state.sessionPath : null;
+  return event.dataTransfer.getData(SESSION_DRAG_MIME) || fromState;
+}
+
+function dragProjectId(event: React.DragEvent, state: SidebarDragState): string | null {
+  const fromState = state?.kind === 'project' ? state.projectId : null;
+  return event.dataTransfer.getData(PROJECT_DRAG_MIME) || fromState;
+}
 
 // ── 主组件 ──
 
@@ -106,14 +164,23 @@ function SessionListInner() {
   const browserBySession = useStore(s => s.browserBySession);
 
   const [browserSessions, setBrowserSessions] = useState<Record<string, BrowserSessionState>>({});
+  const [viewMode, setViewModeState] = useState<SessionViewMode>(readInitialSessionViewMode);
+  const [projectCatalog, setProjectCatalog] = useState<SessionProjectCatalog>(EMPTY_PROJECT_CATALOG);
+  const [collapsedProjectIds, setCollapsedProjectIds] = useState<Set<string>>(() => new Set());
+  const [projectMenuPosition, setProjectMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [projectActionMenu, setProjectActionMenu] = useState<ProjectActionMenuState>(null);
+  const [projectNameDialog, setProjectNameDialog] = useState<ProjectNameDialogState>(null);
+  const [dragState, setDragState] = useState<SidebarDragState>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [titleResults, setTitleResults] = useState<SessionSearchResult[]>([]);
   const [contentResults, setContentResults] = useState<SessionSearchResult[]>([]);
   const [searchStatus, setSearchStatus] = useState<'idle' | 'title' | 'content' | 'done' | 'error'>('idle');
   const closingBrowserSessionsRef = useRef(new Set<string>());
+  const projectNameInputRef = useRef<HTMLInputElement>(null);
   const searchQueryTrimmed = searchQuery.trim();
   const sessionsSignature = useMemo(() => (
-    sessions.map(s => `${s.path}:${s.title || ''}:${s.modified || ''}:${s.messageCount}`).join('\n')
+    sessions.map(s => `${s.path}:${s.title || ''}:${s.modified || ''}:${s.messageCount}:${s.projectId || ''}`).join('\n')
   ), [sessions]);
 
   const setVisibleBrowserSessions = useCallback((data: unknown) => {
@@ -190,6 +257,37 @@ function SessionListInner() {
     };
   }, [searchQueryTrimmed, sessionsSignature]);
 
+  const setViewMode = useCallback((mode: SessionViewMode) => {
+    setViewModeState(mode);
+    try {
+      window.localStorage?.setItem(SESSION_VIEW_MODE_KEY, mode);
+    } catch {
+      // localStorage can be unavailable in tests or privacy modes.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (viewMode !== 'project') return;
+    let cancelled = false;
+    hanaFetch('/api/session-projects')
+      .then(res => res.json())
+      .then(data => {
+        if (!cancelled) setProjectCatalog(normalizeProjectCatalog(data));
+      })
+      .catch(err => console.warn('[sessions] fetch project catalog failed:', err));
+    return () => {
+      cancelled = true;
+    };
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (!projectNameDialog) return;
+    window.setTimeout(() => {
+      projectNameInputRef.current?.focus();
+      projectNameInputRef.current?.select();
+    }, 0);
+  }, [projectNameDialog]);
+
   const handleCloseBrowserSession = useCallback(async (sessionPath: string) => {
     closingBrowserSessionsRef.current.add(sessionPath);
     setBrowserSessions(prev => {
@@ -215,13 +313,206 @@ function SessionListInner() {
     }
   }, []);
 
-  const sections = buildSessionSections(sessions, { mode: 'time' });
+  const updateSessionProjectAssignment = useCallback(async (sessionPath: string, projectId: string | null) => {
+    await hanaFetch('/api/session-projects/session-assignment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionPath, projectId }),
+    });
+    useStore.setState(state => ({
+      sessions: state.sessions.map(session => session.path === sessionPath
+        ? { ...session, projectId }
+        : session),
+    }));
+  }, []);
+
+  const patchProject = useCallback(async (projectId: string, patch: { folderId?: string | null; name?: string }) => {
+    const res = await hanaFetch(`/api/session-projects/projects/${encodeURIComponent(projectId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    const data = await res.json().catch(() => ({}));
+    const project = data?.project;
+    if (!project || typeof project.id !== 'string') return null;
+    setProjectCatalog(catalog => ({
+      ...catalog,
+      projects: catalog.projects.some(item => item.id === project.id)
+        ? catalog.projects.map(item => item.id === project.id ? project : item)
+        : [...catalog.projects, project],
+    }));
+    return project;
+  }, []);
+
+  const reorderProjects = useCallback(async (folderId: string | null, projectIds: string[]) => {
+    const res = await hanaFetch('/api/session-projects/projects/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderId, projectIds }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (data?.catalog) {
+      setProjectCatalog(normalizeProjectCatalog({ catalog: data.catalog }));
+    }
+  }, []);
+
+  const createProject = useCallback(async (name: string) => {
+    const res = await hanaFetch('/api/session-projects/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, folderId: null }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (data?.project) {
+      setProjectCatalog(catalog => ({ ...catalog, projects: [...catalog.projects, data.project] }));
+    }
+  }, []);
+
+  const handleProjectNameDialogSubmit = useCallback(async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!projectNameDialog) return;
+    const name = projectNameDialog.value.trim();
+    if (!name) return;
+    if (projectNameDialog.kind === 'create-project') {
+      await createProject(name);
+    } else {
+      await patchProject(projectNameDialog.projectId, { name });
+    }
+    setProjectNameDialog(null);
+  }, [createProject, patchProject, projectNameDialog]);
+
+  const handleSessionDragStart = useCallback((event: React.DragEvent, session: Session) => {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData(SESSION_DRAG_MIME, session.path);
+    setDragState({ kind: 'session', sessionPath: session.path });
+  }, []);
+
+  const handleProjectDragStart = useCallback((event: React.DragEvent, projectId: string) => {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData(PROJECT_DRAG_MIME, projectId);
+    setDragState({ kind: 'project', projectId });
+  }, []);
+
+  const clearDragState = useCallback(() => {
+    setDragState(null);
+    setDropTargetId(null);
+  }, []);
+
+  const ensureCatalogProject = useCallback(async (project: SessionProjectGroup) => {
+    if (projectCatalog.projects.some(item => item.id === project.id)) return;
+    await patchProject(project.id, { name: project.name });
+  }, [patchProject, projectCatalog.projects]);
+
+  const handleDropOnProject = useCallback(async (event: React.DragEvent, project: SessionProjectGroup) => {
+    event.preventDefault();
+    const sessionPath = dragSessionPath(event, dragState);
+    const projectId = dragProjectId(event, dragState);
+    clearDragState();
+    if (sessionPath) {
+      const session = sessions.find(item => item.path === sessionPath) || null;
+      const ownCwdProject = session ? autoProjectIdForCwd(session.cwd) : null;
+      const assignmentId = project.source === 'cwd' && ownCwdProject === project.id ? null : project.id;
+      await updateSessionProjectAssignment(sessionPath, assignmentId);
+      return;
+    }
+    if (projectId && projectId !== project.id) {
+      const visibleProjects = buildSessionProjectView(sessions, projectCatalog).rootProjects;
+      const draggedProject = visibleProjects.find(item => item.id === projectId) || null;
+      if (!draggedProject) return;
+      const nextProjectIds = visibleProjects
+        .map(item => item.id)
+        .filter(id => id !== projectId);
+      const insertIndex = nextProjectIds.indexOf(project.id);
+      nextProjectIds.splice(insertIndex >= 0 ? insertIndex : nextProjectIds.length, 0, projectId);
+      for (const id of nextProjectIds) {
+        const visibleProject = visibleProjects.find(item => item.id === id);
+        if (visibleProject) await ensureCatalogProject(visibleProject);
+      }
+      await reorderProjects(null, nextProjectIds);
+    }
+  }, [clearDragState, dragState, ensureCatalogProject, projectCatalog, reorderProjects, sessions, updateSessionProjectAssignment]);
+
   const activeSessionPath = pendingSessionSwitchPath || currentSessionPath;
+  const renderSessionItem = (s: Session, options: { draggable?: boolean } = {}) => (
+    <SessionItem
+      key={s.path}
+      session={s}
+      isActive={!pendingNewSession && s.path === activeSessionPath}
+      isStreaming={streamingSessions.includes(s.path)}
+      isPinned={!!s.pinnedAt}
+      agents={agents}
+      browserState={browserSessions[s.path] || null}
+      onCloseBrowser={handleCloseBrowserSession}
+      draggable={options.draggable === true}
+      onDragStart={handleSessionDragStart}
+      onDragEnd={clearDragState}
+    />
+  );
+
+  const sections = buildSessionSections(sessions, { mode: 'time' });
+  const projectView = buildSessionProjectView(sessions, projectCatalog);
   const titleResultPaths = new Set(titleResults.map(result => result.path));
   const visibleContentResults = contentResults.filter(result => !titleResultPaths.has(result.path));
   const hasSearchResults = titleResults.length > 0 || visibleContentResults.length > 0;
   const isSearching = !!searchQueryTrimmed;
   const showEmptyState = sessions.length === 0 && !isSearching;
+  const renderSortMenuButton = () => (
+    <button
+      type="button"
+      className={styles.sectionIconButton}
+      aria-label={t('sidebar.view.sort')}
+      title={t('sidebar.view.sort')}
+      onClick={(event) => setProjectMenuPosition({ x: event.clientX, y: event.clientY })}
+    >
+      <ListFilterIcon />
+    </button>
+  );
+  const handleToggleProjectCollapsed = useCallback((projectId: string) => {
+    setCollapsedProjectIds(prev => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  }, []);
+  const handleProjectNameChange = useCallback((value: string) => {
+    setProjectNameDialog(dialog => dialog ? { ...dialog, value } : dialog);
+  }, []);
+  const hasTodaySection = sections.some(section => section.kind === 'date' && section.group === 'today');
+  const timeContent = sections.map(section => {
+    const items = section.items.map(s => renderSessionItem(s));
+
+    if (section.kind === 'pinned') {
+      return (
+        <section key={section.id} className={styles.pinnedSection}>
+          <SectionTitle className={styles.pinnedSectionTitle}>
+            <span>{t(section.titleKey)}</span>
+            <PinIcon />
+          </SectionTitle>
+          {items}
+        </section>
+      );
+    }
+
+    return (
+      <Fragment key={section.id}>
+        <SectionTitle
+          actions={section.group === 'today' ? renderSortMenuButton() : null}
+        >
+          <span>{t(section.titleKey)}</span>
+        </SectionTitle>
+        {items}
+      </Fragment>
+    );
+  });
+  if (!hasTodaySection && !showEmptyState) {
+    const pinnedIndex = sections.findIndex(section => section.kind === 'pinned');
+    timeContent.splice(Math.max(0, pinnedIndex + 1), 0, (
+      <SectionTitle key="date:today-empty" actions={renderSortMenuButton()}>
+        <span>{t('time.today')}</span>
+      </SectionTitle>
+    ));
+  }
   const content = showEmptyState ? (
     <div className={styles.sessionEmpty}>{t('sidebar.empty')}</div>
   ) : isSearching ? (
@@ -234,44 +525,23 @@ function SessionListInner() {
       activeSessionPath={activeSessionPath}
       pendingNewSession={pendingNewSession}
     />
-  ) : sections.map(section => {
-    const items = section.items.map(s => (
-      <SessionItem
-        key={s.path}
-        session={s}
-        isActive={!pendingNewSession && s.path === activeSessionPath}
-        isStreaming={streamingSessions.includes(s.path)}
-        isPinned={!!s.pinnedAt}
-        agents={agents}
-        browserState={browserSessions[s.path] || null}
-        onCloseBrowser={handleCloseBrowserSession}
-      />
-    ));
-
-    if (section.kind === 'pinned') {
-      return (
-        <section key={section.id} className={styles.pinnedSection}>
-          <div className={`${styles.sessionSectionTitle} ${styles.pinnedSectionTitle}`}>
-            <span>{t(section.titleKey)}</span>
-            <svg className={styles.pinnedTitleIcon} width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 17v5" />
-              <path d="M5 17h14" />
-              <path d="M7 3h10l-2 9H9L7 3z" />
-              <path d="M9 12l-2 5h10l-2-5" />
-            </svg>
-          </div>
-          {items}
-        </section>
-      );
-    }
-
-    return (
-      <Fragment key={section.id}>
-        <div className={styles.sessionSectionTitle}>{t(section.titleKey)}</div>
-        {items}
-      </Fragment>
-    );
-  });
+  ) : viewMode === 'project' ? (
+    <ProjectSessionView
+      view={projectView}
+      renderSessionItem={(session) => renderSessionItem(session, { draggable: true })}
+      collapsedProjectIds={collapsedProjectIds}
+      dragState={dragState}
+      dropTargetId={dropTargetId}
+      setDropTargetId={setDropTargetId}
+      onToggleProject={handleToggleProjectCollapsed}
+      onProjectDragStart={handleProjectDragStart}
+      onDragEnd={clearDragState}
+      onDropProject={handleDropOnProject}
+      onOpenMenu={setProjectMenuPosition}
+      onCreateProject={() => setProjectNameDialog({ kind: 'create-project', value: '' })}
+      onOpenProjectMenu={(position, project) => setProjectActionMenu({ position, project })}
+    />
+  ) : timeContent;
 
   return (
     <>
@@ -283,7 +553,322 @@ function SessionListInner() {
       <div className={styles.sessionListScroller}>
         {content}
       </div>
+      {projectMenuPosition && (
+        <ContextMenu
+          position={projectMenuPosition}
+          onClose={() => setProjectMenuPosition(null)}
+          items={[
+            {
+              label: t('sidebar.view.time'),
+              checked: viewMode === 'time',
+              action: () => setViewMode('time'),
+            },
+            {
+              label: t('sidebar.view.project'),
+              checked: viewMode === 'project',
+              action: () => setViewMode('project'),
+            },
+          ]}
+        />
+      )}
+      {projectActionMenu && (
+        <ContextMenu
+          position={projectActionMenu.position}
+          onClose={() => setProjectActionMenu(null)}
+          items={[
+            {
+              label: t('sidebar.projects.renameProject'),
+              action: () => setProjectNameDialog({
+                kind: 'rename-project',
+                projectId: projectActionMenu.project.id,
+                value: projectActionMenu.project.name,
+              }),
+            },
+          ]}
+        />
+      )}
+      {projectNameDialog && (
+        <ProjectNameDialog
+          dialog={projectNameDialog}
+          inputRef={projectNameInputRef}
+          onChange={handleProjectNameChange}
+          onSubmit={handleProjectNameDialogSubmit}
+          onClose={() => setProjectNameDialog(null)}
+        />
+      )}
     </>
+  );
+}
+
+function SectionTitle({
+  children,
+  actions = null,
+  className = '',
+}: {
+  children: React.ReactNode;
+  actions?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`${styles.sessionSectionTitle}${className ? ` ${className}` : ''}`}>
+      <div className={styles.sessionSectionTitleMain}>{children}</div>
+      {actions && <div className={styles.sectionTitleActions}>{actions}</div>}
+    </div>
+  );
+}
+
+function ProjectNameDialog({
+  dialog,
+  inputRef,
+  onChange,
+  onSubmit,
+  onClose,
+}: {
+  dialog: NonNullable<ProjectNameDialogState>;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  onChange: (value: string) => void;
+  onSubmit: (event: React.FormEvent) => void;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const titleKey = dialog.kind === 'create-project'
+    ? 'sidebar.projects.newProject'
+    : 'sidebar.projects.renameProject';
+  const placeholderKey = 'sidebar.projects.newProjectPrompt';
+  const actionKey = dialog.kind === 'rename-project'
+    ? 'sidebar.projects.save'
+    : 'sidebar.projects.createAction';
+
+  return createPortal(
+    <div
+      className={styles.projectNameDialogBackdrop}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <form className={styles.projectNameDialog} onSubmit={onSubmit}>
+        <div className={styles.projectNameDialogTitle}>{t(titleKey)}</div>
+        <input
+          ref={inputRef}
+          className={styles.projectNameInput}
+          value={dialog.value}
+          placeholder={t(placeholderKey)}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') onClose();
+          }}
+        />
+        <div className={styles.projectNameDialogActions}>
+          <button type="button" onClick={onClose}>{t('sidebar.projects.cancel')}</button>
+          <button type="submit" disabled={!dialog.value.trim()}>{t(actionKey)}</button>
+        </div>
+      </form>
+    </div>,
+    document.body,
+  );
+}
+
+function ProjectSessionView({
+  view,
+  renderSessionItem,
+  collapsedProjectIds,
+  dragState,
+  dropTargetId,
+  setDropTargetId,
+  onToggleProject,
+  onProjectDragStart,
+  onDragEnd,
+  onDropProject,
+  onOpenMenu,
+  onCreateProject,
+  onOpenProjectMenu,
+}: {
+  view: ReturnType<typeof buildSessionProjectView>;
+  renderSessionItem: (session: Session) => React.ReactNode;
+  collapsedProjectIds: Set<string>;
+  dragState: SidebarDragState;
+  dropTargetId: string | null;
+  setDropTargetId: (id: string | null) => void;
+  onToggleProject: (projectId: string) => void;
+  onProjectDragStart: (event: React.DragEvent, projectId: string) => void;
+  onDragEnd: () => void;
+  onDropProject: (event: React.DragEvent, project: SessionProjectGroup) => void;
+  onOpenMenu: (position: { x: number; y: number }) => void;
+  onCreateProject: () => void;
+  onOpenProjectMenu: (position: { x: number; y: number }, project: SessionProjectGroup) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <>
+      <section className={styles.pinnedSection}>
+        <SectionTitle className={styles.pinnedSectionTitle}>
+          <span>{t('sidebar.pinned')}</span>
+          <PinIcon />
+        </SectionTitle>
+        {view.pinned.map(session => renderSessionItem(session))}
+      </section>
+      <SectionTitle
+        actions={(
+          <>
+            <button
+              type="button"
+              className={styles.sectionIconButton}
+              aria-label={t('sidebar.projects.create')}
+              title={t('sidebar.projects.create')}
+              onClick={onCreateProject}
+            >
+              <ProjectPlusIcon />
+            </button>
+            <button
+              type="button"
+              className={styles.sectionIconButton}
+              aria-label={t('sidebar.view.sort')}
+              title={t('sidebar.view.sort')}
+              onClick={(event) => onOpenMenu({ x: event.clientX, y: event.clientY })}
+            >
+              <ListFilterIcon />
+            </button>
+          </>
+        )}
+      >
+        <span>{t('sidebar.projects.title')}</span>
+      </SectionTitle>
+      <div
+        className={`${styles.projectRootDrop}${dropTargetId === 'root' ? ` ${styles.dropTarget}` : ''}`}
+        onDragOver={(event) => {
+          if (dragState?.kind !== 'project') return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'move';
+          setDropTargetId('root');
+        }}
+        onDragLeave={() => setDropTargetId(null)}
+      >
+        {view.rootProjects.map(project => (
+          <ProjectBlock
+            key={project.id}
+            project={project}
+            expanded={!collapsedProjectIds.has(project.id)}
+            onToggle={() => onToggleProject(project.id)}
+            renderSessionItem={renderSessionItem}
+            dropTargetId={dropTargetId}
+            setDropTargetId={setDropTargetId}
+            onProjectDragStart={onProjectDragStart}
+            onDragEnd={onDragEnd}
+            onDropProject={onDropProject}
+            onOpenProjectMenu={onOpenProjectMenu}
+          />
+        ))}
+      </div>
+      {view.rootProjects.length === 0 && (
+        <div className={styles.sessionEmpty}>{t('sidebar.projects.empty')}</div>
+      )}
+    </>
+  );
+}
+
+function ProjectBlock({
+  project,
+  expanded,
+  onToggle,
+  renderSessionItem,
+  dropTargetId,
+  setDropTargetId,
+  onProjectDragStart,
+  onDragEnd,
+  onDropProject,
+  onOpenProjectMenu,
+}: {
+  project: SessionProjectGroup;
+  expanded: boolean;
+  onToggle: () => void;
+  renderSessionItem: (session: Session) => React.ReactNode;
+  dropTargetId: string | null;
+  setDropTargetId: (id: string | null) => void;
+  onProjectDragStart: (event: React.DragEvent, projectId: string) => void;
+  onDragEnd: () => void;
+  onDropProject: (event: React.DragEvent, project: SessionProjectGroup) => void;
+  onOpenProjectMenu: (position: { x: number; y: number }, project: SessionProjectGroup) => void;
+}) {
+  const visibleItems = expanded ? project.items : [];
+  const lastDragEndAtRef = useRef(0);
+  return (
+    <div className={styles.projectBlock}>
+      <div
+        className={`${styles.projectRow}${dropTargetId === project.id ? ` ${styles.dropTarget}` : ''}`}
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        draggable
+        onClick={() => {
+          if (Date.now() - lastDragEndAtRef.current < 250) return;
+          onToggle();
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          onToggle();
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onOpenProjectMenu({ x: event.clientX, y: event.clientY }, project);
+        }}
+        onDragStart={(event) => onProjectDragStart(event, project.id)}
+        onDragEnd={() => {
+          lastDragEndAtRef.current = Date.now();
+          onDragEnd();
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'move';
+          setDropTargetId(project.id);
+        }}
+        onDragLeave={() => setDropTargetId(null)}
+        onDrop={(event) => onDropProject(event, project)}
+      >
+        <FolderIcon />
+        <span className={styles.projectName}>{project.name}</span>
+      </div>
+      <div className={styles.projectSessionList}>
+        {visibleItems.map(session => renderSessionItem(session))}
+      </div>
+    </div>
+  );
+}
+
+function FolderIcon() {
+  return (
+    <svg className={styles.projectIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 7.5a2 2 0 0 1 2-2h4.2l2 2H19a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </svg>
+  );
+}
+
+function ListFilterIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 7h16" />
+      <path d="M7 12h10" />
+      <path d="M10 17h4" />
+    </svg>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg className={styles.pinnedTitleIcon} width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 5v14" />
+      <path d="M8 9h8" />
+    </svg>
+  );
+}
+
+function ProjectPlusIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="4.8" y="4.8" width="14.4" height="14.4" rx="4.2" />
+      <path d="M8.8 12h6.4" />
+      <path d="M12 8.8v6.4" />
+    </svg>
   );
 }
 
@@ -458,7 +1043,7 @@ const SessionSearchItem = memo(function SessionSearchItem({
 
 // ── Session Item ──
 
-const SessionItem = memo(function SessionItem({ session: s, isActive, isStreaming, isPinned, agents, browserState, onCloseBrowser }: {
+const SessionItem = memo(function SessionItem({ session: s, isActive, isStreaming, isPinned, agents, browserState, onCloseBrowser, draggable = false, onDragStart, onDragEnd }: {
   session: Session;
   isActive: boolean;
   isStreaming: boolean;
@@ -466,6 +1051,9 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
   agents: Agent[];
   browserState: BrowserSessionState | null;
   onCloseBrowser: (sessionPath: string) => void;
+  draggable?: boolean;
+  onDragStart?: (event: React.DragEvent, session: Session) => void;
+  onDragEnd?: () => void;
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(false);
@@ -564,8 +1152,11 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
       <button
         className={`${styles.sessionItem}${isActive ? ` ${styles.sessionItemActive}` : ''}`}
         data-session-path={s.path}
+        draggable={draggable && !editing}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        onDragStart={draggable ? (event) => onDragStart?.(event, s) : undefined}
+        onDragEnd={draggable ? onDragEnd : undefined}
       >
         <div className={styles.sessionItemHeader}>
           {s.agentId && (

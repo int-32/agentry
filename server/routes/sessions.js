@@ -399,6 +399,7 @@ export function createSessionsRoute(engine, hub = null) {
           cwd: s.cwd || null,
           agentId: s.agentId || null,
           agentName: s.agentName || null,
+          projectId: s.projectId || null,
           modelId: s.modelId || null,
           modelProvider: s.modelProvider || null,
           permissionMode: typeof engine.getSessionPermissionMode === "function"
@@ -458,6 +459,7 @@ export function createSessionsRoute(engine, hub = null) {
         cwd: s.cwd || null,
         agentId: s.agentId || null,
         agentName: s.agentName || null,
+        projectId: s.projectId || null,
         modelId: s.modelId || null,
         modelProvider: s.modelProvider || null,
         pinnedAt: s.pinnedAt || null,

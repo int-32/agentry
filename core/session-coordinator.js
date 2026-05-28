@@ -2070,6 +2070,9 @@ export class SessionCoordinator {
           const sessKey = path.basename(s.path);
           const metaEntry = meta[sessKey];
           s.pinnedAt = typeof metaEntry?.pinnedAt === "string" ? metaEntry.pinnedAt : null;
+          s.projectId = typeof metaEntry?.projectId === "string" && metaEntry.projectId.trim()
+            ? metaEntry.projectId.trim()
+            : null;
           // 读取新格式 model:{id,provider}；老格式（只有 modelId）视为无 provider，
           // 调用方必须接受 modelProvider 可能为 null。
           if (metaEntry?.model && typeof metaEntry.model === "object") {
@@ -2114,6 +2117,7 @@ export class SessionCoordinator {
         modelId: entry.modelId || null,
         modelProvider: entry.modelProvider || null,
         pinnedAt: null,
+        projectId: null,
       });
       projectedPaths.add(sessionPath);
     }

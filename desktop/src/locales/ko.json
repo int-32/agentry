@@ -89,7 +89,27 @@
     "searchingTitles": "제목 검색 중…",
     "searchingContent": "본문 검색 중…",
     "searchNoResults": "일치하는 채팅이 없습니다",
-    "searchFailed": "검색 실패"
+    "searchFailed": "검색 실패",
+    "view": {
+      "time": "시간순 정렬",
+      "project": "프로젝트순 정렬",
+      "sort": "정렬 방식"
+    },
+    "projects": {
+      "title": "프로젝트",
+      "more": "프로젝트 보기",
+      "create": "새 프로젝트",
+      "newProject": "새 프로젝트",
+      "newFolder": "새 폴더",
+      "renameProject": "프로젝트 이름 바꾸기",
+      "newProjectPrompt": "프로젝트 이름",
+      "newFolderPrompt": "폴더 이름",
+      "createAction": "만들기",
+      "save": "저장",
+      "cancel": "취소",
+      "showMore": "더 보기",
+      "empty": "아직 프로젝트가 없습니다"
+    }
   },
   "titlebar": {
     "currentChatTitle": "현재 대화 제목"

@@ -89,7 +89,27 @@
     "searchingTitles": "タイトルを検索中…",
     "searchingContent": "本文を検索中…",
     "searchNoResults": "一致するチャットがありません",
-    "searchFailed": "検索に失敗しました"
+    "searchFailed": "検索に失敗しました",
+    "view": {
+      "time": "時間順",
+      "project": "プロジェクト順",
+      "sort": "並び替え"
+    },
+    "projects": {
+      "title": "プロジェクト",
+      "more": "プロジェクト表示",
+      "create": "新規プロジェクト",
+      "newProject": "新規プロジェクト",
+      "newFolder": "新規フォルダ",
+      "renameProject": "プロジェクト名を変更",
+      "newProjectPrompt": "プロジェクト名",
+      "newFolderPrompt": "フォルダ名",
+      "createAction": "作成",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "showMore": "さらに表示",
+      "empty": "プロジェクトはまだありません"
+    }
   },
   "titlebar": {
     "currentChatTitle": "現在のチャットタイトル"

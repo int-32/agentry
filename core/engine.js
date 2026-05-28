@@ -91,6 +91,7 @@ function resolveChannelsEnabledForToolAvailability(engine) {
 
 import { PreferencesManager } from "./preferences-manager.js";
 import { ModelManager } from "./model-manager.js";
+import { SessionProjectCatalogStore } from "./session-project-catalog-store.js";
 import { SkillManager } from "./skill-manager.js";
 import { BridgeSessionManager } from "./bridge-session-manager.js";
 import { createSlashSystem } from "./slash-commands/index.js";
@@ -138,6 +139,7 @@ import {
   translateSkillNamesWithCache,
 } from "../lib/skills/skill-name-translation-cache.js";
 import { createUsageLedger } from "../lib/llm/usage-ledger.js";
+import { normalizeSessionProjectId } from "../shared/session-projects.js";
 
 const moduleLog = createModuleLogger("engine");
 const toolAvailabilityLog = createModuleLogger("tool-availability");
@@ -179,6 +181,7 @@ export class HanaEngine {
     // ── Core managers ──
     this._prefs = new PreferencesManager({ userDir: this.userDir, agentsDir: this.agentsDir });
     this._models = new ModelManager({ hanakoHome });
+    this._sessionProjects = new SessionProjectCatalogStore({ userDir: this.userDir });
 
     // 确定启动时焦点 agent
     const startId = agentId || this._prefs.getPrimaryAgent() || this._prefs.findFirstAgent();
@@ -611,6 +614,24 @@ export class HanaEngine {
   isSessionSwitching(p) { return this._sessionCoord.isSessionSwitching(p); }
   async abortSessionByPath(p) { return this._sessionCoord.abortSessionByPath(p); }
   async listSessions() { return this._sessionCoord.listSessions(); }
+  getSessionProjectCatalog() { return this._sessionProjects.getCatalog(); }
+  createSessionProject(input) { return this._sessionProjects.createProject(input); }
+  updateSessionProject(id, patch) { return this._sessionProjects.updateProject(id, patch); }
+  reorderSessionProjects(input) { return this._sessionProjects.reorderProjects(input); }
+  async setSessionProjectAssignment({ sessionPath, projectId }) {
+    if (!sessionPath || typeof sessionPath !== "string") throw new Error("sessionPath is required");
+    const normalizedProjectId = normalizeSessionProjectId(projectId);
+    const catalog = this._sessionProjects.getCatalog();
+    if (
+      normalizedProjectId
+      && !normalizedProjectId.startsWith("cwd:")
+      && !catalog.projects.some(project => project.id === normalizedProjectId)
+    ) {
+      throw new Error("project not found");
+    }
+    await this._sessionCoord.writeSessionMeta(sessionPath, { projectId: normalizedProjectId });
+    return { sessionPath, projectId: normalizedProjectId };
+  }
   async listArchivedSessions() { return this._sessionCoord.listArchivedSessions(); }
   async saveSessionTitle(p, t) { return this._sessionCoord.saveSessionTitle(p, t); }
   async clearSessionTitle(p) { return this._sessionCoord.clearSessionTitle(p); }

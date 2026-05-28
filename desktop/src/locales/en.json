@@ -89,7 +89,27 @@
     "searchingTitles": "Searching titles…",
     "searchingContent": "Searching content…",
     "searchNoResults": "No matching chats",
-    "searchFailed": "Search failed"
+    "searchFailed": "Search failed",
+    "view": {
+      "time": "Sort by time",
+      "project": "Sort by project",
+      "sort": "Sort view"
+    },
+    "projects": {
+      "title": "Projects",
+      "more": "Project view",
+      "create": "New project",
+      "newProject": "New project",
+      "newFolder": "New folder",
+      "renameProject": "Rename project",
+      "newProjectPrompt": "Project name",
+      "newFolderPrompt": "Folder name",
+      "createAction": "Create",
+      "save": "Save",
+      "cancel": "Cancel",
+      "showMore": "Show more",
+      "empty": "No projects yet"
+    }
   },
   "titlebar": {
     "currentChatTitle": "Current chat title"

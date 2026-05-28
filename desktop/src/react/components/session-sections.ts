@@ -1,7 +1,37 @@
 import type { Session } from '../types';
+import {
+  autoProjectIdForCwd as makeAutoProjectIdForCwd,
+  autoProjectNameForCwd,
+  isAutoProjectId,
+} from '../../../../shared/session-projects.js';
 
-export type SessionViewMode = 'time';
+export type SessionViewMode = 'time' | 'project';
 export type DateGroup = 'today' | 'thisWeek' | 'earlier';
+
+export interface SessionProject {
+  id: string;
+  name: string;
+  folderId: string | null;
+  order: number;
+}
+
+export interface SessionProjectCatalog {
+  projects: SessionProject[];
+}
+
+export interface SessionProjectGroup {
+  id: string;
+  name: string;
+  folderId: string | null;
+  order: number;
+  source: 'catalog' | 'cwd';
+  items: Session[];
+}
+
+export interface SessionProjectView {
+  pinned: Session[];
+  rootProjects: SessionProjectGroup[];
+}
 
 export type SessionSection =
   | {
@@ -19,7 +49,7 @@ export type SessionSection =
     };
 
 interface BuildSessionSectionsOptions {
-  mode?: SessionViewMode;
+  mode?: 'time';
   now?: Date;
 }
 
@@ -59,16 +89,14 @@ function compareByPath(a: Session, b: Session): number {
   return String(a.path || '').localeCompare(String(b.path || ''));
 }
 
+export function autoProjectIdForCwd(cwd: string | null | undefined): string {
+  return makeAutoProjectIdForCwd(cwd);
+}
+
 export function buildSessionSections(
   sessions: Session[],
   options: BuildSessionSectionsOptions = {},
 ): SessionSection[] {
-  const mode = options.mode ?? 'time';
-  if (mode !== 'time') {
-    const exhaustive: never = mode;
-    throw new Error(`Unsupported session view mode: ${exhaustive}`);
-  }
-
   const pinned = sessions
     .filter(isPinnedSession)
     .sort((a, b) => pinnedTime(b) - pinnedTime(a) || compareByPath(a, b));
@@ -110,4 +138,92 @@ export function buildSessionSections(
   }
 
   return sections;
+}
+
+export function buildSessionProjectView(
+  sessions: Session[],
+  catalog: SessionProjectCatalog = { projects: [] },
+): SessionProjectView {
+  const pinned = sessions
+    .filter(isPinnedSession)
+    .sort((a, b) => pinnedTime(b) - pinnedTime(a) || compareByPath(a, b));
+  const regular = sessions.filter(session => !isPinnedSession(session));
+
+  const catalogProjects = normalizeCatalogProjects(catalog.projects);
+  const projectById = new Map<string, SessionProjectGroup>();
+
+  for (const project of catalogProjects) {
+    projectById.set(project.id, {
+      id: project.id,
+      name: project.name,
+      folderId: null,
+      order: project.order,
+      source: 'catalog',
+      items: [],
+    });
+  }
+
+  for (const session of regular) {
+    const explicitProjectId = typeof session.projectId === 'string' ? session.projectId.trim() : '';
+    const targetId = explicitProjectId && (projectById.has(explicitProjectId) || isAutoProjectId(explicitProjectId))
+      ? explicitProjectId
+      : autoProjectIdForCwd(session.cwd);
+    const project = ensureProjectGroup(projectById, targetId, session);
+    project.items.push(session);
+  }
+
+  for (const project of projectById.values()) {
+    project.items.sort((a, b) => modifiedTime(b) - modifiedTime(a) || compareByPath(a, b));
+  }
+
+  const rootProjects = Array.from(projectById.values())
+    .sort(compareProjectGroups);
+
+  return { pinned, rootProjects };
+}
+
+function ensureProjectGroup(
+  projectById: Map<string, SessionProjectGroup>,
+  projectId: string,
+  session: Session,
+): SessionProjectGroup {
+  const existing = projectById.get(projectId);
+  if (existing) return existing;
+  const project: SessionProjectGroup = {
+    id: projectId,
+    name: autoProjectNameForCwd(session.cwd, '未指定项目'),
+    folderId: null,
+    order: Number.MAX_SAFE_INTEGER,
+    source: 'cwd',
+    items: [],
+  };
+  projectById.set(projectId, project);
+  return project;
+}
+
+function normalizeCatalogProjects(
+  projects: SessionProject[] | undefined,
+): SessionProject[] {
+  if (!Array.isArray(projects)) return [];
+  return projects
+    .filter(project => !!project && typeof project.id === 'string' && typeof project.name === 'string')
+    .map((project, index) => ({
+      id: project.id,
+      name: project.name,
+      folderId: null,
+      order: Number.isFinite(project.order) ? project.order : index,
+    }));
+}
+
+function compareProjectGroups(a: SessionProjectGroup, b: SessionProjectGroup): number {
+  if (a.source !== b.source) return a.source === 'catalog' ? -1 : 1;
+  const latestDelta = latestModifiedTime(b) - latestModifiedTime(a);
+  return a.order - b.order
+    || (a.source === 'cwd' ? latestDelta : 0)
+    || a.name.localeCompare(b.name)
+    || a.id.localeCompare(b.id);
+}
+
+function latestModifiedTime(project: SessionProjectGroup): number {
+  return project.items.reduce((latest, session) => Math.max(latest, modifiedTime(session)), 0);
 }

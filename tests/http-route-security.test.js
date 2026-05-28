@@ -101,6 +101,10 @@ describe("HTTP route security policy", () => {
       .toMatchObject({ allowed: true });
     expect(authorizeHttpRoute({ method: "GET", path: "/api/sessions", principal }))
       .toMatchObject({ allowed: true });
+    expect(authorizeHttpRoute({ method: "GET", path: "/api/session-projects", principal }))
+      .toMatchObject({ allowed: true });
+    expect(authorizeHttpRoute({ method: "POST", path: "/api/session-projects/session-assignment", principal }))
+      .toMatchObject({ allowed: true });
     expect(authorizeHttpRoute({ method: "GET", path: "/api/resources/res_1", principal }))
       .toMatchObject({ allowed: true });
     expect(authorizeHttpRoute({ method: "HEAD", path: "/api/resources/res_1/content", principal }))
