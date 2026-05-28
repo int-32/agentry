@@ -151,6 +151,7 @@ function sourceLabel(task: TaskLedgerTask): string {
   const type = task.source?.type || 'manual';
   switch (type) {
     case 'manual': return '本地';
+    case 'channel': return '频道';
     case 'subagent': return 'Subagent';
     case 'plugin': return 'Plugin';
     case 'cron': return 'Cron';
@@ -369,6 +370,12 @@ function agentDisplayName(agents: Agent[], agentId?: string | null): string {
   return agent?.name || agentId;
 }
 
+function channelDisplayName(channels: Array<{ id: string; name?: string }>, channelId?: string | null): string {
+  if (!channelId) return '未绑定';
+  const channel = channels.find(item => item.id === channelId);
+  return channel?.name || channelId;
+}
+
 function boardAgentSummary(board: TaskBoard, agents: Agent[]) {
   const coordinatorId = board.coordinatorAgentId || agents[0]?.id || null;
   const childIds = board.selectedAgentIds.filter(id => id && id !== coordinatorId);
@@ -538,12 +545,16 @@ function TaskCard({ task, latestRun, selected, onOpen, onDragEnd }: {
 
 function BoardAgentSettings({ board, agents }: { board: TaskBoard; agents: Agent[] }) {
   const updateTaskBoard = useStore(s => s.updateTaskBoard);
+  const storeChannels = useStore(s => s.channels);
+  const channels = useMemo(() => storeChannels.filter(channel => !channel.isDM), [storeChannels]);
   const knownIds = new Set(agents.map(agent => agent.id));
   const coordinatorId = board.coordinatorAgentId && knownIds.has(board.coordinatorAgentId)
     ? board.coordinatorAgentId
     : agents[0]?.id || null;
   const selectedIds = board.selectedAgentIds.filter(id => knownIds.has(id));
   const effectiveSelectedIds = coordinatorId && !selectedIds.includes(coordinatorId) ? [coordinatorId, ...selectedIds] : selectedIds;
+  const effectiveSelectedKey = effectiveSelectedIds.join('|');
+  const [bindingError, setBindingError] = useState('');
 
   useEffect(() => {
     if (!coordinatorId) return;
@@ -551,6 +562,36 @@ function BoardAgentSettings({ board, agents }: { board: TaskBoard; agents: Agent
       updateTaskBoard(board.id, { coordinatorAgentId: coordinatorId, selectedAgentIds: effectiveSelectedIds });
     }
   }, [board.coordinatorAgentId, board.id, board.selectedAgentIds.length, coordinatorId, effectiveSelectedIds, updateTaskBoard]);
+
+  useEffect(() => {
+    if (!board.channelId || !coordinatorId) return;
+    let cancelled = false;
+    hanaFetch(`/api/channels/${encodeURIComponent(board.channelId)}/task-board`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        boardId: board.id,
+        boardTitle: board.title,
+        coordinatorAgentId: coordinatorId,
+        selectedAgentIds: effectiveSelectedIds,
+      }),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+        if (cancelled) return;
+        setBindingError('');
+        useStore.setState((state) => ({
+          channels: state.channels.map(channel => (
+            channel.id === board.channelId ? { ...channel, taskBoard: data.taskBoard || null } : channel
+          )),
+        }));
+      })
+      .catch((err) => {
+        if (!cancelled) setBindingError(err instanceof Error ? err.message : String(err));
+      });
+    return () => { cancelled = true; };
+  }, [board.channelId, board.id, board.title, coordinatorId, effectiveSelectedKey]);
 
   const chooseCoordinator = (agentId: string) => {
     const next = effectiveSelectedIds.includes(agentId) ? effectiveSelectedIds : [agentId, ...effectiveSelectedIds];
@@ -563,6 +604,30 @@ function BoardAgentSettings({ board, agents }: { board: TaskBoard; agents: Agent
       ? effectiveSelectedIds.filter(id => id !== agentId)
       : [...effectiveSelectedIds, agentId];
     updateTaskBoard(board.id, { selectedAgentIds: next });
+  };
+
+  const chooseChannel = async (channelId: string) => {
+    const previousChannelId = board.channelId || '';
+    updateTaskBoard(board.id, { channelId: channelId || null });
+    setBindingError('');
+    if (previousChannelId && previousChannelId !== channelId) {
+      try {
+        const res = await hanaFetch(`/api/channels/${encodeURIComponent(previousChannelId)}/task-board`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+        useStore.setState((state) => ({
+          channels: state.channels.map(channel => (
+            channel.id === previousChannelId ? { ...channel, taskBoard: null } : channel
+          )),
+        }));
+      } catch (err) {
+        setBindingError(err instanceof Error ? err.message : String(err));
+      }
+    }
   };
 
   return (
@@ -579,6 +644,17 @@ function BoardAgentSettings({ board, agents }: { board: TaskBoard; agents: Agent
           {agents.map(agent => <option key={agent.id} value={agent.id}>{agent.name || agent.id}</option>)}
         </select>
       </label>
+      <label className={styles.coordinatorSelect}>
+        <span>绑定频道</span>
+        <select value={board.channelId || ''} onChange={event => chooseChannel(event.target.value)}>
+          <option value="">不绑定频道</option>
+          {channels.map(channel => <option key={channel.id} value={channel.id}>{channel.name || channel.id}</option>)}
+        </select>
+      </label>
+      <div className={styles.sectionHint}>
+        频道任务会进入这个看板；write 模式下绑定频道会默认启动主 agent。当前：{channelDisplayName(channels, board.channelId)}
+      </div>
+      {bindingError && <div className={styles.creatorError}>频道绑定失败：{bindingError}</div>}
       <div className={styles.agentPicker}>
         {agents.map(agent => {
           const selected = effectiveSelectedIds.includes(agent.id);
@@ -1096,7 +1172,10 @@ function LocalTaskBoard({ board, tasks, agents, onCreateTask }: {
 }) {
   const applyTaskLedgerUpdate = useStore(s => s.applyTaskLedgerUpdate);
   const applyTaskGraphUpdate = useStore(s => s.applyTaskGraphUpdate);
+  const storeChannels = useStore(s => s.channels);
+  const channels = useMemo(() => storeChannels.filter(channel => !channel.isDM), [storeChannels]);
   const agentSummary = useMemo(() => boardAgentSummary(board, agents), [board, agents]);
+  const channelName = channelDisplayName(channels, board.channelId);
   const visibleTasks = tasks.filter(task => task.status !== 'archived' && task.status !== 'cancelled');
   const columns = KANBAN_COLUMNS.map(column => ({ ...column, tasks: visibleTasks.filter(task => taskMatchesColumn(task, column.id)) }));
   const activeTaskId = useStore(s => s.activeTaskLedgerId);
@@ -1200,7 +1279,7 @@ function LocalTaskBoard({ board, tasks, agents, onCreateTask }: {
         <div className={styles.headerText}>
           <div className={styles.eyebrow}>Project Kanban</div>
           <div className={styles.mainTitle}>{board.title}</div>
-          <div className={styles.goal}>本地项目看板 · 主代理：{agentSummary.coordinatorName} · 子代理：{agentSummary.childText}</div>
+          <div className={styles.goal}>本地项目看板 · 频道：{channelName} · 主代理：{agentSummary.coordinatorName} · 子代理：{agentSummary.childText}</div>
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.secondaryAction} onClick={() => setDrawer('agents')}>项目 Agent</button>
@@ -1280,14 +1359,17 @@ function LocalTaskBoard({ board, tasks, agents, onCreateTask }: {
 
 function EmptyProjectBoard({ board, agents }: { board: TaskBoard; agents: Agent[] }) {
   const setTaskCreatorOpen = useStore(s => s.setTaskCreatorOpen);
+  const storeChannels = useStore(s => s.channels);
+  const channels = useMemo(() => storeChannels.filter(channel => !channel.isDM), [storeChannels]);
   const agentSummary = useMemo(() => boardAgentSummary(board, agents), [board, agents]);
+  const channelName = channelDisplayName(channels, board.channelId);
   return (
     <>
       <header className={styles.header}>
         <div className={styles.headerText}>
           <div className={styles.eyebrow}>Project Kanban</div>
           <div className={styles.mainTitle}>{board.title}</div>
-          <div className={styles.goal}>空项目看板 · 主代理：{agentSummary.coordinatorName} · 子代理：{agentSummary.childText}</div>
+          <div className={styles.goal}>空项目看板 · 频道：{channelName} · 主代理：{agentSummary.coordinatorName} · 子代理：{agentSummary.childText}</div>
         </div>
         <button type="button" className={styles.primaryAction} onClick={() => setTaskCreatorOpen(true)}>新建任务</button>
       </header>
@@ -1310,6 +1392,8 @@ export function TaskSidebar() {
   const setActiveTaskBoardId = useStore(s => s.setActiveTaskBoardId);
   const setTaskBoardCreatorOpen = useStore(s => s.setTaskBoardCreatorOpen);
   const tasksById = useStore(s => s.taskLedgerTasksById);
+  const storeChannels = useStore(s => s.channels);
+  const channels = useMemo(() => storeChannels.filter(channel => !channel.isDM), [storeChannels]);
   const currentAgentId = useStore(s => s.currentAgentId);
   const agentName = useStore(s => s.agentName);
   const storeAgents = useStore(s => s.agents);
@@ -1339,7 +1423,7 @@ export function TaskSidebar() {
           return (
             <button key={board.id} className={`${styles.sidebarRunItem} ${board.id === activeBoardId ? styles.sidebarRunItemActive : ''}`} onClick={() => setActiveTaskBoardId(board.id)}>
               <span className={styles.sidebarRunTitle}>{board.title}</span>
-              <span className={styles.sidebarRunMeta}><span>{count} 任务</span><span>{agentSummary.coordinatorName}</span></span>
+              <span className={styles.sidebarRunMeta}><span>{count} 任务</span><span>{channelDisplayName(channels, board.channelId)}</span><span>{agentSummary.coordinatorName}</span></span>
             </button>
           );
         })}

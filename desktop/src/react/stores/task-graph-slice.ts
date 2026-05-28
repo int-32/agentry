@@ -92,6 +92,7 @@ export interface TaskBoard {
   title: string;
   coordinatorAgentId?: string | null;
   selectedAgentIds: string[];
+  channelId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

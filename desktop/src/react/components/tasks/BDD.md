@@ -6,7 +6,7 @@ Local TDD: `./TDD.md`
 
 ## Local Scope
 
-`desktop/src/react/components/tasks/` owns observable board-tab behavior: task cards, columns, detail editing, project board switching, and board agent controls. Server persistence, Task Ledger data shape, and graph scheduling are validated by the shared task orchestration specs.
+`desktop/src/react/components/tasks/` owns observable board-tab behavior: task cards, columns, detail editing, project board switching, board agent controls, and board-to-channel binding controls. Server persistence, Task Ledger data shape, and graph scheduling are validated by the shared task orchestration specs.
 
 ## Scenarios
 
@@ -48,8 +48,15 @@ Feature: Desktop task board UI
     Then the task contains a task_board context reference
     And the task assignee defaults to the board coordinator agent
     And the title area displays the coordinator and collaborator agent names
+
+  Scenario: Users bind a project board to a channel [AG-BDD-TASK-016]
+    Given the user opens a project board
+    When they select a channel in the project Agent panel
+    Then the board stores the channel id locally
+    And the channel task-board binding is persisted through the channel route
+    And the board header and sidebar show the bound channel
 ```
 
 ## Maintenance Note
 
-Update `EARS.md`, this file, `TDD.md`, and the full feature spec when changing board routes, board sidebar structure, manual task UI, Kanban status movement, or board agent selection.
+Update `EARS.md`, this file, `TDD.md`, and the full feature spec when changing board routes, board sidebar structure, manual task UI, Kanban status movement, board agent selection, or board-channel binding.

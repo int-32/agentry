@@ -1,11 +1,11 @@
 # 任务编排图
 
 Status: draft
-Last updated: 2026-05-22
+Last updated: 2026-05-28
 
 ## Scope
 
-本规格覆盖用户或 Agent 把一个目标拆成任务图、按依赖调度节点、跟踪节点状态、取消运行和在前端展示进度。第一阶段任务图运行会同步到轻量 Task Ledger，用于把执行图挂到可持久追踪的 Task 记录下；第二阶段 subagent 与 TaskRegistry 插件任务也会镜像到同一账本；第三阶段 cron job 会作为 recurring task source 进入账本；桌面顶部入口与路由键命名为「看板」/ `boards`，本地项目看板可以创建 manual task、选择主 agent 与协作 agent，并在创建看板任务时自动启动主 agent 执行。它不覆盖长期计划系统或频道消息本身。
+本规格覆盖用户或 Agent 把一个目标拆成任务图、按依赖调度节点、跟踪节点状态、取消运行和在前端展示进度。第一阶段任务图运行会同步到轻量 Task Ledger，用于把执行图挂到可持久追踪的 Task 记录下；第二阶段 subagent 与 TaskRegistry 插件任务也会镜像到同一账本；第三阶段 cron job 会作为 recurring task source 进入账本；桌面顶部入口与路由键命名为「看板」/ `boards`，本地项目看板可以创建 manual task、选择主 agent 与协作 agent，并在创建看板任务时自动启动主 agent 执行。频道沟通中形成的后续工作也必须通过频道任务工具保存进 Task Ledger，并优先使用频道绑定看板的主 agent/协作 agent 作为执行域，而不是只保存在聊天文本或 session todo。它不覆盖长期计划系统或频道消息存储本身。
 
 ## Code Map
 
@@ -19,7 +19,7 @@ Last updated: 2026-05-22
 | Local board UI TDD | `desktop/src/react/components/tasks/TDD.md` |
 | Library | `lib/task-orchestration/task-orchestrator.js`, `lib/task-ledger.js` |
 | Background integrations | `lib/tools/subagent-tool.js`, `lib/task-registry.js`, `lib/desk/cron-store.js`, `lib/desk/cron-scheduler.js` |
-| Tools | `lib/tools/task-orchestrate-tool.js` |
+| Tools | `lib/tools/task-orchestrate-tool.js`, `lib/tools/task-create-tool.js`, `hub/channel-router.js` |
 | Server | `server/routes/tasks.js` |
 | Desktop | `desktop/src/react/components/tasks/`, `desktop/src/react/stores/task-graph-slice.ts` |
 | Tests | `tests/task-orchestrator.test.js`, `tests/task-ledger.test.js`, `tests/subagent-tool.test.js`, `tests/task-registry.test.js`, `tests/cron-store.test.js`, `tests/cron-scheduler.test.js`, `tests/tasks-route.test.js` |
@@ -34,6 +34,7 @@ Last updated: 2026-05-22
 | Edge | 节点依赖关系 |
 | Artifact | 节点执行产生的文件、摘要或其他输出 |
 | Event | Task 或 Run 的状态变化记录 |
+| Bound channel | Project board 绑定的频道，用于把频道讨论产生的任务投射回默认看板执行域 |
 
 ## EARS Requirements
 
@@ -52,6 +53,8 @@ Last updated: 2026-05-22
 | AG-EARS-TASK-011 | Ubiquitous | The local task board shall allow users to edit task details and add comments while preserving Task Ledger as the source of truth. | AG-BDD-TASK-012 | AG-TDD-TASK-011 |
 | AG-EARS-TASK-012 | Ubiquitous | The desktop board tab shall use the `boards` route key and present project boards as the left-sidebar primary object, with a compact title-row create button and no project-group creation flow. | AG-BDD-TASK-013 | AG-TDD-TASK-012 |
 | AG-EARS-TASK-013 | Ubiquitous | Each project board shall store a coordinator agent and collaborator agents, display their names in the title area, and manual tasks created inside it shall carry the board context. | AG-BDD-TASK-014 | AG-TDD-TASK-013 |
+| AG-EARS-TASK-014 | Event-driven | When a channel-scoped task tool creates a task from discussion, the Task Ledger shall persist it with `source.type = "channel"` and channel/project/board context, use the bound board coordinator as assignee when present, auto-start bound-board tasks only in channel write mode, and never auto-start in read-only channel mode. | AG-BDD-TASK-015, AG-BDD-CHANNEL-007 | AG-TDD-TASK-014 |
+| AG-EARS-TASK-015 | Event-driven | When users bind a project board to a channel, the board UI shall persist the channel task-board binding and keep the bound channel visible in board navigation/header context. | AG-BDD-TASK-016, AG-BDD-CHANNEL-008 | AG-TDD-TASK-015 |
 
 ## BDD Scenarios
 
@@ -150,6 +153,24 @@ Feature: Task orchestration graph
     Then the task contains a task_board context reference
     And the task assignee defaults to the board coordinator agent
     And the title area displays the coordinator and collaborator agent names
+
+  Scenario: Channel discussion creates a durable board task [AG-BDD-TASK-015]
+    Given a channel discussion produces a follow-up work item
+    And the channel is bound to a project board with a coordinator agent
+    When the channel task tool saves it
+    Then the Task Ledger task source is "channel"
+    And the task includes task_board and channel context references
+    And the task is visible on the bound board unless a board id is explicitly provided
+    And the task assignee defaults to the bound board coordinator
+    And write-mode channels may auto-start the bound coordinator run
+    And read-only channel mode does not start a run automatically
+
+  Scenario: Users bind a project board to a channel [AG-BDD-TASK-016]
+    Given the user opens a project board
+    When they select a channel in the project Agent panel
+    Then the board stores the channel id locally
+    And the channel task-board binding is persisted through the channel route
+    And the board header and sidebar show the bound channel
 ```
 
 ## TDD Matrix
@@ -169,12 +190,16 @@ Feature: Task orchestration graph
 | AG-TDD-TASK-011 | AG-EARS-TASK-011, AG-BDD-TASK-012 | typecheck, `tests/task-ledger.test.js` | edit task details and add comments from desktop kanban | `npm run typecheck && npm test -- tests/task-ledger.test.js` | needs-review |
 | AG-TDD-TASK-012 | AG-EARS-TASK-012, AG-BDD-TASK-013 | typecheck, manual desktop verification | desktop tab route key, tab label, sidebar board list, create-board button, removal of project-group entry | `npm run typecheck` | needs-review |
 | AG-TDD-TASK-013 | AG-EARS-TASK-013, AG-BDD-TASK-014 | typecheck, manual desktop verification | board-level agent names, selection, and task_board context reference on created manual tasks | `npm run typecheck` | needs-review |
+| AG-TDD-TASK-014 | AG-EARS-TASK-014, AG-BDD-TASK-015, AG-BDD-CHANNEL-007 | `tests/channel-router-reply-tools.test.js` | channel task tool persists Task Ledger records with channel/project context and read-only auto-start guard | `npm test -- tests/channel-router-reply-tools.test.js` | needs-review |
+| AG-TDD-TASK-015 | AG-EARS-TASK-015, AG-BDD-TASK-016, AG-BDD-CHANNEL-008 | typecheck, `tests/channels-route.test.js`, `tests/channel-router-reply-tools.test.js` | board-to-channel binding projection and channel task execution-domain defaults | `npm run typecheck && npm test -- tests/channels-route.test.js tests/channel-router-reply-tools.test.js` | needs-review |
 
 ## Manual Verification
 
 - 打开顶部「看板」tab，确认左侧栏标题为「看板」，标题行右侧显示 `+` 新建看板入口。
 - 确认左侧栏直接列出项目看板，例如「默认项目」，且不再显示「项目看板 / 新建 / N 个项目看板」介绍卡或任何「创建项目组」入口。
-- 进入默认项目看板，选择主 agent 与协作 agent，创建一条 manual task，确认任务只出现在当前项目看板中，并自动以主 agent 启动执行。
+- 进入默认项目看板，选择主 agent 与协作 agent，绑定一个频道，确认看板 header/sidebar 显示绑定频道。
+- 在绑定频道内创建 follow-up task，确认任务带 channel/project/board context，并按绑定看板的主 agent 执行域处理。
+- 进入默认项目看板，创建一条 manual task，确认任务只出现在当前项目看板中，并自动以主 agent 启动执行。
 - 通过任务编排入口创建一个包含依赖的任务图。
 - 观察节点状态从 pending 到 running/done 的变化。
 - 在运行中取消任务，确认 UI 和服务端状态都显示 aborted。
