@@ -84,3 +84,10 @@ reviews/
 
 # Codex environments
 .codex/
+
+# ═══════════════════════════════════════════
+# Agent 运行时产物（任务定义 + 巡检日志，本地累积，不入仓库）
+# ═══════════════════════════════════════════
+jian.md
+docs/jian.md
+HeartBeat/Genta/patrol-log.md
