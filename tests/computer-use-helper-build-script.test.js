@@ -1,10 +1,15 @@
+import fs from "fs";
+import os from "os";
 import path from "path";
 import { describe, expect, it } from "vitest";
 import {
   computerUseHelperOutputDir,
+  fallbackComputerUseHelperSourcePath,
+  installFallbackComputerUseHelper,
   patchCuaDriverAppStateSource,
   patchCuaDriverClickToolSource,
   resolveComputerUseHelperBuildArch,
+  swiftPmHealthErrorMessage,
   shouldBuildComputerUseHelper,
   swiftBuildScratchPath,
   swiftArchForNodeArch,
@@ -48,6 +53,40 @@ describe("Computer Use helper build script", () => {
       rootDir: "/repo",
       arch: "arm64",
     })).toBe(path.join("/repo", ".cache", "computer-use-helper", "swift-build", "mac-arm64"));
+  });
+
+  it("installs the JS/JXA fallback helper into the same macOS helper path", () => {
+    const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-helper-fallback-"));
+    try {
+      const fallbackSource = fallbackComputerUseHelperSourcePath({ rootDir });
+      fs.mkdirSync(path.dirname(fallbackSource), { recursive: true });
+      fs.writeFileSync(fallbackSource, "#!/usr/bin/env node\n");
+
+      const result = installFallbackComputerUseHelper({
+        rootDir,
+        arch: "arm64",
+        reason: "SwiftPM failed",
+      });
+
+      expect(result).toMatchObject({ fallback: true, skipped: false });
+      expect(result.target).toBe(path.join(rootDir, "dist-computer-use", "mac-arm64", "hana-computer-use-helper"));
+      expect(fs.existsSync(result.target)).toBe(true);
+      expect(fs.statSync(result.target).mode & 0o111).not.toBe(0);
+    } finally {
+      fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it("turns SwiftPM manifest linker failures into actionable helper build diagnostics", () => {
+    const message = swiftPmHealthErrorMessage({
+      stderr: "Invalid manifest\nUndefined symbols for architecture arm64:\nPackageDescription.Package.__allocating_init",
+      message: "Command failed: swift package describe",
+    });
+
+    expect(message).toContain("SwiftPM cannot compile package manifests");
+    expect(message).toContain("Xcode Command Line Tools");
+    expect(message).toContain("xcode-select --install");
+    expect(message).toContain("Original SwiftPM output");
   });
 
   it("patches Cua AppState snapshots to stay bounded and AX-safe", () => {

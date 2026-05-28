@@ -65,7 +65,11 @@ function bundledHelperCandidates({ env, hanaRoot, cwd, arch }) {
   return [...new Set(roots.filter(Boolean))].map(helperPath);
 }
 
-export function resolveCuaDriverCommand({
+function candidate(pathValue, source) {
+  return { path: pathValue, source };
+}
+
+export function resolveCuaDriverCommandDetails({
   env = process.env,
   homeDir = os.homedir(),
   existsSync = fs.existsSync,
@@ -74,18 +78,37 @@ export function resolveCuaDriverCommand({
   arch = process.arch,
 } = {}) {
   const candidates = [
-    env.HANA_COMPUTER_USE_HELPER_PATH,
-    ...bundledHelperCandidates({ env, hanaRoot, cwd, arch }),
-    env.HANA_CUA_DRIVER_PATH,
-    "~/.local/bin/cua-driver",
-    "/usr/local/bin/cua-driver",
-    "/Applications/CuaDriver.app/Contents/MacOS/cua-driver",
-  ].filter(Boolean).map((p) => expandHome(p, homeDir));
+    candidate(env.HANA_COMPUTER_USE_HELPER_PATH, "HANA_COMPUTER_USE_HELPER_PATH"),
+    ...bundledHelperCandidates({ env, hanaRoot, cwd, arch }).map((p) => candidate(p, "bundled-helper")),
+    candidate(env.HANA_CUA_DRIVER_PATH, "HANA_CUA_DRIVER_PATH"),
+    candidate("~/.local/bin/cua-driver", "user-local-cua-driver"),
+    candidate("/usr/local/bin/cua-driver", "usr-local-cua-driver"),
+    candidate("/Applications/CuaDriver.app/Contents/MacOS/cua-driver", "cua-driver-app"),
+  ].filter((item) => item.path).map((item) => ({
+    ...item,
+    path: expandHome(item.path, homeDir),
+  }));
 
   for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
+    if (existsSync(candidate.path)) {
+      return {
+        command: candidate.path,
+        found: true,
+        source: candidate.source,
+        candidates,
+      };
+    }
   }
-  return "cua-driver";
+  return {
+    command: "cua-driver",
+    found: false,
+    source: "PATH",
+    candidates,
+  };
+}
+
+export function resolveCuaDriverCommand(options = {}) {
+  return resolveCuaDriverCommandDetails(options).command;
 }
 
 function parseJsonMaybe(stdout) {
@@ -178,6 +201,119 @@ function normalizeAppsPayload(payload) {
 function normalizeWindowsPayload(payload) {
   const windows = Array.isArray(payload) ? payload : (payload?.windows || payload?.items || []);
   return normalizeWindows(windows);
+}
+
+function stableHash(value) {
+  const text = String(value || "");
+  let hash = 5381;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) + hash) ^ text.charCodeAt(index);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function normalizeBounds(bounds) {
+  if (!bounds || typeof bounds !== "object") return null;
+  const x = Number(bounds.x ?? bounds.left);
+  const y = Number(bounds.y ?? bounds.top);
+  const width = Number(bounds.width ?? bounds.w);
+  const height = Number(bounds.height ?? bounds.h);
+  if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null;
+  return { x, y, width, height };
+}
+
+function actionableRole(role) {
+  return /button|checkbox|radio|menu|row|cell|link|field|tab|slider|pop|combo|search/i.test(String(role || ""));
+}
+
+function estimateElementConfidence(element = {}) {
+  let score = 0.2;
+  if (element.enabled !== false) score += 0.1;
+  if (element.label || element.value || element.description || element.title) score += 0.25;
+  if (Array.isArray(element.actions) && element.actions.length > 0) score += 0.25;
+  if (element.bounds) score += 0.15;
+  if (actionableRole(element.role)) score += 0.05;
+  return Math.max(0.05, Math.min(0.98, Number(score.toFixed(2))));
+}
+
+function elementStableRef(element = {}) {
+  const bounds = element.bounds
+    ? `${Math.round(element.bounds.x)},${Math.round(element.bounds.y)},${Math.round(element.bounds.width)},${Math.round(element.bounds.height)}`
+    : "";
+  const signature = [
+    element.role,
+    element.label,
+    element.value,
+    Array.isArray(element.actions) ? element.actions.join(",") : "",
+    bounds,
+  ].map((part) => String(part || "").trim()).join("|");
+  return `ax:${stableHash(signature)}`;
+}
+
+function normalizeCuaElement(raw = {}, index = 0) {
+  const providerIndex = raw.providerData?.elementIndex
+    ?? raw.element_index
+    ?? raw.elementIndex
+    ?? raw.id
+    ?? index;
+  const element = {
+    elementId: String(raw.elementId ?? providerIndex),
+    role: raw.role || raw.ax_role || raw.type || "element",
+    label: raw.label || raw.name || raw.title || "",
+    value: raw.value,
+    description: raw.description,
+    title: raw.title,
+    actions: Array.isArray(raw.actions) ? raw.actions.map(String).filter(Boolean) : [],
+    bounds: normalizeBounds(raw.bounds),
+    enabled: raw.enabled !== false,
+    source: "macos:ax",
+    providerData: {
+      ...(raw.providerData && typeof raw.providerData === "object" ? raw.providerData : {}),
+      elementIndex: Number.isFinite(Number(providerIndex)) ? Number(providerIndex) : providerIndex,
+    },
+  };
+  element.confidence = estimateElementConfidence(element);
+  element.stableRef = elementStableRef(element);
+  return element;
+}
+
+function computeRecognition(elements = [], display = {}) {
+  const total = Array.isArray(elements) ? elements.length : 0;
+  const actionable = elements.filter((element) =>
+    actionableRole(element.role) || (Array.isArray(element.actions) && element.actions.length > 0)
+  ).length;
+  const labeled = elements.filter((element) =>
+    String(element.label || element.value || element.description || element.title || "").trim()
+  ).length;
+  const bounded = elements.filter((element) => element.bounds).length;
+  const confidences = elements.map((element) => Number(element.confidence || 0)).filter(Number.isFinite);
+  const averageConfidence = confidences.length
+    ? confidences.reduce((sum, value) => sum + value, 0) / confidences.length
+    : 0;
+  const coverageScore = total
+    ? Math.min(1, (
+        (actionable / total) * 0.35
+        + (labeled / total) * 0.3
+        + (bounded / total) * 0.2
+        + averageConfidence * 0.15
+      ))
+    : 0;
+  const screenshotArea = Number(display.width || 0) * Number(display.height || 0);
+  const boundedArea = elements.reduce((sum, element) => {
+    const area = Number(element.bounds?.width || 0) * Number(element.bounds?.height || 0);
+    return sum + (Number.isFinite(area) ? Math.max(0, area) : 0);
+  }, 0);
+  return {
+    primarySource: "macos:ax",
+    elementCount: total,
+    actionableCount: actionable,
+    labeledCount: labeled,
+    boundedCount: bounded,
+    averageConfidence: Number(averageConfidence.toFixed(2)),
+    coverageScore: Number(coverageScore.toFixed(2)),
+    visualFallbackRecommended: total < 3 || actionable < 2 || coverageScore < 0.45,
+    visibleAreaCoverage: screenshotArea > 0 ? Number(Math.min(1, boundedArea / screenshotArea).toFixed(2)) : null,
+  };
 }
 
 function windowArea(win) {
@@ -304,6 +440,7 @@ function parseElementsFromMarkdown(markdown) {
       actions: actionsFromMarkdownFragment(rest),
       enabled: !/\bDISABLED\b/.test(rest),
       bounds: null,
+      providerData: { elementIndex: Number(match[2]) },
     });
   }
   return elements;
@@ -359,17 +496,11 @@ function normalizeWindowState(result, lease) {
   };
   const display = normalizeScreenshotDisplay(structured);
 
-  const elements = Array.isArray(structured.elements)
-    ? structured.elements.map((el, index) => ({
-        elementId: String(el.element_index ?? el.elementId ?? el.id ?? index),
-        role: el.role || el.ax_role || el.type || "element",
-        label: el.label || el.name || el.title || "",
-        value: el.value,
-        actions: Array.isArray(el.actions) ? el.actions.map(String).filter(Boolean) : [],
-        bounds: el.bounds || null,
-        enabled: el.enabled !== false,
-      }))
-    : parseElementsFromMarkdown(structured.tree_markdown || structured.treeMarkdown || text);
+  const elements = (Array.isArray(structured.elements)
+    ? structured.elements
+    : parseElementsFromMarkdown(structured.tree_markdown || structured.treeMarkdown || text))
+    .map(normalizeCuaElement);
+  const recognition = computeRecognition(elements, display);
 
   return {
     mode: "vision-native",
@@ -379,6 +510,7 @@ function normalizeWindowState(result, lease) {
     display,
     focusedElementId: structured.focusedElementId || null,
     elements,
+    recognition,
     providerState: lease.providerState,
   };
 }
@@ -426,6 +558,8 @@ function elementIndexFromId(elementId) {
 }
 
 function requireElementIndex(action) {
+  const snapshotIndex = action?.snapshotElement?.providerData?.elementIndex;
+  if (Number.isInteger(Number(snapshotIndex))) return Number(snapshotIndex);
   if (action?.elementId) return elementIndexFromId(action.elementId);
   throw computerUseError(
     COMPUTER_USE_ERRORS.TARGET_NOT_FOUND,
@@ -476,6 +610,16 @@ function normalizeCursorStyle({ cursorStyle, cursorImagePath, cursorBloomColor }
     normalized.image_path = cursorStyle.image_path;
   }
   return normalized;
+}
+
+function binaryNotFoundDiagnostics(command) {
+  const details = resolveCuaDriverCommandDetails();
+  return {
+    command,
+    searchedPaths: details.candidates.map((item) => item.path),
+    buildCommand: "npm run build:computer-use-helper",
+    helperEnv: "HANA_COMPUTER_USE_HELPER_PATH",
+  };
 }
 
 export function createMacosCuaProvider({
@@ -658,12 +802,22 @@ export function createMacosCuaProvider({
         return { providerId, available: false, reason: "unsupported-platform", platform };
       }
       try {
-        const status = await runner.run(command, ["status", "--socket", socketPath], {
+        let status = await runner.run(command, ["status", "--socket", socketPath], {
           timeoutMs: 5000,
           env: runEnv(process.env),
         });
         if (status.exitCode !== 0) {
-          return { providerId, available: false, reason: "daemon-unavailable", stderr: status.stderr || "" };
+          if (!shouldAutoStartDaemon) {
+            return { providerId, available: false, reason: "daemon-unavailable", stderr: status.stderr || "" };
+          }
+          await ensureDaemonRunning();
+          status = await runner.run(command, ["status", "--socket", socketPath], {
+            timeoutMs: 5000,
+            env: runEnv(process.env),
+          });
+          if (status.exitCode !== 0) {
+            return { providerId, available: false, reason: "daemon-unavailable", stderr: status.stderr || "" };
+          }
         }
         let permissions = [];
         try {
@@ -674,11 +828,13 @@ export function createMacosCuaProvider({
         }
         return { providerId, available: true, command, daemon: status.stdout.trim(), permissions };
       } catch (err) {
+        const binaryMissing = err?.code === "ENOENT";
         return {
           providerId,
           available: false,
-          reason: err?.code === "ENOENT" ? "binary-not-found" : "status-failed",
+          reason: binaryMissing ? "binary-not-found" : "status-failed",
           error: err?.message || String(err),
+          ...(binaryMissing ? binaryNotFoundDiagnostics(command) : {}),
         };
       }
     },

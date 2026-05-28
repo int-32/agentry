@@ -182,6 +182,39 @@ describe("ComputerHost", () => {
     })).rejects.toMatchObject({ code: COMPUTER_USE_ERRORS.ACTION_REQUIRES_FOREGROUND });
   });
 
+  it("allows Windows foreground input only after explicit settings opt-in", async () => {
+    const provider = createMockComputerProvider({ providerId: "windows:uia" });
+    provider.capabilities.keyboardInput = "unsupported";
+    const providers = new ComputerProviderRegistry();
+    providers.register(provider);
+    const host = new ComputerHost({
+      providers,
+      defaultProviderId: "windows:uia",
+      platform: "win32",
+      getSettings: () => ({ enabled: true, allow_windows_input_injection: true }),
+    });
+
+    const status = await host.getStatus(ctx);
+    const lease = await host.createLease(ctx, { appId: "app.notes" });
+    const snapshot = await host.getAppState(ctx, lease.leaseId);
+    const result = await host.performAction(ctx, lease.leaseId, {
+      type: "press_key",
+      snapshotId: snapshot.snapshotId,
+      key: "Return",
+    });
+
+    expect(status.providers[0].capabilities).toMatchObject({
+      keyboardInput: "foreground",
+      requiresForegroundForInput: true,
+    });
+    expect(lease.allowedActions).toContain("press_key");
+    expect(result).toMatchObject({ ok: true, action: "press_key" });
+    expect(provider.actions.at(-1).action).toMatchObject({
+      type: "press_key",
+      allowForegroundInput: true,
+    });
+  });
+
   it("accepts pid-scoped keyboard capability for macOS Cua key input", async () => {
     const provider = createMockComputerProvider({ providerId: "mock" });
     provider.capabilities.keyboardInput = "pidScoped";

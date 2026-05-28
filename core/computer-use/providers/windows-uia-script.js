@@ -280,6 +280,126 @@ function Element-Center($el) {
   }
 }
 
+$script:AgentryForegroundInputReady = $false
+
+function Ensure-ForegroundInputSupport() {
+  if ($script:AgentryForegroundInputReady) { return }
+  Add-Type -AssemblyName System.Windows.Forms
+  Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class AgentryNativeInput {
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);
+  [DllImport("user32.dll")] public static extern void mouse_event(uint flags, int dx, int dy, int data, UIntPtr extraInfo);
+}
+"@
+  $script:AgentryForegroundInputReady = $true
+}
+
+function Activate-Window($window) {
+  Ensure-ForegroundInputSupport
+  $handle = [int]$window.Current.NativeWindowHandle
+  if ($handle -gt 0) {
+    [AgentryNativeInput]::SetForegroundWindow([IntPtr]$handle) | Out-Null
+    Start-Sleep -Milliseconds 80
+  }
+}
+
+function Invoke-Foreground-Click($window, $pt, $clicks) {
+  Ensure-ForegroundInputSupport
+  Activate-Window $window
+  [AgentryNativeInput]::SetCursorPos([int]$pt.x, [int]$pt.y) | Out-Null
+  Start-Sleep -Milliseconds 40
+  $count = [Math]::Max(1, [int]$clicks)
+  for ($i = 0; $i -lt $count; $i += 1) {
+    [AgentryNativeInput]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 30
+    [AgentryNativeInput]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 80
+  }
+}
+
+function Invoke-Foreground-Drag($window, $from, $to) {
+  Ensure-ForegroundInputSupport
+  Activate-Window $window
+  [AgentryNativeInput]::SetCursorPos([int]$from.x, [int]$from.y) | Out-Null
+  Start-Sleep -Milliseconds 40
+  [AgentryNativeInput]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+  Start-Sleep -Milliseconds 80
+  [AgentryNativeInput]::SetCursorPos([int]$to.x, [int]$to.y) | Out-Null
+  Start-Sleep -Milliseconds 120
+  [AgentryNativeInput]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+}
+
+function Escape-SendKeysText($text) {
+  $parts = @()
+  foreach ($char in ([string]$text).ToCharArray()) {
+    $s = [string]$char
+    if ($s -eq ([string][char]13)) { continue }
+    elseif ($s -eq ([string][char]10)) { $parts += "{ENTER}" }
+    elseif ($s -eq "+") { $parts += "{+}" }
+    elseif ($s -eq "^") { $parts += "{^}" }
+    elseif ($s -eq "%") { $parts += "{%}" }
+    elseif ($s -eq "~") { $parts += "{~}" }
+    elseif ($s -eq "(") { $parts += "{(}" }
+    elseif ($s -eq ")") { $parts += "{)}" }
+    elseif ($s -eq "[") { $parts += "{[}" }
+    elseif ($s -eq "]") { $parts += "{]}" }
+    elseif ($s -eq "{") { $parts += "{{}" }
+    elseif ($s -eq "}") { $parts += "{}}" }
+    else { $parts += $s }
+  }
+  return ($parts -join "")
+}
+
+function Normalize-KeyForSendKeys($key) {
+  $k = ([string]$key).Trim()
+  $lower = $k.ToLowerInvariant()
+  if ($lower -eq "return" -or $lower -eq "enter") { return "{ENTER}" }
+  if ($lower -eq "escape" -or $lower -eq "esc") { return "{ESC}" }
+  if ($lower -eq "tab") { return "{TAB}" }
+  if ($lower -eq "backspace") { return "{BACKSPACE}" }
+  if ($lower -eq "delete") { return "{DELETE}" }
+  if ($lower -eq "space") { return " " }
+  if ($lower -eq "up") { return "{UP}" }
+  if ($lower -eq "down") { return "{DOWN}" }
+  if ($lower -eq "left") { return "{LEFT}" }
+  if ($lower -eq "right") { return "{RIGHT}" }
+  return Escape-SendKeysText $k
+}
+
+function Invoke-Foreground-Type($window, $text, $pt = $null) {
+  Ensure-ForegroundInputSupport
+  Activate-Window $window
+  if ($null -ne $pt) {
+    Invoke-Foreground-Click $window $pt 1
+  }
+  [System.Windows.Forms.SendKeys]::SendWait((Escape-SendKeysText $text))
+}
+
+function Invoke-Foreground-Key($window, $key) {
+  Ensure-ForegroundInputSupport
+  Activate-Window $window
+  [System.Windows.Forms.SendKeys]::SendWait((Normalize-KeyForSendKeys $key))
+}
+
+function Invoke-Foreground-Scroll($window, $pt, $direction, $amount) {
+  Ensure-ForegroundInputSupport
+  Activate-Window $window
+  [AgentryNativeInput]::SetCursorPos([int]$pt.x, [int]$pt.y) | Out-Null
+  $steps = [Math]::Max(1, [Math]::Min(12, [int]$amount))
+  $flags = 0x0800
+  $delta = -120
+  if ($direction -eq "up") { $delta = 120 }
+  elseif ($direction -eq "right") { $flags = 0x01000; $delta = 120 }
+  elseif ($direction -eq "left") { $flags = 0x01000; $delta = -120 }
+  for ($i = 0; $i -lt $steps; $i += 1) {
+    [AgentryNativeInput]::mouse_event($flags, 0, 0, $delta, [UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 30
+  }
+}
+
 function Foreground-Required($message, $details) {
   return @{
     ok = $false
@@ -311,6 +431,7 @@ try {
   $inputJson = [Console]::In.ReadToEnd()
   if ([string]::IsNullOrWhiteSpace($inputJson)) { throw "Missing helper request JSON." }
   $req = $inputJson | ConvertFrom-Json
+  $allowForegroundInput = $req.allowForegroundInput -eq $true
 
   if ($req.command -eq "status") {
     Write-Result @{ ok = $true; data = @{ available = $true; permissions = @() } }
@@ -366,6 +487,11 @@ try {
     }
     if ($req.action.type -eq "click_point") {
       $pt = Window-Point $window $req.action.x $req.action.y $req.action.snapshotDisplay
+      if ($allowForegroundInput) {
+        Invoke-Foreground-Click $window $pt 1
+        Write-Result @{ ok = $true; data = @{ ok = $true; mode = "foreground-input"; action = "click_point"; point = $pt } }
+        exit 0
+      }
       Write-Result (Foreground-Required "Windows UIA is configured for background-only control; click_point would require foreground input." @{
         action = "click_point"
         x = $pt.x
@@ -375,6 +501,11 @@ try {
     }
     if ($req.action.type -eq "double_click" -and -not $req.action.elementId) {
       $pt = Window-Point $window $req.action.x $req.action.y $req.action.snapshotDisplay
+      if ($allowForegroundInput) {
+        Invoke-Foreground-Click $window $pt 2
+        Write-Result @{ ok = $true; data = @{ ok = $true; mode = "foreground-input"; action = "double_click"; point = $pt } }
+        exit 0
+      }
       Write-Result (Foreground-Required "Windows UIA is configured for background-only control; double_click would require foreground input." @{
         action = "double_click"
         x = $pt.x
@@ -385,6 +516,11 @@ try {
     if ($req.action.type -eq "drag") {
       $from = Window-Point $window $req.action.fromX $req.action.fromY $req.action.snapshotDisplay
       $to = Window-Point $window $req.action.toX $req.action.toY $req.action.snapshotDisplay
+      if ($allowForegroundInput) {
+        Invoke-Foreground-Drag $window $from $to
+        Write-Result @{ ok = $true; data = @{ ok = $true; mode = "foreground-input"; action = "drag"; from = $from; to = $to } }
+        exit 0
+      }
       Write-Result (Foreground-Required "Windows UIA is configured for background-only control; drag would require foreground input." @{
         action = "drag"
         from = $from
@@ -393,6 +529,11 @@ try {
       exit 0
     }
     if ($req.action.type -eq "press_key") {
+      if ($allowForegroundInput) {
+        Invoke-Foreground-Key $window $req.action.key
+        Write-Result @{ ok = $true; data = @{ ok = $true; mode = "foreground-input"; action = "press_key"; key = $req.action.key } }
+        exit 0
+      }
       Write-Result (Foreground-Required "Windows UIA is configured for background-only control; press_key would require foreground input." @{
         action = "press_key"
         key = $req.action.key
@@ -400,6 +541,11 @@ try {
       exit 0
     }
     if ($req.action.type -eq "type_text" -and -not $req.action.elementId) {
+      if ($allowForegroundInput) {
+        Invoke-Foreground-Type $window $req.action.text
+        Write-Result @{ ok = $true; data = @{ ok = $true; mode = "foreground-input"; action = "type_text"; textLength = ([string]$req.action.text).Length } }
+        exit 0
+      }
       Write-Result (Foreground-Required "Windows UIA is configured for background-only control; type_text without an element would require foreground input." @{
         action = "type_text"
         textLength = ([string]$req.action.text).Length
@@ -411,6 +557,11 @@ try {
         $pt = Window-Point $window $req.action.x $req.action.y $req.action.snapshotDisplay
       } else {
         $pt = Window-Center $window
+      }
+      if ($allowForegroundInput) {
+        Invoke-Foreground-Scroll $window $pt $req.action.direction $req.action.amount
+        Write-Result @{ ok = $true; data = @{ ok = $true; mode = "foreground-input"; action = "scroll"; point = $pt; direction = $req.action.direction } }
+        exit 0
       }
       Write-Result (Foreground-Required "Windows UIA is configured for background-only control; scroll without an element would require foreground input." @{
         action = "scroll"
@@ -438,6 +589,12 @@ try {
         $pattern = Invoke-Element $el
         Write-Result @{ ok = $true; data = @{ ok = $true; mode = "background"; pattern = $pattern } }
       } catch {
+        if ($allowForegroundInput) {
+          $pt = Element-Center $el
+          Invoke-Foreground-Click $window $pt 1
+          Write-Result @{ ok = $true; data = @{ ok = $true; mode = "foreground-input"; action = "click_element"; elementId = $req.action.elementId; point = $pt } }
+          exit 0
+        }
         Write-Result (Foreground-Required "Element does not expose a UIA invoke pattern, and foreground input is disabled." @{
           elementId = $req.action.elementId
           bounds = Bounds-Of $el
@@ -447,6 +604,11 @@ try {
     }
     if ($req.action.type -eq "double_click") {
       $pt = Element-Center $el
+      if ($allowForegroundInput) {
+        Invoke-Foreground-Click $window $pt 2
+        Write-Result @{ ok = $true; data = @{ ok = $true; mode = "foreground-input"; action = "double_click"; elementId = $req.action.elementId; point = $pt } }
+        exit 0
+      }
       Write-Result (Foreground-Required "Windows UIA is configured for background-only control; double_click would require foreground input." @{
         action = "double_click"
         elementId = $req.action.elementId
@@ -460,6 +622,12 @@ try {
         $pattern = Set-Element-Value $el $req.action.text
         Write-Result @{ ok = $true; data = @{ ok = $true; mode = "background"; pattern = $pattern } }
       } catch {
+        if ($allowForegroundInput) {
+          $pt = Element-Center $el
+          Invoke-Foreground-Type $window $req.action.text $pt
+          Write-Result @{ ok = $true; data = @{ ok = $true; mode = "foreground-input"; action = "type_text"; elementId = $req.action.elementId; textLength = ([string]$req.action.text).Length } }
+          exit 0
+        }
         Write-Result (Foreground-Required "Element does not expose ValuePattern, and foreground text input is disabled." @{
           elementId = $req.action.elementId
           bounds = Bounds-Of $el
@@ -472,6 +640,12 @@ try {
         $pattern = Scroll-Element $el $req.action.direction $req.action.amount
         Write-Result @{ ok = $true; data = @{ ok = $true; mode = "background"; pattern = $pattern } }
       } catch {
+        if ($allowForegroundInput) {
+          $pt = Element-Center $el
+          Invoke-Foreground-Scroll $window $pt $req.action.direction $req.action.amount
+          Write-Result @{ ok = $true; data = @{ ok = $true; mode = "foreground-input"; action = "scroll"; elementId = $req.action.elementId; point = $pt; direction = $req.action.direction } }
+          exit 0
+        }
         Write-Result (Foreground-Required "Element does not expose ScrollPattern, and foreground wheel input is disabled." @{
           suggestedAction = "scroll"
           elementId = $req.action.elementId

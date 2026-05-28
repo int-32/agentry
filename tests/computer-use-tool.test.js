@@ -8,10 +8,18 @@ import { approveComputerUseApp } from "../core/computer-use/settings.js";
 
 function makeTool(
   model = { id: "gpt-5.5", provider: "openai", input: ["text", "image"] },
-  { enabled = true } = {},
+  { enabled = true, recognition = null } = {},
 ) {
   const providers = new ComputerProviderRegistry();
-  providers.register(createMockComputerProvider({ providerId: "mock" }));
+  const provider = createMockComputerProvider({ providerId: "mock" });
+  if (recognition) {
+    const getAppState = provider.getAppState.bind(provider);
+    provider.getAppState = async (...args) => ({
+      ...await getAppState(...args),
+      recognition,
+    });
+  }
+  providers.register(provider);
   const host = new ComputerHost({
     providers,
     defaultProviderId: "mock",
@@ -285,7 +293,35 @@ describe("computer tool", () => {
     expect(state.content[0].text).toContain("Current Computer Use state");
     expect(state.content[0].text).toContain("mock-button");
     expect(state.content[0].text).toContain("Continue");
+    expect(state.content[0].text).toContain("x=100, y=120, w=160, h=44");
     expect(state.content[1].type).toBe("image");
+  });
+
+  it("exposes provider recognition quality in app state results", async () => {
+    const recognition = {
+      primarySource: "macos:ax",
+      elementCount: 1,
+      actionableCount: 0,
+      labeledCount: 1,
+      boundedCount: 1,
+      averageConfidence: 0.41,
+      coverageScore: 0.32,
+      visualFallbackRecommended: true,
+    };
+    const { tool, ctx } = makeTool(undefined, { recognition });
+    await tool.execute("call-1", {
+      action: "start",
+      appId: "app.notes",
+      windowId: "win-1",
+    }, null, null, ctx);
+
+    const state = await tool.execute("call-2", {
+      action: "get_app_state",
+    }, null, null, ctx);
+
+    expect(state.content[0].text).toContain("recognition: macos:ax coverage=0.32");
+    expect(state.content[0].text).toContain("AX coverage is weak");
+    expect(state.details.recognition).toEqual(recognition);
   });
 
   it("does not advertise provider-internal coordinate actions when element clicks are not lease-allowed", async () => {

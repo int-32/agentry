@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMacosCuaProvider, resolveCuaDriverCommand } from "../core/computer-use/providers/macos-cua-provider.js";
+import {
+  createMacosCuaProvider,
+  resolveCuaDriverCommand,
+  resolveCuaDriverCommandDetails,
+} from "../core/computer-use/providers/macos-cua-provider.js";
 import { COMPUTER_USE_ERRORS } from "../core/computer-use/errors.js";
 
 function rawResult(structuredContent, content = [{ type: "text", text: "ok" }]) {
@@ -66,6 +70,25 @@ describe("macos Cua provider", () => {
     expect(command).toBe("/Users/hana/project-hana/dist-computer-use/mac-arm64/hana-computer-use-helper");
   });
 
+  it("returns helper resolution diagnostics when no Cua binary exists", () => {
+    const details = resolveCuaDriverCommandDetails({
+      env: { HANA_ROOT: "/Users/hana/project-hana" },
+      existsSync: () => false,
+      homeDir: "/Users/hana",
+      arch: "arm64",
+      cwd: "/Users/hana/project-hana",
+    });
+
+    expect(details).toMatchObject({
+      command: "cua-driver",
+      found: false,
+      source: "PATH",
+    });
+    expect(details.candidates.map((item) => item.path)).toContain(
+      "/Users/hana/project-hana/dist-computer-use/mac-arm64/hana-computer-use-helper",
+    );
+  });
+
   it("reports unavailable on non-macOS platforms", async () => {
     const provider = createMacosCuaProvider({ platform: "win32", command: "cua-driver" });
 
@@ -100,6 +123,40 @@ describe("macos Cua provider", () => {
         { name: "Accessibility", granted: true },
         { name: "Screen Recording", granted: false },
       ],
+    });
+  });
+
+  it("auto-starts the bundled helper daemon before reporting status", async () => {
+    let daemonRunning = false;
+    const { runner, calls } = makeRunner((_command, args) => {
+      if (args[0] === "status") {
+        return daemonRunning
+          ? { stdout: "hana-computer-use-helper running", stderr: "", exitCode: 0 }
+          : { stdout: "", stderr: "daemon is not running", exitCode: 1 };
+      }
+      if (args[0] === "check_permissions") {
+        return rawResult({ permissions: [{ name: "accessibility", granted: true }] });
+      }
+      throw new Error(`unexpected command ${args[0]}`);
+    });
+    runner.spawn.mockImplementation((command, args, options = {}) => {
+      calls.push({ command, args, options, spawned: true });
+      daemonRunning = true;
+      return { unref: vi.fn() };
+    });
+    const provider = createMacosCuaProvider({
+      platform: "darwin",
+      command: "/tmp/hana-computer-use-helper",
+      runner,
+      socketPath: "/tmp/hana.sock",
+    });
+
+    await expect(provider.getStatus()).resolves.toMatchObject({
+      available: true,
+      daemon: "hana-computer-use-helper running",
+    });
+    expect(calls.find((call) => call.spawned)).toMatchObject({
+      args: ["serve", "--socket", "/tmp/hana.sock"],
     });
   });
 
@@ -439,9 +496,61 @@ describe("macos Cua provider", () => {
         scaleFactor: 2,
       },
       elements: [
-        { elementId: "3", role: "AXRow", label: "搜索" },
-        { elementId: "14", role: "AXButton", label: "Three" },
+        {
+          elementId: "3",
+          role: "AXRow",
+          label: "搜索",
+          source: "macos:ax",
+          stableRef: expect.stringMatching(/^ax:/),
+          providerData: { elementIndex: 3 },
+        },
+        {
+          elementId: "14",
+          role: "AXButton",
+          label: "Three",
+          source: "macos:ax",
+          stableRef: expect.stringMatching(/^ax:/),
+          providerData: { elementIndex: 14 },
+        },
       ],
+      recognition: {
+        primarySource: "macos:ax",
+        elementCount: 2,
+        actionableCount: 2,
+        labeledCount: 2,
+      },
+    });
+  });
+
+  it("reports low AX coverage so callers can choose visual fallback", async () => {
+    const { runner } = makeRunner((_command, args) => {
+      expect(args[0]).toBe("get_window_state");
+      return rawResult(
+        {
+          tree_markdown: "- [1] AXGroup",
+          screenshot_width: 400,
+          screenshot_height: 300,
+        },
+        [
+          { type: "text", text: "- [1] AXGroup" },
+          { type: "image", mimeType: "image/png", data: "abc" },
+        ],
+      );
+    });
+    const provider = createMacosCuaProvider({ platform: "darwin", command: "/tmp/cua-driver", runner });
+
+    const snapshot = await provider.getAppState({}, {
+      leaseId: "lease-1",
+      appId: "com.example.canvas",
+      windowId: "10725",
+      providerState: { pid: 844, windowId: 10725 },
+    });
+
+    expect(snapshot.recognition).toMatchObject({
+      primarySource: "macos:ax",
+      elementCount: 1,
+      actionableCount: 0,
+      visualFallbackRecommended: true,
     });
   });
 
@@ -570,6 +679,35 @@ describe("macos Cua provider", () => {
     ]);
   });
 
+  it("uses the snapshot-bound Cua index when the visible element id is stable", async () => {
+    const { runner, calls } = makeRunner(() => rawResult({ ok: true }));
+    const provider = createMacosCuaProvider({ platform: "darwin", command: "/tmp/cua-driver", runner });
+    const lease = {
+      leaseId: "lease-1",
+      appId: "com.apple.calculator",
+      windowId: "10725",
+      providerState: { pid: 844, windowId: 10725 },
+    };
+
+    await provider.performAction({}, lease, {
+      type: "click_element",
+      elementId: "ax:stable-button",
+      snapshotElement: {
+        elementId: "ax:stable-button",
+        role: "AXButton",
+        label: "Three",
+        providerData: { elementIndex: 14 },
+      },
+    });
+
+    expect(calls.map((c) => c.args[0])).toEqual(["click"]);
+    expect(JSON.parse(calls[0].args[1])).toMatchObject({
+      pid: 844,
+      window_id: 10725,
+      element_index: 14,
+    });
+  });
+
   it("uses AXShowDefaultUI instead of double-click fallback for rows that do not support AXPress", async () => {
     const { runner, calls } = makeRunner((_command, args) => {
       if (args[0] === "get_window_state") {
@@ -646,6 +784,23 @@ describe("macos Cua provider", () => {
     await expect(provider.listApps()).rejects.toMatchObject({
       code: COMPUTER_USE_ERRORS.PROVIDER_CRASHED,
       message: expect.stringContaining("No cached AX state"),
+    });
+  });
+
+  it("surfaces actionable diagnostics when the helper binary is missing", async () => {
+    const { runner } = makeRunner(() => {
+      const err = new Error("spawn cua-driver ENOENT");
+      err.code = "ENOENT";
+      throw err;
+    });
+    const provider = createMacosCuaProvider({ platform: "darwin", command: "cua-driver", runner });
+
+    await expect(provider.getStatus()).resolves.toMatchObject({
+      available: false,
+      reason: "binary-not-found",
+      buildCommand: "npm run build:computer-use-helper",
+      helperEnv: "HANA_COMPUTER_USE_HELPER_PATH",
+      searchedPaths: expect.any(Array),
     });
   });
 });

@@ -25,6 +25,7 @@ const CAPABILITY_ALLOWED_VALUES = new Set([
 ]);
 
 const FOREGROUND_CAPABILITY_VALUES = new Set(["foreground"]);
+const WINDOWS_UIA_PROVIDER_ID = "windows:uia";
 
 function sameLeaseOwner(lease, ctx = {}) {
   return lease?.sessionPath === (ctx?.sessionPath || null)
@@ -66,9 +67,39 @@ function actionCapabilitiesFromProvider(capabilities = {}) {
   };
 }
 
+function isWindowsUiaProvider(providerId) {
+  return String(providerId || "").toLowerCase() === WINDOWS_UIA_PROVIDER_ID;
+}
+
+function windowsForegroundCapabilities(capabilities = {}) {
+  return {
+    ...capabilities,
+    pointClick: "foreground",
+    drag: "foreground",
+    textInput: "foreground",
+    keyboardInput: "foreground",
+    requiresForegroundForInput: true,
+  };
+}
+
+function appendUniqueActions(actions = [], extra = []) {
+  const out = [];
+  for (const action of [...actions, ...extra]) {
+    if (!action || out.includes(action)) continue;
+    out.push(action);
+  }
+  return out;
+}
+
 function capabilityKeyForAction(capabilities, action = {}) {
   if (action?.type === "double_click" && action?.elementId && capabilities?.elementDoubleClick !== undefined) {
     return "elementDoubleClick";
+  }
+  if (action?.type === "type_text" && !action?.elementId && capabilities?.textInput !== undefined) {
+    return "textInput";
+  }
+  if (action?.type === "scroll" && !action?.elementId && capabilities?.pointClick !== undefined) {
+    return "pointClick";
   }
   return ACTION_CAPABILITY[action?.type];
 }
@@ -98,7 +129,7 @@ export class ComputerHost {
     for (const provider of this._providers.list()) {
       providers.push({
         providerId: provider.providerId,
-        capabilities: provider.capabilities,
+        capabilities: this._effectiveProviderCapabilities(provider),
         status: provider.getStatus ? await provider.getStatus(ctx) : { available: true },
       });
     }
@@ -147,7 +178,10 @@ export class ComputerHost {
       providerId,
       appId: providerLease?.appId || target.appId,
       windowId: providerLease?.windowId || target.windowId || null,
-      allowedActions: providerLease?.allowedActions || ["click_element", "type_text", "press_key", "scroll", "perform_secondary_action", "stop"],
+      allowedActions: this._allowedActionsForProvider(
+        providerId,
+        providerLease?.allowedActions || ["click_element", "type_text", "press_key", "scroll", "perform_secondary_action", "stop"],
+      ),
       providerState: providerLease?.providerState || {},
     });
   }
@@ -166,12 +200,13 @@ export class ComputerHost {
     const lease = this._resolveActiveLease(ctx, leaseId);
     const provider = this._providers.require(lease.providerId);
     const raw = await provider.getAppState(ctx, lease);
+    const capabilities = this._effectiveProviderCapabilities(provider);
     return this._leases.recordSnapshot(ctx, lease.leaseId, {
       ...raw,
       leaseId: lease.leaseId,
       providerId: lease.providerId,
       allowedActions: Array.isArray(lease.allowedActions) ? [...lease.allowedActions] : [],
-      actionCapabilities: actionCapabilitiesFromProvider(provider.capabilities),
+      actionCapabilities: actionCapabilitiesFromProvider(capabilities),
       mode: raw.mode || "vision-native",
     });
   }
@@ -190,11 +225,13 @@ export class ComputerHost {
     }
 
     const provider = this._providers.require(lease.providerId);
-    this._assertCapability(provider.capabilities, action);
+    const capabilities = this._effectiveProviderCapabilities(provider);
+    this._assertCapability(capabilities, action, { providerId: lease.providerId });
     const providerAction = {
       ...action,
       snapshotId,
       snapshotDisplay: snapshot?.display || null,
+      allowForegroundInput: this._allowsInputInjection(lease.providerId),
     };
     if (action?.elementId) {
       const snapshotElement = findSnapshotElement(snapshot, action.elementId);
@@ -210,21 +247,23 @@ export class ComputerHost {
     return await provider.performAction(ctx, lease, providerAction);
   }
 
-  getActionPresentation(ctx, leaseId, actionType) {
+  getActionPresentation(ctx, leaseId, actionType, action = {}) {
     const lease = leaseId
       ? this._leases.getLease(ctx, leaseId)
       : this._leases.getActiveLeaseFor?.(ctx);
     if (!lease) return {};
     const provider = this._providers.require(lease.providerId);
-    const capabilityKey = ACTION_CAPABILITY[actionType];
-    const capabilityValue = capabilityKey ? provider.capabilities?.[capabilityKey] : null;
+    const capabilities = this._effectiveProviderCapabilities(provider);
+    const capabilityAction = { ...action, type: actionType };
+    const capabilityKey = capabilityKeyForAction(capabilities, capabilityAction);
+    const capabilityValue = capabilityKey ? capabilities?.[capabilityKey] : null;
     const requiresForeground = FOREGROUND_CAPABILITY_VALUES.has(capabilityValue);
     return {
       providerId: lease.providerId,
       inputMode: requiresForeground ? "foreground-input" : "background",
       requiresForeground,
       interruptKey: requiresForeground ? "Escape" : null,
-      visualSurface: provider.capabilities?.nativeCursor === true ? "provider" : "renderer",
+      visualSurface: capabilities?.nativeCursor === true ? "provider" : "renderer",
     };
   }
 
@@ -354,7 +393,7 @@ export class ComputerHost {
     return Boolean(appId || windowId);
   }
 
-  _assertCapability(capabilities, action) {
+  _assertCapability(capabilities, action, { providerId = null } = {}) {
     const actionType = typeof action === "string" ? action : action?.type;
     const key = typeof action === "string"
       ? ACTION_CAPABILITY[actionType]
@@ -363,6 +402,7 @@ export class ComputerHost {
     const value = capabilities?.[key];
     if (CAPABILITY_ALLOWED_VALUES.has(value)) return;
     if (value === "foreground") {
+      if (this._allowsInputInjection(providerId)) return;
       throw computerUseError(COMPUTER_USE_ERRORS.ACTION_REQUIRES_FOREGROUND, `Computer action requires foreground input: ${actionType}`, {
         action: actionType,
         capability: key,
@@ -391,6 +431,24 @@ export class ComputerHost {
       defaultProviderId: this._defaultProviderId,
       hasProvider: (providerId) => this._providers.has(providerId),
     });
+  }
+
+  _allowsInputInjection(providerId) {
+    return isWindowsUiaProvider(providerId) && this._settings().allow_windows_input_injection === true;
+  }
+
+  _effectiveProviderCapabilities(provider) {
+    const capabilities = provider?.capabilities || {};
+    if (this._allowsInputInjection(provider?.providerId)) {
+      return windowsForegroundCapabilities(capabilities);
+    }
+    return capabilities;
+  }
+
+  _allowedActionsForProvider(providerId, actions) {
+    if (!this._allowsInputInjection(providerId)) return actions;
+    if (!isWindowsUiaProvider(providerId)) return actions;
+    return appendUniqueActions(actions, ["press_key"]);
   }
 
   _assertAppApproved(provider, providerId, target = {}) {

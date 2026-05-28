@@ -1,4 +1,5 @@
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { execFileSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
@@ -37,6 +38,89 @@ export function swiftBuildScratchPath({
   arch = process.arch,
 } = {}) {
   return path.join(rootDir, ".cache", "computer-use-helper", "swift-build", `mac-${arch}`);
+}
+
+export function fallbackComputerUseHelperSourcePath({
+  rootDir = path.resolve(__dirname, ".."),
+} = {}) {
+  return path.join(rootDir, "scripts", "macos-computer-use-fallback-helper.mjs");
+}
+
+function commandErrorOutput(err) {
+  return [
+    err?.stdout,
+    err?.stderr,
+    err?.message,
+  ].map((part) => String(part || "").trim()).filter(Boolean).join("\n");
+}
+
+export function swiftPmHealthErrorMessage(err) {
+  const output = commandErrorOutput(err);
+  const hint = /PackageDescription|Invalid manifest|Undefined symbols/i.test(output)
+    ? "The installed Xcode Command Line Tools appear to be incomplete or version-mismatched. Reinstall or update them with `xcode-select --install`, or switch to a full Xcode toolchain with `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`."
+    : "Install or repair Xcode Command Line Tools with `xcode-select --install`.";
+  return [
+    "[computer-use-helper] SwiftPM cannot compile package manifests, so the macOS Computer Use helper cannot be built.",
+    hint,
+    "Original SwiftPM output:",
+    output || "(no output)",
+  ].join("\n");
+}
+
+export function assertSwiftPackageManagerHealthy({
+  platform = process.platform,
+  env = process.env,
+  cwd = path.resolve(__dirname, ".."),
+  execFile = execFileSync,
+} = {}) {
+  if (!shouldBuildComputerUseHelper({ platform })) return;
+  const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-computer-use-swiftpm-"));
+  try {
+    fs.writeFileSync(
+      path.join(probeDir, "Package.swift"),
+      [
+        "// swift-tools-version: 6.0",
+        "import PackageDescription",
+        "let package = Package(name: \"SwiftPMProbe\", products: [], targets: [])",
+        "",
+      ].join("\n"),
+    );
+    execFile("swift", ["package", "describe", "--package-path", probeDir], {
+      cwd,
+      env,
+      stdio: "pipe",
+      encoding: "utf8",
+    });
+  } catch (err) {
+    throw new Error(swiftPmHealthErrorMessage(err));
+  } finally {
+    fs.rmSync(probeDir, { recursive: true, force: true });
+  }
+}
+
+export function installFallbackComputerUseHelper({
+  rootDir = path.resolve(__dirname, ".."),
+  arch = process.arch,
+  reason = null,
+} = {}) {
+  const source = fallbackComputerUseHelperSourcePath({ rootDir });
+  if (!fs.existsSync(source)) {
+    throw new Error(`[computer-use-helper] fallback helper source is missing at ${source}`);
+  }
+  const outDir = computerUseHelperOutputDir({ rootDir, osName: "mac", arch });
+  fs.rmSync(outDir, { recursive: true, force: true });
+  fs.mkdirSync(outDir, { recursive: true });
+  const target = path.join(outDir, "hana-computer-use-helper");
+  fs.copyFileSync(source, target);
+  fs.chmodSync(target, 0o755);
+  if (reason) {
+    console.warn("[computer-use-helper] Swift helper unavailable; installed JS/JXA macOS fallback helper.");
+    console.warn(reason);
+  } else {
+    console.warn("[computer-use-helper] installed JS/JXA macOS fallback helper.");
+  }
+  console.warn("[computer-use-helper] fallback supports AX app/window snapshots and basic element actions; rebuild with a healthy SwiftPM for native Cua speed.");
+  return { skipped: false, target, fallback: true };
 }
 
 const CUA_APP_STATE_RELATIVE_PATH = path.join(
@@ -418,6 +502,16 @@ export function buildComputerUseHelper({
   if (!shouldBuildComputerUseHelper({ platform })) {
     console.log(`[computer-use-helper] skipped on ${platform}`);
     return { skipped: true };
+  }
+  try {
+    assertSwiftPackageManagerHealthy({ platform, env, cwd: rootDir });
+  } catch (err) {
+    if (env.HANA_COMPUTER_USE_HELPER_DISABLE_FALLBACK === "1") throw err;
+    return installFallbackComputerUseHelper({
+      rootDir,
+      arch,
+      reason: err?.message || String(err),
+    });
   }
 
   const packageDir = path.join(rootDir, "desktop", "native", "HanaComputerUseHelper");

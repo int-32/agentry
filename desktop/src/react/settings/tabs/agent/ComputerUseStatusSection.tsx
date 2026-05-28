@@ -3,6 +3,7 @@ import { hanaFetch } from '../../api';
 import { t } from '../../helpers';
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
+import { summarizeComputerPermissions } from '../computer-use-ui';
 import styles from '../../Settings.module.css';
 
 interface ComputerProviderStatus {
@@ -62,6 +63,26 @@ export function ComputerUseStatusSection({ visible }: { visible: boolean }) {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!visible) return undefined;
+    const relevantEvents = new Set([
+      'computer-use-settings-changed',
+      'computer-use-permissions-requested',
+    ]);
+    const onLocalSettings = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail;
+      if (relevantEvents.has(detail?.type)) void load();
+    };
+    window.addEventListener('hana-settings', onLocalSettings);
+    const cleanup = window.platform?.onSettingsChanged?.((type: string) => {
+      if (relevantEvents.has(type)) void load();
+    });
+    return () => {
+      window.removeEventListener('hana-settings', onLocalSettings);
+      if (typeof cleanup === 'function') cleanup();
+    };
+  }, [load, visible]);
+
   const selectedProvider = useMemo(() => {
     const id = data?.selectedProviderId || null;
     return data?.status?.providers?.find((provider) => provider.providerId === id) || null;
@@ -71,9 +92,7 @@ export function ComputerUseStatusSection({ visible }: { visible: boolean }) {
 
   const available = selectedProvider?.status?.available === true;
   const permissions = selectedProvider?.status?.permissions || [];
-  const permissionText = permissions.length > 0
-    ? permissions.map((p) => `${p.name || 'permission'}:${p.granted ? 'ok' : 'missing'}`).join(' · ')
-    : t('settings.agent.computerUse.permissionsEmpty');
+  const permissionState = summarizeComputerPermissions(permissions);
   const approvals = data?.settings?.app_approvals || [];
   const approvalsText = approvals.length > 0
     ? approvals.map((item) => item.appName || item.appId).join(' · ')
@@ -106,7 +125,7 @@ export function ComputerUseStatusSection({ visible }: { visible: boolean }) {
       />
       <SettingsRow
         label={t('settings.agent.computerUse.permissions')}
-        control={<StatusText ok={permissions.every((p) => p.granted !== false)} text={permissionText} />}
+        control={<StatusText ok={permissionState.ok} text={permissionState.text} />}
       />
       <SettingsRow
         label={t('settings.agent.computerUse.approvals')}

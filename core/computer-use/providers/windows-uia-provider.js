@@ -95,12 +95,18 @@ function normalizeSnapshot(data, lease) {
 const WINDOWS_UIA_ALLOWED_ACTIONS = ["click_element", "type_text", "scroll", "stop"];
 const ELEMENT_BOUND_ACTIONS = new Set(["click_element", "double_click", "type_text", "scroll"]);
 const FOREGROUND_ONLY_ACTIONS = new Set(["click_point", "double_click", "drag", "press_key"]);
+const FOREGROUND_INPUT_ACTIONS = new Set(["click_point", "double_click", "drag", "press_key", "type_text", "scroll"]);
 
 function isForegroundOnlyAction(action = {}) {
   if (FOREGROUND_ONLY_ACTIONS.has(action.type)) return true;
   if (action.type === "type_text" && !action.elementId) return true;
   if (action.type === "scroll" && !action.elementId) return true;
   return false;
+}
+
+function isSupportedAction(action = {}) {
+  if (WINDOWS_UIA_ALLOWED_ACTIONS.includes(action.type)) return true;
+  return action.allowForegroundInput === true && FOREGROUND_INPUT_ACTIONS.has(action.type);
 }
 
 function rejectForegroundOnlyAction(providerId, action = {}) {
@@ -302,10 +308,11 @@ export function createWindowsUiaProvider({
     async performAction(_ctx, lease, action) {
       ensureWin32();
       validateForegroundAction(action);
-      if (isForegroundOnlyAction(action)) {
+      const allowForegroundInput = action.allowForegroundInput === true;
+      if (isForegroundOnlyAction(action) && !allowForegroundInput) {
         rejectForegroundOnlyAction(providerId, action);
       }
-      if (!WINDOWS_UIA_ALLOWED_ACTIONS.includes(action.type)) {
+      if (!isSupportedAction(action)) {
         throw computerUseError(COMPUTER_USE_ERRORS.CAPABILITY_UNSUPPORTED, `Unsupported Windows UIA action: ${action.type}`, {
           action: action.type,
         });
@@ -315,6 +322,7 @@ export function createWindowsUiaProvider({
         command: "perform_action",
         target: lease.providerState || {},
         action: helperAction(action),
+        allowForegroundInput,
       });
     },
 
