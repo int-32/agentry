@@ -21,6 +21,7 @@ const TAB_LABELS: Record<string, string> = {
   'settings.tabs.providers': '模型供应',
   'settings.tabs.media': '媒体模型',
   'settings.tabs.work': '工作空间',
+  'settings.tabs.projects': '项目管理',
   'settings.tabs.skills': '技能工具',
   'settings.tabs.mcp': '外部连接',
   'settings.tabs.bridge': '社交连接',
@@ -83,6 +84,7 @@ vi.mock('../../settings/tabs/AgentTab', () => ({ AgentTab: () => <div data-testi
 vi.mock('../../settings/tabs/MeTab', () => ({ MeTab: () => <div data-testid="active-tab">me tab</div> }));
 vi.mock('../../settings/tabs/InterfaceTab', () => ({ InterfaceTab: () => <div data-testid="active-tab">interface tab</div> }));
 vi.mock('../../settings/tabs/WorkTab', () => ({ WorkTab: () => <div data-testid="active-tab">work tab</div> }));
+vi.mock('../../settings/tabs/ProjectsTab', () => ({ ProjectsTab: () => <div data-testid="active-tab">projects tab</div> }));
 vi.mock('../../settings/tabs/ComputerUseTab', () => ({ ComputerUseTab: () => <div data-testid="active-tab">computer tab</div> }));
 vi.mock('../../settings/tabs/SkillsTab', () => ({ SkillsTab: () => <div data-testid="active-tab">skills tab</div> }));
 vi.mock('../../settings/tabs/BridgeTab', () => ({ BridgeTab: () => <div data-testid="active-tab">bridge tab</div> }));
@@ -168,6 +170,7 @@ describe('SettingsContent title placement', () => {
       '模型供应',
       '媒体模型',
       '工作空间',
+      '项目管理',
       '技能工具',
       '外部连接',
       '社交连接',

@@ -38,6 +38,8 @@ Feature: <功能名>
 | 频道与多 Agent 协作 | [channels-and-agent-collaboration.md](./features/channels-and-agent-collaboration.md) | `lib/channels/`, `hub/channel-router.js`, `server/routes/channels.js`, `desktop/src/react/components/channels/` |
 | 任务编排图 | [task-orchestration.md](./features/task-orchestration.md) | `lib/task-orchestration/`, `lib/tools/task-orchestrate-tool.js`, `server/routes/tasks.js`, `desktop/src/react/components/tasks/` |
 | 媒体生成插件 | [media-generation.md](./features/media-generation.md) | `plugins/image-gen/`, `tests/image-gen-*.test.js` |
+| 项目登记与频道关联 | [project-registry.md](./features/project-registry.md) | `lib/projects/`, `server/routes/projects.js`, `server/routes/channels.js`, `desktop/src/react/settings/tabs/ProjectsTab.tsx`, `desktop/src/react/components/channels/` |
+| Computer Use 本机应用控制 | [computer-use.md](./features/computer-use.md) | `core/computer-use/`, `lib/tools/computer-use-tool.js`, `server/routes/preferences.js`, `desktop/src/react/settings/tabs/ComputerUseTab.tsx` |
 
 ## 反模式
 

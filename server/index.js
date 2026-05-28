@@ -53,6 +53,7 @@ import { createCheckpointsRoute } from "./routes/checkpoints.js";
 import { createCommandsRoute } from "./routes/commands.js";
 import { createServerIdentityRoute } from "./routes/server-identity.js";
 import { createTasksRoute } from "./routes/tasks.js";
+import { createProjectsRoute } from "./routes/projects.js";
 import {
   configureProcessPiSdkEnv,
   ensureHanaPiSdkDirs,
@@ -432,6 +433,7 @@ app.route("/api", createCheckpointsRoute(engine));
 app.route("/api", createCommandsRoute(engine));
 app.route("/api", createServerIdentityRoute({ agentryHome: engine.agentryHome, appVersion }));
 app.route("/api", createTasksRoute(engine));
+app.route("/api", createProjectsRoute(engine));
 // internal-browser WS — see unified upgrade handler in server startup below
 
 // 健康检查 + 身份信息

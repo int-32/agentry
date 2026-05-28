@@ -2528,6 +2528,108 @@
     color: var(--danger, #e74c3c);
 }
 
+.project-description-input {
+    min-height: 84px;
+}
+
+.project-empty {
+    padding: var(--space-sm) var(--space-md);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+
+.project-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: var(--space-sm) var(--space-md);
+}
+
+.project-list-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-input, 4px);
+    background: color-mix(in srgb, var(--bg-card) 82%, transparent);
+}
+
+.project-list-main {
+    min-width: 0;
+}
+
+.project-list-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.project-list-title {
+    min-width: 0;
+    color: var(--text);
+    font-size: 0.92rem;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-chip-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-width: 0;
+}
+
+.project-chip {
+    max-width: 120px;
+    padding: 2px 6px;
+    border-radius: var(--radius-input, 4px);
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 0.68rem;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-path,
+.project-command,
+.project-description {
+    margin-top: 6px;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.project-command {
+    font-family: var(--font-mono);
+    color: var(--text);
+}
+
+.project-description {
+    color: color-mix(in srgb, var(--text) 78%, var(--text-muted));
+}
+
+.project-list-actions {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.project-danger-action {
+    color: var(--danger, #c85143);
+}
+
+.project-danger-action:hover {
+    background: rgba(var(--danger-rgb, 200, 81, 67), 0.08);
+}
+
 /* Textarea（ishiki 人格编辑等）
  * 分层优先 border，不用 shadow（对齐 DESIGN.md 已校准规则）
  * border + radius 与 .settings-input 对齐 */

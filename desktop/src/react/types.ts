@@ -76,6 +76,20 @@ export interface Channel {
   id: string;
   name: string;
   description?: string;
+  project?: {
+    id: string;
+    name: string;
+    workspaceRoot: string;
+    docsRoot?: string;
+    testCommand?: string;
+    description?: string;
+  } | null;
+  taskBoard?: {
+    id: string;
+    title?: string;
+    coordinatorAgentId?: string;
+    selectedAgentIds?: string[];
+  } | null;
   members: string[];
   lastMessage: string;
   lastSender: string;
@@ -92,6 +106,14 @@ export interface ChannelMessage {
   timestamp: string;
   body: string;
 }
+
+export interface ChannelTokenUsage {
+  today: number;
+  week: number;
+}
+
+export type ChannelTokenUsageByAgent = Record<string, ChannelTokenUsage>;
+export type ChannelTokenUsageByConversation = Record<string, ChannelTokenUsageByAgent>;
 
 export interface AgentPhoneActivity {
   conversationId: string;

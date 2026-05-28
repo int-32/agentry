@@ -87,6 +87,7 @@ describe('handleAppEvent', () => {
       setTheme: vi.fn(),
       setSerifFont: vi.fn(),
       setPaperTexture: vi.fn(),
+      platform: { settingsChanged: vi.fn() },
       dispatchEvent: vi.fn(),
     };
     (globalThis as Record<string, unknown>).i18n = {
@@ -315,6 +316,21 @@ describe('handleAppEvent', () => {
     expect(mockApplyEditorTypography).toHaveBeenCalledWith({
       markdown: { bodyFontSize: 17 },
     });
+  });
+
+  it('computer-use permission events refresh local settings UI without re-emitting through platform settings', async () => {
+    const { handleAppEvent } = await import('../../services/app-event-actions');
+
+    handleAppEvent('computer-use-permissions-requested', { providerId: 'macos:cua' });
+
+    expect((globalThis as any).window.dispatchEvent).toHaveBeenCalledTimes(1);
+    const event = (globalThis as any).window.dispatchEvent.mock.calls[0][0] as CustomEvent;
+    expect(event.type).toBe('hana-settings');
+    expect(event.detail).toEqual({
+      type: 'computer-use-permissions-requested',
+      data: { providerId: 'macos:cua' },
+    });
+    expect((globalThis as any).window.platform.settingsChanged).not.toHaveBeenCalled();
   });
 
   it('agent-workspace-changed updates only the current agent workspace and activates the desk', async () => {

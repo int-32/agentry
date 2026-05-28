@@ -11,5 +11,7 @@
 | 频道与多 Agent 协作 | [channels-and-agent-collaboration.md](./channels-and-agent-collaboration.md) | draft |
 | 任务编排图 | [task-orchestration.md](./task-orchestration.md) | draft |
 | 媒体生成插件 | [media-generation.md](./media-generation.md) | draft |
+| 项目登记与频道关联 | [project-registry.md](./project-registry.md) | draft |
+| Computer Use 本机应用控制 | [computer-use.md](./computer-use.md) | draft |
 
 新增 feature 时复制 `../templates/feature-spec.md`，并在本索引和 `../BDD.md` 中登记。

@@ -12,6 +12,7 @@ import { AgentTab } from './tabs/AgentTab';
 import { MeTab } from './tabs/MeTab';
 import { InterfaceTab } from './tabs/InterfaceTab';
 import { WorkTab } from './tabs/WorkTab';
+import { ProjectsTab } from './tabs/ProjectsTab';
 import { ComputerUseTab } from './tabs/ComputerUseTab';
 import { SkillsTab } from './tabs/SkillsTab';
 import { BridgeTab } from './tabs/BridgeTab';
@@ -39,6 +40,7 @@ const TAB_COMPONENTS: Record<string, React.ComponentType> = {
   me: MeTab,
   interface: InterfaceTab,
   work: WorkTab,
+  projects: ProjectsTab,
   computer: ComputerUseTab,
   skills: SkillsTab,
   bridge: BridgeTab,
@@ -57,6 +59,7 @@ const TAB_TITLE_KEYS: Record<string, string> = {
   me: 'settings.tabs.me',
   interface: 'settings.tabs.interface',
   work: 'settings.tabs.work',
+  projects: 'settings.tabs.projects',
   computer: 'settings.tabs.computer',
   skills: 'settings.tabs.skills',
   bridge: 'settings.tabs.bridge',

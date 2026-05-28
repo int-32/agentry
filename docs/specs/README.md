@@ -48,6 +48,12 @@ lib/task-orchestration/TDD.md
 plugins/image-gen/EARS.md
 plugins/image-gen/BDD.md
 plugins/image-gen/TDD.md
+lib/projects/EARS.md
+lib/projects/BDD.md
+lib/projects/TDD.md
+core/computer-use/EARS.md
+core/computer-use/BDD.md
+core/computer-use/TDD.md
 ```
 
 判断标准：
@@ -89,6 +95,8 @@ plugins/image-gen/TDD.md
 - [频道与多 Agent 协作](./features/channels-and-agent-collaboration.md)
 - [任务编排图](./features/task-orchestration.md)
 - [媒体生成插件](./features/media-generation.md)
+- [项目登记与频道关联](./features/project-registry.md)
+- [Computer Use 本机应用控制](./features/computer-use.md)
 
 已建立模块本地三件套的重点实现目录：
 
@@ -96,3 +104,5 @@ plugins/image-gen/TDD.md
 - `lib/task-orchestration/`
 - `desktop/src/react/components/tasks/`
 - `plugins/image-gen/`
+- `lib/projects/`
+- `core/computer-use/`

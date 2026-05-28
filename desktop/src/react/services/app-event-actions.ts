@@ -97,6 +97,14 @@ function hasWorkspaceChange(data: any): boolean {
   return false;
 }
 
+// These events already came from the app-event stream. Re-emitting them through
+// platform.settingsChanged sends them back through IPC and creates a refresh loop.
+function broadcastComputerUseSettingsEvent(type: string, data: any): void {
+  window.dispatchEvent(new CustomEvent('hana-settings', {
+    detail: { type, data },
+  }));
+}
+
 export function handleAppEvent(type: string, data: any = {}): void {
   switch (type) {
     case 'agent-config-changed':
@@ -237,6 +245,10 @@ export function handleAppEvent(type: string, data: any = {}): void {
       break;
     case 'network-proxy-changed':
       window.platform?.settingsChanged?.('network-proxy-changed', data);
+      break;
+    case 'computer-use-settings-changed':
+    case 'computer-use-permissions-requested':
+      broadcastComputerUseSettingsEvent(type, data);
       break;
     case 'paper-texture-changed':
       window.setPaperTexture(data.enabled);
