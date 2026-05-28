@@ -22,6 +22,7 @@ export function ChannelHeader() {
   const headerName = useStore(s => s.channelHeaderName);
   const headerMembers = useStore(s => s.channelHeaderMembersText);
   const currentChannel = useStore(s => s.currentChannel);
+  const currentChannelRecord = useStore(s => s.channels.find((channel) => channel.id === s.currentChannel));
   const isDM = useStore(s => s.channelIsDM);
 
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
@@ -49,6 +50,16 @@ export function ChannelHeader() {
       <div className={styles.channelHeaderInfo}>
         <span className={styles.channelHeaderName}>{headerName}</span>
         <span className={styles.channelHeaderMembers}>{headerMembers}</span>
+        {!isDM && currentChannelRecord?.project?.name && (
+          <span className={styles.channelHeaderProject}>
+            {t('channel.linkedProject')}: {currentChannelRecord.project.name}
+          </span>
+        )}
+        {!isDM && currentChannelRecord?.taskBoard?.id && (
+          <span className={styles.channelHeaderProject}>
+            看板: {currentChannelRecord.taskBoard.title || currentChannelRecord.taskBoard.id}
+          </span>
+        )}
       </div>
       <div className={styles.channelHeaderActions}>
         {currentChannel && !isDM && (

@@ -15,6 +15,7 @@ export const APP_EVENTS = Object.freeze([
   "models-changed",
   "network-proxy-changed",
   "paper-texture-changed",
+  "projects-changed",
   "skills-changed",
   "theme-changed",
 ]);
@@ -23,4 +24,3 @@ export const APP_EVENTS = Object.freeze([
 export function isKnownAppEventType(type) {
   return APP_EVENTS.includes(type);
 }
-

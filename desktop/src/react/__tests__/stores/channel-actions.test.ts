@@ -22,6 +22,7 @@ const mockState: Record<string, unknown> = {
   channelIsDM: false,
   channelInfoName: '',
   channelAgentActivities: {},
+  channelAgentTokenUsage: {},
   channelAgentPhoneToolMode: 'read_only',
   channelAgentReplyMinChars: null,
   channelAgentReplyMaxChars: null,
@@ -61,6 +62,7 @@ describe('channel-actions', () => {
     mockState.channelTotalUnread = 0;
     mockState.channelsEnabled = true;
     mockState.channelAgentPhoneToolMode = 'read_only';
+    mockState.channelAgentTokenUsage = {};
     mockState.channelAgentReplyMinChars = null;
     mockState.channelAgentReplyMaxChars = null;
     mockState.channelAgentProactiveEnabled = true;

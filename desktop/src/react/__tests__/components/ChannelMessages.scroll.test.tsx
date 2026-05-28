@@ -69,4 +69,26 @@ describe('ChannelMessages scroll behavior', () => {
     expect(screen.getByText('new reply')).toBeInTheDocument();
     expect(metrics.scrollTop).toBe(120);
   });
+
+  it('does not trip hook order when channel messages load after the empty state', () => {
+    useStore.setState({ channelMessages: [] } as never);
+
+    render(
+      <div className="channel-messages">
+        <ChannelMessages />
+      </div>,
+    );
+
+    expect(screen.getByText('channel.noMessages')).toBeInTheDocument();
+
+    act(() => {
+      useStore.setState({
+        channelMessages: [
+          { sender: 'user', timestamp: '2026-05-07 17:00:00', body: 'loaded message' },
+        ],
+      } as never);
+    });
+
+    expect(screen.getByText('loaded message')).toBeInTheDocument();
+  });
 });

@@ -9,7 +9,16 @@
 import { useStore } from './index';
 import { hanaFetch } from '../hooks/use-hana-fetch';
 import { hasServerConnection } from '../services/server-connection';
-import type { AgentPhoneActivity, AgentPhoneSettings, AgentPhoneToolMode, Channel, ChannelAgentActivities, ChannelMessage } from '../types';
+import type {
+  AgentPhoneActivity,
+  AgentPhoneSettings,
+  AgentPhoneToolMode,
+  Channel,
+  ChannelAgentActivities,
+  ChannelMessage,
+  ChannelTokenUsageByAgent,
+  ChannelTokenUsageByConversation,
+} from '../types';
 
 // ══════════════════════════════════════════════════════
 // 加载频道列表
@@ -61,6 +70,31 @@ function keyActivities(activities: AgentPhoneActivity[]): Record<string, AgentPh
     keyed[activity.agentId] = [activity];
   }
   return keyed;
+}
+
+function normalizeChannelTokenUsage(data: unknown): ChannelTokenUsageByAgent {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+  const result: ChannelTokenUsageByAgent = {};
+  for (const [agentId, raw] of Object.entries(data as Record<string, unknown>)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    const today = Number((raw as { today?: unknown }).today);
+    const week = Number((raw as { week?: unknown }).week);
+    result[agentId] = {
+      today: Number.isFinite(today) && today > 0 ? Math.floor(today) : 0,
+      week: Number.isFinite(week) && week > 0 ? Math.floor(week) : 0,
+    };
+  }
+  return result;
+}
+
+function applyChannelTokenUsage(conversationId: string, tokenUsage: unknown): void {
+  const current = (useStore.getState().channelAgentTokenUsage || {}) as ChannelTokenUsageByConversation;
+  useStore.setState({
+    channelAgentTokenUsage: {
+      ...current,
+      [conversationId]: normalizeChannelTokenUsage(tokenUsage),
+    },
+  });
 }
 
 export async function loadConversationAgentActivities(conversationId: string): Promise<void> {
@@ -275,7 +309,11 @@ export async function openChannel(channelId: string, isDM?: boolean): Promise<vo
         channelHeaderMembersText: `${displayMembers.length} ${t('channel.membersCount')}`,
         channelIsDM: false,
         channelInfoName: data.name || channelId,
+        channels: useStore.getState().channels.map((channel: Channel) =>
+          channel.id === channelId ? { ...channel, project: data.project || null, taskBoard: data.taskBoard || null } : channel,
+        ),
       });
+      applyChannelTokenUsage(channelId, data.tokenUsage);
 
       // Mark as read
       const msgs = data.messages || [];
@@ -509,7 +547,13 @@ export async function toggleChannelsEnabled(): Promise<boolean> {
 // 创建频道
 // ══════════════════════════════════════════════════════
 
-export async function createChannel(name: string, members: string[], intro?: string): Promise<string | null> {
+export async function createChannel(
+  name: string,
+  members: string[],
+  intro?: string,
+  projectId?: string,
+  taskBoard?: { id: string; title?: string; coordinatorAgentId?: string | null; selectedAgentIds?: string[] },
+): Promise<string | null> {
   try {
     const res = await hanaFetch('/api/channels', {
       method: 'POST',
@@ -518,6 +562,8 @@ export async function createChannel(name: string, members: string[], intro?: str
         name,
         members,
         intro: intro || undefined,
+        projectId: projectId || undefined,
+        taskBoard: taskBoard || undefined,
       }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

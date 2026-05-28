@@ -5,9 +5,27 @@ import os from "os";
 import path from "path";
 import { createChannelsRoute } from "../server/routes/channels.js";
 import { createChannel, getChannelMeta, readBookmarks } from "../lib/channels/channel-store.js";
+import { safeConversationStem } from "../lib/conversations/agent-phone-projection.js";
 
 function mktemp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "hana-channels-route-test-"));
+}
+
+function writePhoneSessionUsage({ agentsDir, agentId, conversationId, rows }) {
+  const sessionDir = path.join(agentsDir, agentId, "phone", "sessions", safeConversationStem(conversationId));
+  fs.mkdirSync(sessionDir, { recursive: true });
+  const sessionPath = path.join(sessionDir, "usage-test.jsonl");
+  fs.writeFileSync(sessionPath, rows.map((row, index) => JSON.stringify({
+    type: "message",
+    id: `msg_${index}`,
+    timestamp: row.timestamp,
+    message: {
+      role: "assistant",
+      content: [{ type: "text", text: "ok" }],
+      usage: row.usage,
+    },
+  })).join("\n"), "utf-8");
+  return sessionPath;
 }
 
 describe("channels route membership contract", () => {
@@ -73,6 +91,156 @@ describe("channels route membership contract", () => {
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toMatch(/at least 2/i);
+  });
+
+  it("persists a registered project snapshot when creating a channel", async () => {
+    const workspaceRoot = path.join(tmpDir, "calculator-workspace");
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "user", "projects.json"),
+      JSON.stringify({
+        projects: [
+          {
+            id: "prj_calc",
+            name: "计算器页面",
+            workspaceRoot,
+            docsRoot: "",
+            testCommand: "npm test",
+            description: "研发频道默认项目",
+            modules: [],
+            createdAt: "2026-05-28T00:00:00.000Z",
+            updatedAt: "2026-05-28T00:00:00.000Z",
+          },
+        ],
+      }),
+      "utf-8",
+    );
+
+    const res = await app.request("/api/channels", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "研发小组",
+        members: ["alice", "bob"],
+        projectId: "prj_calc",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.project).toMatchObject({
+      id: "prj_calc",
+      name: "计算器页面",
+      workspaceRoot,
+      testCommand: "npm test",
+    });
+
+    const meta = getChannelMeta(path.join(tmpDir, "channels", `${data.id}.md`));
+    expect(meta.projectId).toBe("prj_calc");
+    expect(meta.projectName).toBe("计算器页面");
+    expect(meta.projectWorkspaceRoot).toBe(workspaceRoot);
+
+    const listRes = await app.request("/api/channels");
+    const listJson = await listRes.json();
+    expect(listJson.channels[0].project).toMatchObject({ id: "prj_calc", workspaceRoot });
+
+    const detailRes = await app.request(`/api/channels/${data.id}`);
+    const detailJson = await detailRes.json();
+    expect(detailJson.project).toMatchObject({ id: "prj_calc", workspaceRoot });
+  });
+
+  it("persists and exposes the channel task-board binding", async () => {
+    const res = await app.request("/api/channels", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "研发执行频道",
+        members: ["alice", "bob"],
+        taskBoard: {
+          id: "board_calc",
+          title: "计算器看板",
+          coordinatorAgentId: "alice",
+          selectedAgentIds: ["alice", "bob"],
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.taskBoard).toMatchObject({
+      id: "board_calc",
+      title: "计算器看板",
+      coordinatorAgentId: "alice",
+      selectedAgentIds: ["alice", "bob"],
+    });
+
+    const meta = getChannelMeta(path.join(tmpDir, "channels", `${data.id}.md`));
+    expect(meta.taskBoardId).toBe("board_calc");
+    expect(meta.taskBoardTitle).toBe("计算器看板");
+    expect(meta.taskBoardCoordinatorAgentId).toBe("alice");
+    expect(meta.taskBoardSelectedAgentIds).toEqual(["alice", "bob"]);
+
+    const detailRes = await app.request(`/api/channels/${data.id}`);
+    const detailJson = await detailRes.json();
+    expect(detailJson.taskBoard).toMatchObject({ id: "board_calc", coordinatorAgentId: "alice" });
+
+    const updateRes = await app.request(`/api/channels/${data.id}/task-board`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        boardId: "board_design",
+        boardTitle: "设计看板",
+        coordinatorAgentId: "bob",
+        selectedAgentIds: ["bob"],
+      }),
+    });
+    expect(updateRes.status).toBe(200);
+    const updateJson = await updateRes.json();
+    expect(updateJson.taskBoard).toMatchObject({ id: "board_design", title: "设计看板", coordinatorAgentId: "bob" });
+  });
+
+  it("returns per-member token usage scoped to the current channel", async () => {
+    const channelsDir = path.join(tmpDir, "channels");
+    await createChannel(channelsDir, {
+      id: "ch_crew",
+      name: "Crew",
+      members: ["alice", "bob"],
+    });
+
+    const now = Date.now();
+    writePhoneSessionUsage({
+      agentsDir: path.join(tmpDir, "agents"),
+      agentId: "alice",
+      conversationId: "ch_crew",
+      rows: [
+        { timestamp: new Date(now - 60_000).toISOString(), usage: { input: 10, output: 5, totalTokens: 15 } },
+        { timestamp: new Date(now - 8 * 24 * 60 * 60 * 1000).toISOString(), usage: { input: 100, output: 100, totalTokens: 200 } },
+      ],
+    });
+    writePhoneSessionUsage({
+      agentsDir: path.join(tmpDir, "agents"),
+      agentId: "alice",
+      conversationId: "ch_other",
+      rows: [
+        { timestamp: new Date(now - 60_000).toISOString(), usage: { input: 999, output: 1, totalTokens: 1000 } },
+      ],
+    });
+    writePhoneSessionUsage({
+      agentsDir: path.join(tmpDir, "agents"),
+      agentId: "bob",
+      conversationId: "ch_crew",
+      rows: [
+        { timestamp: new Date(now - 60_000).toISOString(), usage: { prompt_tokens: 7, completion_tokens: 3, total_tokens: 10 } },
+      ],
+    });
+
+    const detailRes = await app.request("/api/channels/ch_crew");
+    expect(detailRes.status).toBe(200);
+    const detailJson = await detailRes.json();
+    expect(detailJson.tokenUsage).toEqual({
+      alice: { today: 15, week: 15 },
+      bob: { today: 10, week: 10 },
+    });
   });
 
   it("returns agent phone activities for a conversation", async () => {

@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from '../../stores';
 import { useI18n } from '../../hooks/use-i18n';
+import { hanaFetch } from '../../hooks/use-hana-fetch';
 import { createChannel } from '../../stores/channel-actions';
 import { AgentAvatar, refreshAgentAvatarVersion, resolveAgentDisplayInfo } from '../../utils/agent-display';
 import { Overlay } from '../../ui';
@@ -12,6 +13,12 @@ import type { Agent } from '../../types';
 import styles from './Channels.module.css';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- catch(err: any) 提取 message */
+
+interface ProjectEntry {
+  id: string;
+  name: string;
+  workspaceRoot: string;
+}
 
 export function refreshCreateAvatarTs() { refreshAgentAvatarVersion(); }
 
@@ -41,6 +48,8 @@ export function ChannelCreateOverlay() {
 
   const [name, setName] = useState('');
   const [intro, setIntro] = useState('');
+  const [projects, setProjects] = useState<ProjectEntry[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [nameError, setNameError] = useState(false);
@@ -52,9 +61,14 @@ export function ChannelCreateOverlay() {
     if (visible) {
       setName('');
       setIntro('');
+      setSelectedProjectId('');
       setSelectedMembers(agents.map((a) => a.id));
       setNameError(false);
       setMembersError(false);
+      hanaFetch('/api/projects')
+        .then(res => (res.ok ? res.json() : { projects: [] }))
+        .then(data => setProjects(Array.isArray(data.projects) ? data.projects : []))
+        .catch(() => setProjects([]));
       requestAnimationFrame(() => nameRef.current?.focus());
     }
   }, [visible, agents]);
@@ -86,7 +100,7 @@ export function ChannelCreateOverlay() {
 
     setCreating(true);
     try {
-      await createChannel(name.trim(), selectedMembers, intro.trim() || undefined);
+      await createChannel(name.trim(), selectedMembers, intro.trim() || undefined, selectedProjectId || undefined);
       setVisible(false);
     } catch (err: any) {
       const msg = String(err?.message || err || '');
@@ -100,7 +114,7 @@ export function ChannelCreateOverlay() {
     } finally {
       setCreating(false);
     }
-  }, [creating, name, selectedMembers, intro, setVisible]);
+  }, [creating, name, selectedMembers, intro, selectedProjectId, setVisible]);
 
   return (
     <Overlay
@@ -146,6 +160,26 @@ export function ChannelCreateOverlay() {
               );
             })}
           </div>
+        </div>
+        <div className={styles.createField}>
+          <label className={styles.createFieldLabel}>{t('channel.createProject')}</label>
+          <select
+            className={styles.createInput}
+            value={selectedProjectId}
+            onChange={(e) => setSelectedProjectId(e.target.value)}
+          >
+            <option value="">{t('channel.createProjectNone')}</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name || project.id}
+              </option>
+            ))}
+          </select>
+          {selectedProjectId && (
+            <div className={styles.createFieldHint}>
+              {projects.find((project) => project.id === selectedProjectId)?.workspaceRoot || ''}
+            </div>
+          )}
         </div>
         <div className={styles.createField}>
           <label className={styles.createFieldLabel}>

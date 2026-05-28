@@ -6,7 +6,7 @@ Local TDD: `./TDD.md`
 
 ## Module Responsibility
 
-`lib/channels/` owns the local channel file contract: channel metadata, message parsing, member validation, read/write locking, mention helpers, and background channel polling support. It should stay usable without assuming a specific desktop UI.
+`lib/channels/` owns the local channel file contract: channel metadata, optional project snapshot metadata, optional task-board execution-domain metadata, message parsing, member validation, read/write locking, mention helpers, and background channel polling support. It should stay usable without assuming a specific desktop UI.
 
 ## Core Scenarios
 
@@ -37,8 +37,20 @@ Feature: Channel file contract
     When routing decides whether Agent C should receive the channel message
     Then the message is not routed to Agent C
     And reply tools do not expose private channel context to Agent C
+
+  Scenario: Project metadata is snapshotted into channel frontmatter [AG-BDD-CHANNEL-006]
+    Given the caller provides a valid project snapshot while creating a channel
+    When the channel file is written
+    Then the frontmatter contains the project id and metadata fields
+    And channel projections can expose the linked project without re-reading the project registry
+
+  Scenario: Task board execution domain is snapshotted into channel frontmatter [AG-BDD-CHANNEL-008]
+    Given the caller provides a task board binding while creating or updating a channel
+    When the channel file is written
+    Then the frontmatter contains the board id, title, coordinator agent, and selected agent ids
+    And channel projections can expose the bound board without re-reading the board UI state
 ```
 
 ## Before Editing
 
-Update `EARS.md`, this file, `TDD.md`, and the full feature spec when changing channel file format, member rules, locking behavior, or route eligibility.
+Update `EARS.md`, this file, `TDD.md`, and the full feature spec when changing channel file format, member rules, project snapshot metadata, task-board metadata, locking behavior, or route eligibility.

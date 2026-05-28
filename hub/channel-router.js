@@ -24,6 +24,7 @@ import { callText } from "../core/llm-client.js";
 import { runAgentPhoneSession } from "./agent-executor.js";
 import { debugLog } from "../lib/debug-log.js";
 import { getLocale } from "../server/i18n.js";
+import { createTaskCreateTool } from "../lib/tools/task-create-tool.js";
 import {
   getAgentPhoneProjectionPath,
   readAgentPhoneProjection,
@@ -126,6 +127,60 @@ export class ChannelRouter {
     }
   }
 
+  _resolveChannelProject(channelName) {
+    try {
+      const filePath = path.join(this._engine.channelsDir || "", `${channelName}.md`);
+      if (!fs.existsSync(filePath)) return null;
+      const meta = getChannelMeta(filePath);
+      const id = typeof meta.projectId === "string" ? meta.projectId.trim() : "";
+      if (!id) return null;
+      return {
+        id,
+        name: typeof meta.projectName === "string" ? meta.projectName.trim() : "",
+        workspaceRoot: typeof meta.projectWorkspaceRoot === "string" ? meta.projectWorkspaceRoot.trim() : "",
+        docsRoot: typeof meta.projectDocsRoot === "string" ? meta.projectDocsRoot.trim() : "",
+        testCommand: typeof meta.projectTestCommand === "string" ? meta.projectTestCommand.trim() : "",
+        description: typeof meta.projectDescription === "string" ? meta.projectDescription.trim() : "",
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  _resolveChannelTaskBoard(channelName) {
+    try {
+      const filePath = path.join(this._engine.channelsDir || "", `${channelName}.md`);
+      if (!fs.existsSync(filePath)) return null;
+      const meta = getChannelMeta(filePath);
+      const id = typeof meta.taskBoardId === "string" ? meta.taskBoardId.trim() : "";
+      if (!id) return null;
+      const selectedAgentIds = Array.isArray(meta.taskBoardSelectedAgentIds)
+        ? Array.from(new Set(meta.taskBoardSelectedAgentIds.map((item) => String(item || "").trim()).filter(Boolean)))
+        : [];
+      return {
+        id,
+        title: typeof meta.taskBoardTitle === "string" ? meta.taskBoardTitle.trim() : "",
+        coordinatorAgentId: typeof meta.taskBoardCoordinatorAgentId === "string" ? meta.taskBoardCoordinatorAgentId.trim() : "",
+        selectedAgentIds,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  _resolveChannelAgentMemberIds(channelName) {
+    try {
+      const filePath = path.join(this._engine.channelsDir || "", `${channelName}.md`);
+      if (!fs.existsSync(filePath)) return [];
+      const meta = getChannelMeta(filePath);
+      return Array.isArray(meta.members)
+        ? meta.members.map((id) => String(id || "").trim()).filter(Boolean)
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
   _formatPhonePromptGuidance(agentId, settings, isZh) {
     return formatAgentPhonePromptGuidance({
       agentId,
@@ -154,7 +209,109 @@ export class ChannelRouter {
     }
   }
 
-  _createChannelPhoneTools(agentId, channelName, { setDecision } = {}) {
+  _createChannelTaskTool(agentId, channelName, { phoneSettings = null, channelProject = null } = {}) {
+    const engine = this._engine;
+    const isZh = getLocale().startsWith("zh");
+    const settings = phoneSettings || this._resolveChannelPhoneSettings(channelName);
+    const channelMemberIds = this._resolveChannelAgentMemberIds(channelName);
+    const channelTaskBoard = this._resolveChannelTaskBoard(channelName);
+    const taskCreateTool = createTaskCreateTool({
+      getTaskLedger: () => engine.taskLedger,
+      getTaskOrchestrator: () => engine.taskOrchestrator,
+      getCurrentSessionPath: () => null,
+      getParentCwd: () => channelProject?.workspaceRoot || engine.getHomeCwd?.(agentId) || engine.cwd || null,
+      listAgents: () => this._listMentionableAgents(),
+      currentAgentId: agentId,
+      createSource: ({ toolCallId }) => ({
+        type: "channel",
+        channel: channelName,
+        channelName,
+        toolName: "channel_task_create",
+        agentId,
+        toolCallId: toolCallId || null,
+        projectId: channelProject?.id || null,
+      }),
+      getExtraContextRefs: () => [{
+        type: "channel",
+        channelName,
+        projectId: channelProject?.id || null,
+        projectName: channelProject?.name || null,
+      }],
+    });
+
+    return {
+      name: "channel_task_create",
+      label: isZh ? "保存频道任务" : "Save channel task",
+      description: isZh
+        ? "把频道沟通中形成的后续工作保存到绑定项目看板 Task Ledger，避免只在聊天里承诺后遗漏。绑定看板且频道工具权限为 write 时默认启动主代理执行；只读频道只保存不执行。"
+        : "Save follow-up work from channel discussion into the bound project kanban Task Ledger so it is not lost in chat. When a board is bound and channel tool mode is write, execution starts by default; read-only channels only save.",
+      parameters: Type.Object({
+        title: Type.String({ description: isZh ? "任务标题，简短描述要跟踪的工作。" : "Short title for the work to track." }),
+        body: Type.Optional(Type.String({ description: isZh ? "任务背景、验收标准、频道结论或用户原话。" : "Context, acceptance criteria, channel decision, or user wording." })),
+        goal: Type.Optional(Type.String({ description: isZh ? "可选目标；为空时使用 body 或 title。" : "Optional goal; falls back to body or title." })),
+        status: Type.Optional(Type.String({ description: isZh ? "初始状态，默认 todo；需要准备执行时可用 ready。" : "Initial status, defaults to todo; use ready when prepared for execution." })),
+        autoStart: Type.Optional(Type.Boolean({ description: isZh ? "是否立即启动执行。默认 false；只在频道工具权限为 write 时生效。" : "Whether to start execution immediately. Defaults false and only works in channel write mode." })),
+        coordinatorAgentId: Type.Optional(Type.String({ description: isZh ? "主代理 id；省略时使用当前发起保存的 agent。" : "Coordinator agent id; defaults to the current agent." })),
+        selectedAgentIds: Type.Optional(Type.Array(Type.String(), { description: isZh ? "可协作 agent id 列表；省略时使用频道成员。" : "Collaborator-capable agent ids; defaults to channel members." })),
+        boardId: Type.Optional(Type.String({ description: isZh ? "目标看板 id；默认 default-board，确保任务在默认看板可见。" : "Target board id; defaults to default-board so the task is visible." })),
+        boardTitle: Type.Optional(Type.String({ description: isZh ? "目标看板名称。" : "Target board title." })),
+        priority: Type.Optional(Type.Number({ description: isZh ? "可选优先级，数字越大越靠前。" : "Optional priority; higher sorts first." })),
+        cwd: Type.Optional(Type.String({ description: isZh ? "任务执行目录；省略时使用频道关联项目工作空间。" : "Task working directory; defaults to the linked channel project workspace." })),
+        idempotencyKey: Type.Optional(Type.String({ description: isZh ? "可选幂等键；相同键不会重复创建未归档任务。" : "Optional idempotency key; same key will not create a duplicate unarchived task." })),
+      }),
+      execute: async (toolCallId, params = {}, signal, onUpdate) => {
+        const boundBoardAutoStart = !!channelTaskBoard?.id && params.autoStart !== false && !params.status;
+        const requestedAutoStart = params.autoStart === true || params.status === "running" || boundBoardAutoStart;
+        const orchestratorAvailable = !!engine.taskOrchestrator?.createRun;
+        const canAutoStart = settings.toolMode === "write" && orchestratorAvailable;
+        const autoStart = requestedAutoStart && canAutoStart;
+        const status = params.status === "running"
+          ? (autoStart ? "running" : "ready")
+          : (params.status || (requestedAutoStart ? "ready" : "todo"));
+        const safeParams = {
+          ...params,
+          status,
+          autoStart,
+          boardId: params.boardId || channelTaskBoard?.id || "default-board",
+          boardTitle: params.boardTitle || channelTaskBoard?.title || (isZh ? "默认项目" : "Default project"),
+          cwd: params.cwd || channelProject?.workspaceRoot || undefined,
+          coordinatorAgentId: params.coordinatorAgentId || params.assigneeAgentId || channelTaskBoard?.coordinatorAgentId || agentId,
+          selectedAgentIds: Array.isArray(params.selectedAgentIds)
+            ? params.selectedAgentIds
+            : channelTaskBoard?.selectedAgentIds?.length
+              ? channelTaskBoard.selectedAgentIds
+              : channelMemberIds,
+          idempotencyKey: params.idempotencyKey || (toolCallId ? `channel:${channelName}:${toolCallId}` : undefined),
+        };
+        const result = await taskCreateTool.execute(toolCallId, safeParams, signal, onUpdate, null);
+        result.details = {
+          ...(result.details || {}),
+          taskBoardBound: !!channelTaskBoard?.id,
+          taskBoardId: safeParams.boardId,
+          autoStartRequestedByTaskBoardBinding: boundBoardAutoStart,
+        };
+        if (requestedAutoStart && !canAutoStart) {
+          result.details = {
+            ...(result.details || {}),
+            autoStartBlockedByToolMode: settings.toolMode !== "write",
+            autoStartUnavailable: settings.toolMode === "write" && !orchestratorAvailable,
+          };
+          if (Array.isArray(result.content) && result.content[0]?.type === "text") {
+            result.content[0].text += isZh
+              ? (settings.toolMode !== "write"
+                ? " 当前频道工具权限为只读，任务已保存但未自动执行。"
+                : " 当前任务执行器不可用，任务已保存但未自动执行。")
+              : (settings.toolMode !== "write"
+                ? " Channel tool mode is read-only, so the task was saved but not started."
+                : " The task orchestrator is unavailable, so the task was saved but not started.");
+          }
+        }
+        return result;
+      },
+    };
+  }
+
+  _createChannelPhoneTools(agentId, channelName, { setDecision, phoneSettings = null, channelProject = null } = {}) {
     const engine = this._engine;
     const isZh = getLocale().startsWith("zh");
     const channelFile = path.join(engine.channelsDir || "", `${channelName}.md`);
@@ -197,6 +354,7 @@ export class ChannelRouter {
           };
         },
       },
+      this._createChannelTaskTool(agentId, channelName, { phoneSettings, channelProject }),
       {
         name: "channel_reply",
         label: isZh ? "发送频道消息" : "Send channel message",
@@ -593,6 +751,30 @@ export class ChannelRouter {
       ].join("\n");
   }
 
+  _formatChannelProjectGuidance(project, isZh) {
+    if (!project?.id) return "";
+    const lines = isZh
+      ? [
+        "频道关联项目：",
+        `- 项目：${project.name || project.id}`,
+        project.workspaceRoot ? `- 工作空间：${project.workspaceRoot}` : "",
+        project.docsRoot ? `- 文档目录：${project.docsRoot}` : "",
+        project.testCommand ? `- 验证命令：${project.testCommand}` : "",
+        project.description ? `- 项目说明：${project.description}` : "",
+        "- 本频道内涉及研发、测试、架构工作时，默认使用这个项目工作空间；不要使用 Agent 默认空间，除非用户另行指定。",
+      ]
+      : [
+        "Linked project:",
+        `- Project: ${project.name || project.id}`,
+        project.workspaceRoot ? `- Workspace: ${project.workspaceRoot}` : "",
+        project.docsRoot ? `- Docs: ${project.docsRoot}` : "",
+        project.testCommand ? `- Test command: ${project.testCommand}` : "",
+        project.description ? `- Notes: ${project.description}` : "",
+        "- For development, testing, and architecture work in this channel, use this project workspace by default unless the user says otherwise.",
+      ];
+    return lines.filter(Boolean).join("\n");
+  }
+
   async _executeReply(agentId, channelName, msgText, {
     signal,
     messageCount = null,
@@ -602,8 +784,10 @@ export class ChannelRouter {
   } = {}) {
     const isZh = getLocale().startsWith("zh");
     const phoneSettings = this._resolveChannelPhoneSettings(channelName);
+    const channelProject = this._resolveChannelProject(channelName);
     const promptGuidance = this._formatPhonePromptGuidance(agentId, phoneSettings, isZh);
     const behaviorGuidance = this._formatChannelBehaviorGuidance(agentId, mentionedAgents, mentionTargeted, isZh);
+    const projectGuidance = this._formatChannelProjectGuidance(channelProject, isZh);
     const zhIntro = proactive
       ? `你的手机收到了 #${channelName} 的频道提醒。\n\n`
         + `以下是最近的频道内容，来源是频道聊天记录 Truth，不是用户单独发给你的请求，也不一定是新消息：\n\n`
@@ -622,18 +806,22 @@ export class ChannelRouter {
         {
           text: isZh
             ? zhIntro
+              + (projectGuidance ? `${projectGuidance}\n\n` : "")
               + `${msgText || "（没有新消息）"}\n\n`
               + `请像群聊成员一样阅读并行动：\n`
               + `${behaviorGuidance}\n`
               + `- 需要旧上下文时，用 channel_read_context 读取频道 Truth；需要事实和长期背景时，用 search_memory\n`
+              + `- 如果沟通形成了后续工作、回修、验证项或需要有人执行的决定，先调用 channel_task_create 保存到看板，再回复；不要只靠文字承诺或 todo_write 做持久追踪\n`
               + `${promptGuidance}\n`
               + `- 本轮最后必须调用 channel_reply 或 channel_pass 之一完成动作\n`
               + `- 不要把最终群聊回复写在普通文本里；只有 channel_reply.content 会进入群聊`
             : enIntro
+              + (projectGuidance ? `${projectGuidance}\n\n` : "")
               + `${msgText || "(No new messages)"}\n\n`
               + `Read and act like a group chat member:\n`
               + `${behaviorGuidance}\n`
               + `- Use channel_read_context for older channel Truth; use search_memory for facts and long-term background\n`
+              + `- If the discussion creates follow-up work, fixes, verification, or a decision someone must act on, call channel_task_create to save it to the kanban before replying; do not rely on text promises or todo_write for durable tracking\n`
               + `${promptGuidance}\n`
               + `- End this turn by calling exactly one of channel_reply or channel_pass\n`
               + `- Do not write the final channel reply as ordinary text; only channel_reply.content enters the channel`,
@@ -647,8 +835,11 @@ export class ChannelRouter {
         conversationType: "channel",
         toolMode: phoneSettings.toolMode,
         modelOverride: phoneSettings.modelOverrideEnabled ? phoneSettings.modelOverrideModel : null,
+        workspaceRoot: channelProject?.workspaceRoot || null,
         emitEvents: true,
         extraCustomTools: this._createChannelPhoneTools(agentId, channelName, {
+          phoneSettings,
+          channelProject,
           setDecision: (next) => { if (!decision) decision = next; },
         }),
         onSessionReady: (sessionPath) => {

@@ -313,6 +313,18 @@
     color: var(--text-muted);
 }
 
+.channelHeaderProject {
+    max-width: 260px;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    background: var(--overlay-subtle);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .channelHeaderActions {
     display: flex;
     align-items: center;
@@ -675,6 +687,15 @@
     color: var(--text-muted);
 }
 
+.createFieldHint {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .createActions {
     display: flex;
     justify-content: flex-end;
@@ -811,6 +832,21 @@
     color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.channelMemberUsage {
+    width: 72px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+    color: var(--text-muted);
+    font-size: 0.58rem;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.72;
     white-space: nowrap;
 }
 

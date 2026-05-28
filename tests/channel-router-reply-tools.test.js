@@ -32,6 +32,7 @@ vi.mock("../lib/debug-log.js", () => ({
 
 import { ChannelRouter } from "../hub/channel-router.js";
 import { readAgentPhoneProjection, getAgentPhoneProjectionPath } from "../lib/conversations/agent-phone-projection.js";
+import { TaskLedger } from "../lib/task-ledger.js";
 
 describe("ChannelRouter reply tool boundary", () => {
   it("runs channel phone delivery with channel-scoped decision tools", async () => {
@@ -219,6 +220,252 @@ describe("ChannelRouter reply tool boundary", () => {
     expect(runAgentPhoneSessionMock.mock.calls[0][2]).toMatchObject({
       toolMode: "write",
     });
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("passes the linked channel project workspace into the phone session", async () => {
+    runAgentPhoneSessionMock.mockClear();
+
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "hana-channel-project-workspace-"));
+    const channelsDir = path.join(root, "channels");
+    const workspaceRoot = path.join(root, "calculator-app");
+    fs.mkdirSync(channelsDir, { recursive: true });
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(channelsDir, "ch_calc.md"),
+      [
+        "---",
+        "id: ch_calc",
+        "members: [coder, tester]",
+        "projectId: prj_calc",
+        "projectName: Calculator",
+        `projectWorkspaceRoot: ${workspaceRoot}`,
+        "projectTestCommand: npm test",
+        "---",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    const router = new ChannelRouter({
+      hub: {
+        engine: {
+          marker: "engine",
+          channelsDir,
+          getAgent: () => ({ config: { agent: { yuan: "hanako" } } }),
+        },
+        eventBus: { emit: vi.fn() },
+      },
+    });
+
+    await router._executeReply(
+      "coder",
+      "ch_calc",
+      "user: 请实现计算器页面。",
+    );
+
+    const rounds = runAgentPhoneSessionMock.mock.calls[0][1];
+    const options = runAgentPhoneSessionMock.mock.calls[0][2];
+    expect(rounds[0].text).toContain(workspaceRoot);
+    expect(rounds[0].text).toContain("npm test");
+    expect(options).toMatchObject({ workspaceRoot });
+
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("persists channel discussion follow-up tasks into TaskLedger", async () => {
+    runAgentSessionMock.mockClear();
+    runAgentPhoneSessionMock.mockClear();
+
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "hana-channel-task-ledger-"));
+    const channelsDir = path.join(root, "channels");
+    const agentsDir = path.join(root, "agents");
+    const userDir = path.join(root, "user");
+    const productDir = path.join(root, "product");
+    const workspaceRoot = path.join(root, "calculator-app");
+    fs.mkdirSync(path.join(agentsDir, "coder"), { recursive: true });
+    fs.mkdirSync(channelsDir, { recursive: true });
+    fs.mkdirSync(userDir, { recursive: true });
+    fs.mkdirSync(path.join(productDir, "yuan"), { recursive: true });
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    fs.writeFileSync(path.join(agentsDir, "coder", "config.yaml"), "agent:\n  name: Coder\n", "utf-8");
+    fs.writeFileSync(
+      path.join(channelsDir, "ch_calc.md"),
+      [
+        "---",
+        "id: ch_calc",
+        "members: [coder, reviewer]",
+        "projectId: prj_calc",
+        "projectName: Calculator",
+        `projectWorkspaceRoot: ${workspaceRoot}`,
+        "---",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+    const ledgerPath = path.join(root, "task-ledger.json");
+    const ledger = new TaskLedger({ persistencePath: ledgerPath });
+    const createRun = vi.fn();
+
+    runAgentPhoneSessionMock.mockImplementationOnce(async (_agentId, _rounds, options) => {
+      const taskTool = options.extraCustomTools.find((tool) => tool.name === "channel_task_create");
+      const replyTool = options.extraCustomTools.find((tool) => tool.name === "channel_reply");
+      expect(taskTool).toBeTruthy();
+      const result = await taskTool.execute("task-call-1", {
+        title: "修复 file 打开后按钮无响应",
+        body: "频道确认页面直接打开后点击数字显示不变，需要回修并验证。",
+        autoStart: true,
+      });
+      expect(result.details.autoStartBlockedByToolMode).toBe(true);
+      await replyTool.execute("reply-call-1", { content: "已保存回修任务到看板。" });
+      return "";
+    });
+
+    const router = new ChannelRouter({
+      hub: {
+        engine: {
+          channelsDir,
+          agentsDir,
+          userDir,
+          productDir,
+          taskLedger: ledger,
+          taskOrchestrator: { createRun },
+          isChannelsEnabled: () => true,
+          getHomeCwd: () => root,
+          listAgents: () => [
+            { id: "coder", name: "Coder" },
+            { id: "reviewer", name: "Reviewer" },
+          ],
+          getAgent: (id) => ({ id, agentName: id, config: { agent: { name: id } } }),
+        },
+        eventBus: { emit: vi.fn() },
+      },
+    });
+
+    await router._executeCheck(
+      "coder",
+      "ch_calc",
+      [{ sender: "user", timestamp: "2026-05-28 11:29:37", body: "现在点击数字计算器上面的信息都不变" }],
+      [],
+    );
+
+    const tasks = ledger.listTasks({ sourceType: "channel" });
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]).toMatchObject({
+      title: "修复 file 打开后按钮无响应",
+      status: "ready",
+      source: {
+        type: "channel",
+        channelName: "ch_calc",
+        toolName: "channel_task_create",
+        agentId: "coder",
+      },
+      cwd: workspaceRoot,
+      assignee: { type: "agent", id: "coder" },
+      idempotencyKey: "channel:ch_calc:task-call-1",
+    });
+    expect(tasks[0].contextRefs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "task_board", boardId: "default-board" }),
+      expect.objectContaining({ type: "channel", channelName: "ch_calc", projectId: "prj_calc" }),
+    ]));
+    expect(createRun).not.toHaveBeenCalled();
+    expect(new TaskLedger({ persistencePath: ledgerPath }).listTasks({ sourceType: "channel" })).toHaveLength(1);
+
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("uses a bound task board as the channel task execution domain", async () => {
+    runAgentPhoneSessionMock.mockClear();
+
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "hana-channel-task-board-"));
+    const channelsDir = path.join(root, "channels");
+    const agentsDir = path.join(root, "agents");
+    const userDir = path.join(root, "user");
+    const productDir = path.join(root, "product");
+    fs.mkdirSync(path.join(agentsDir, "coder"), { recursive: true });
+    fs.mkdirSync(path.join(agentsDir, "reviewer"), { recursive: true });
+    fs.mkdirSync(channelsDir, { recursive: true });
+    fs.mkdirSync(userDir, { recursive: true });
+    fs.mkdirSync(path.join(productDir, "yuan"), { recursive: true });
+    fs.writeFileSync(
+      path.join(channelsDir, "ch_calc.md"),
+      [
+        "---",
+        "id: ch_calc",
+        "members: [coder, reviewer]",
+        "agentPhoneToolMode: write",
+        "taskBoardId: board_calc",
+        "taskBoardTitle: Calculator",
+        "taskBoardCoordinatorAgentId: reviewer",
+        "taskBoardSelectedAgentIds: [reviewer, coder]",
+        "---",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+    const ledger = new TaskLedger({ persistencePath: path.join(root, "task-ledger.json") });
+    const createRun = vi.fn((input) => ({ id: "run-bound", taskId: input.taskId, status: "running", nodes: input.nodes, edges: [] }));
+
+    runAgentPhoneSessionMock.mockImplementationOnce(async (_agentId, _rounds, options) => {
+      const taskTool = options.extraCustomTools.find((tool) => tool.name === "channel_task_create");
+      const result = await taskTool.execute("task-call-bound", {
+        title: "实现计算器按键反馈",
+        body: "频道确认需要修复按键反馈。",
+      });
+      expect(result.details).toMatchObject({
+        taskBoardBound: true,
+        taskBoardId: "board_calc",
+        autoStartRequestedByTaskBoardBinding: true,
+        autoStart: true,
+      });
+      return "";
+    });
+
+    const router = new ChannelRouter({
+      hub: {
+        engine: {
+          channelsDir,
+          agentsDir,
+          userDir,
+          productDir,
+          taskLedger: ledger,
+          taskOrchestrator: { createRun },
+          isChannelsEnabled: () => true,
+          getHomeCwd: () => root,
+          listAgents: () => [
+            { id: "coder", name: "Coder" },
+            { id: "reviewer", name: "Reviewer" },
+          ],
+          getAgent: (id) => ({ id, agentName: id, config: { agent: { name: id } } }),
+        },
+        eventBus: { emit: vi.fn() },
+      },
+    });
+
+    await router._executeCheck(
+      "coder",
+      "ch_calc",
+      [{ sender: "user", timestamp: "2026-05-28 12:00:00", body: "这个需要有人做掉" }],
+      [],
+    );
+
+    const tasks = ledger.listTasks({ sourceType: "channel" });
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]).toMatchObject({
+      assignee: { type: "agent", id: "reviewer" },
+    });
+    expect(tasks[0].contextRefs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: "task_board",
+        boardId: "board_calc",
+        boardTitle: "Calculator",
+        coordinatorAgentId: "reviewer",
+        selectedAgentIds: ["reviewer", "coder"],
+      }),
+    ]));
+    expect(createRun).toHaveBeenCalledOnce();
+    expect(createRun.mock.calls[0][0].nodes.map((node) => node.agentId)).toEqual(["coder", "reviewer"]);
+
     fs.rmSync(root, { recursive: true, force: true });
   });
 

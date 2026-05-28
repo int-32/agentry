@@ -1,4 +1,4 @@
-import type { AgentPhoneToolMode, Channel, ChannelAgentActivities, ChannelMessage } from '../types';
+import type { AgentPhoneToolMode, Channel, ChannelAgentActivities, ChannelMessage, ChannelTokenUsageByConversation } from '../types';
 
 export interface ChannelSlice {
   channels: Channel[];
@@ -12,6 +12,7 @@ export interface ChannelSlice {
   channelInfoName: string;
   channelIsDM: boolean;
   channelAgentActivities: ChannelAgentActivities;
+  channelAgentTokenUsage: ChannelTokenUsageByConversation;
   channelAgentPhoneToolMode: AgentPhoneToolMode;
   channelAgentReplyMinChars: number | null;
   channelAgentReplyMaxChars: number | null;
@@ -41,6 +42,7 @@ export const createChannelSlice = (
   channelInfoName: '',
   channelIsDM: false,
   channelAgentActivities: {},
+  channelAgentTokenUsage: {},
   channelAgentPhoneToolMode: 'read_only',
   channelAgentReplyMinChars: null,
   channelAgentReplyMaxChars: null,

@@ -22,7 +22,7 @@ import type { MemberInfo } from './channels/ChannelList';
 import { ChatTranscript } from './chat/ChatTranscript';
 import { ContextMenu, type ContextMenuItem } from '../ui';
 import type { ChatListItem, ChatMessage, ContentBlock } from '../stores/chat-types';
-import type { AgentPhoneActivity, Model } from '../types';
+import type { AgentPhoneActivity, ChannelTokenUsage, Model } from '../types';
 import styles from './channels/Channels.module.css';
 import chatStyles from './chat/Chat.module.css';
 
@@ -151,16 +151,17 @@ export function ChannelMessages() {
     previousLengthRef.current = messages.length;
   }, [currentChannel, getScrollContainer, messages.length, scrollToBottom]);
 
+  const renderedMessages = useMemo(() => messages.map(msg => ({
+    msg,
+    html: renderChannelMarkdownCached(msg),
+  })), [messages]);
+
   if (!currentChannel || messages.length === 0) {
     return <div className={styles.channelWelcome}>{t('channel.noMessages')}</div>;
   }
 
   const ch = channels.find((c) => c.id === currentChannel);
   const isDM = ch?.isDM ?? false;
-  const renderedMessages = useMemo(() => messages.map(msg => ({
-    msg,
-    html: renderChannelMarkdownCached(msg),
-  })), [messages]);
   let lastSender: string | null = null;
 
   return (
@@ -219,12 +220,44 @@ export function ChannelMessages() {
 
 // ── ChannelMembers — 右侧面板成员列表
 
-function MemberItem({ info, memberId, onRemove, removeDisabled, removeTitle }: {
+const EMPTY_CHANNEL_TOKEN_USAGE: ChannelTokenUsage = { today: 0, week: 0 };
+
+function formatTokenCount(value: number | null | undefined): string {
+  const safe = Math.max(0, Math.floor(Number(value) || 0));
+  if (safe >= 1_000_000) {
+    const digits = safe >= 10_000_000 ? 0 : 1;
+    return `${(safe / 1_000_000).toFixed(digits)}M`;
+  }
+  if (safe >= 1_000) {
+    const digits = safe >= 10_000 ? 0 : 1;
+    return `${(safe / 1_000).toFixed(digits)}k`;
+  }
+  return String(safe);
+}
+
+function MemberTokenUsage({ usage }: { usage?: ChannelTokenUsage }) {
+  const { t } = useI18n();
+  const today = formatTokenCount(usage?.today ?? 0);
+  const week = formatTokenCount(usage?.week ?? 0);
+
+  return (
+    <div
+      className={styles.channelMemberUsage}
+      title={t('channel.tokenUsageTitle', { today, week })}
+    >
+      <span>{t('channel.tokenTodayShort', { value: today })}</span>
+      <span>{t('channel.tokenWeekShort', { value: week })}</span>
+    </div>
+  );
+}
+
+function MemberItem({ info, memberId, onRemove, removeDisabled, removeTitle, tokenUsage }: {
   info: MemberInfo;
   memberId?: string;
   onRemove?: (memberId: string, info: MemberInfo) => void;
   removeDisabled?: boolean;
   removeTitle?: string;
+  tokenUsage?: ChannelTokenUsage;
 }) {
   return (
     <div className={styles.channelMemberItem}>
@@ -232,6 +265,7 @@ function MemberItem({ info, memberId, onRemove, removeDisabled, removeTitle }: {
         <MemberAvatar info={info} className={styles.channelMemberAvatarImg} />
       </div>
       <div className={styles.channelMemberName}>{info.displayName}</div>
+      {tokenUsage && <MemberTokenUsage usage={tokenUsage} />}
       {onRemove && (
         <button
           type="button"
@@ -254,6 +288,7 @@ export function ChannelMembers() {
   const { t } = useI18n();
   const currentChannel = useStore(s => s.currentChannel);
   const channelMembers = useStore(s => s.channelMembers);
+  const channelAgentTokenUsage = useStore(s => s.channelAgentTokenUsage);
   const isDM = useStore(s => s.channelIsDM);
   const agents = useStore(s => s.agents);
   const userName = useStore(s => s.userName);
@@ -276,6 +311,7 @@ export function ChannelMembers() {
 
   const availableAgents = agents.filter((agent) => !channelMembers.includes(agent.id));
   const canRemoveMembers = channelMembers.length > 2;
+  const memberTokenUsage = channelAgentTokenUsage[currentChannel] || {};
 
   const handleAddClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -314,6 +350,7 @@ export function ChannelMembers() {
           key={memberId}
           memberId={memberId}
           info={resolve(memberId)}
+          tokenUsage={memberTokenUsage[memberId] || EMPTY_CHANNEL_TOKEN_USAGE}
           onRemove={handleRemove}
           removeDisabled={!canRemoveMembers || busyMemberId === memberId}
           removeTitle={canRemoveMembers ? t('channel.removeMember') : t('channel.minMembers')}

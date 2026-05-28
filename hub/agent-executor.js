@@ -191,6 +191,18 @@ function resolveStoredSessionPath(agentDir, stored) {
   return resolved;
 }
 
+function resolveSessionWorkspace(engine, agentId, workspaceRoot) {
+  const requested = typeof workspaceRoot === "string" ? workspaceRoot.trim() : "";
+  if (requested) {
+    try {
+      if (path.isAbsolute(requested) && fs.statSync(requested).isDirectory()) return requested;
+    } catch {
+      // Fall back to the agent home folder below.
+    }
+  }
+  return engine.getHomeCwd(agentId) || process.cwd();
+}
+
 async function maybeCompactPhoneSession(session, { isActive = false, onActivity } = {}) {
   const usage = session.getContextUsage?.() ?? null;
   const reason = shouldCompactAgentPhoneSession({
@@ -403,6 +415,7 @@ export async function runAgentPhoneSession(agentId, rounds, {
   noMemory = false,
   toolMode = "read_only",
   modelOverride = null,
+  workspaceRoot = null,
   onActivity,
   onSessionReady,
   emitEvents = false,
@@ -429,7 +442,7 @@ export async function runAgentPhoneSession(agentId, rounds, {
     systemAppend ? `${basePrompt}\n\n${systemAppend}` : basePrompt;
   tempResourceLoader.getSkills = () => ctx.getSkillsForAgent(agent);
 
-  const cwd = engine.getHomeCwd(agentId) || process.cwd();
+  const cwd = resolveSessionWorkspace(engine, agentId, workspaceRoot);
   const sessionDir = getAgentPhoneSessionDir(agentDir, conversationId);
   fs.mkdirSync(sessionDir, { recursive: true });
 
@@ -459,7 +472,7 @@ export async function runAgentPhoneSession(agentId, rounds, {
   const phonePermissionMode = getAgentPhonePermissionMode(toolMode);
   const built = ctx.buildTools(cwd, agentToolsSnapshot, {
     agentDir,
-    workspace: engine.getHomeCwd(agentId),
+    workspace: cwd,
     getSessionPath: () => sessionManager?.getSessionFile?.() || null,
     getPermissionMode: () => phonePermissionMode,
   });

@@ -35,6 +35,7 @@ import {
   updateChannelMeta,
 } from "../../lib/channels/channel-store.js";
 import { extractMentionedAgentIds } from "../../lib/channels/channel-mentions.js";
+import { createProjectRegistry } from "../../lib/projects/project-registry.js";
 import { normalizeAgentPhoneToolMode } from "../../lib/conversations/agent-phone-session.js";
 import {
   DEFAULT_AGENT_PHONE_SETTINGS,
@@ -49,6 +50,7 @@ import {
   readAgentPhoneProjection,
   updateAgentPhoneProjectionMeta,
 } from "../../lib/conversations/agent-phone-projection.js";
+import { readChannelTokenUsageByMember } from "../../lib/channels/channel-token-usage.js";
 import { resolveAgent } from "../utils/resolve-agent.js";
 import { findModel } from "../../shared/model-ref.js";
 
@@ -123,6 +125,72 @@ function readChannelPhoneSettingsFromMeta(meta) {
   };
 }
 
+function readChannelProjectFromMeta(meta = {}) {
+  const id = typeof meta.projectId === "string" ? meta.projectId.trim() : "";
+  if (!id) return null;
+  return {
+    id,
+    name: typeof meta.projectName === "string" ? meta.projectName : "",
+    workspaceRoot: typeof meta.projectWorkspaceRoot === "string" ? meta.projectWorkspaceRoot : "",
+    docsRoot: typeof meta.projectDocsRoot === "string" ? meta.projectDocsRoot : "",
+    testCommand: typeof meta.projectTestCommand === "string" ? meta.projectTestCommand : "",
+    description: typeof meta.projectDescription === "string" ? meta.projectDescription : "",
+  };
+}
+
+function normalizeTextList(value) {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value.map((item) => String(item || "").trim()).filter(Boolean)));
+}
+
+function readChannelTaskBoardFromMeta(meta = {}) {
+  const id = typeof meta.taskBoardId === "string" ? meta.taskBoardId.trim() : "";
+  if (!id) return null;
+  return {
+    id,
+    title: typeof meta.taskBoardTitle === "string" ? meta.taskBoardTitle : "",
+    coordinatorAgentId: typeof meta.taskBoardCoordinatorAgentId === "string" ? meta.taskBoardCoordinatorAgentId.trim() : "",
+    selectedAgentIds: normalizeTextList(meta.taskBoardSelectedAgentIds),
+  };
+}
+
+function normalizeTaskBoardPayload(body = {}) {
+  const taskBoard = body.taskBoard && typeof body.taskBoard === "object" && !Array.isArray(body.taskBoard)
+    ? body.taskBoard
+    : body;
+  const id = typeof taskBoard.id === "string"
+    ? taskBoard.id.trim()
+    : typeof taskBoard.boardId === "string"
+      ? taskBoard.boardId.trim()
+      : typeof taskBoard.taskBoardId === "string"
+        ? taskBoard.taskBoardId.trim()
+        : "";
+  if (!id) return null;
+  return {
+    id,
+    title: typeof taskBoard.title === "string"
+      ? taskBoard.title.trim()
+      : typeof taskBoard.boardTitle === "string"
+        ? taskBoard.boardTitle.trim()
+        : "",
+    coordinatorAgentId: typeof taskBoard.coordinatorAgentId === "string" ? taskBoard.coordinatorAgentId.trim() : "",
+    selectedAgentIds: normalizeTextList(taskBoard.selectedAgentIds),
+  };
+}
+
+async function resolveProjectForChannel(registry, projectId) {
+  const normalizedId = typeof projectId === "string" ? projectId.trim() : "";
+  if (!normalizedId) return null;
+  const projects = await registry.listProjects();
+  const project = projects.find((entry) => entry.id === normalizedId);
+  if (!project) {
+    const err = new Error("Project not found");
+    err.status = 404;
+    throw err;
+  }
+  return project;
+}
+
 function assertAvailableModelOverride(engine, settings) {
   if (!settings.modelOverrideEnabled || !settings.modelOverrideModel) return;
   const { id, provider } = settings.modelOverrideModel;
@@ -139,6 +207,7 @@ function assertAvailableModelOverride(engine, settings) {
 
 export function createChannelsRoute(engine, hub) {
   const route = new Hono();
+  const projectRegistry = createProjectRegistry({ userDir: engine.userDir });
 
   /** 用户 bookmark 文件路径 */
   function userBookmarkPath() {
@@ -340,6 +409,8 @@ export function createChannelsRoute(engine, hub) {
           id: channelId,
           name: meta.name || channelId,
           description: meta.description || "",
+          project: readChannelProjectFromMeta(meta),
+          taskBoard: readChannelTaskBoardFromMeta(meta),
           members,
           messageCount: messages.length,
           newMessageCount,
@@ -366,7 +437,7 @@ export function createChannelsRoute(engine, hub) {
   route.post("/channels", async (c) => {
     try {
       const body = await safeJson(c);
-      const { name, description, members, intro } = body;
+      const { name, description, members, intro, projectId } = body;
 
       if (!name || typeof name !== "string") {
         return c.json({ error: "name is required" }, 400);
@@ -380,11 +451,14 @@ export function createChannelsRoute(engine, hub) {
 
       const channelsDir = engine.channelsDir;
       fs.mkdirSync(channelsDir, { recursive: true });
+      const project = await resolveProjectForChannel(projectRegistry, projectId);
 
       const { id: channelId } = await createChannel(channelsDir, {
         name,
         description: description || undefined,
         members: normalizedMembers,
+        project,
+        taskBoard: normalizeTaskBoardPayload(body) || undefined,
         intro: intro || undefined,
       });
 
@@ -402,7 +476,15 @@ export function createChannelsRoute(engine, hub) {
       await addBookmarkEntry(userBookmarkPath(), channelId);
 
       debugLog()?.log("api", `POST /channels — created "${channelId}" (${name}) members=[${normalizedMembers}]`);
-      return c.json({ ok: true, id: channelId, name, members: normalizedMembers });
+      const taskBoard = normalizeTaskBoardPayload(body);
+      return c.json({ ok: true, id: channelId, name, members: normalizedMembers, taskBoard, project: project ? readChannelProjectFromMeta({
+        projectId: project.id,
+        projectName: project.name,
+        projectWorkspaceRoot: project.workspaceRoot,
+        projectDocsRoot: project.docsRoot,
+        projectTestCommand: project.testCommand,
+        projectDescription: project.description,
+      }) : null });
     } catch (err) {
       if (err.message?.includes("已存在")) {
         return c.json({ error: err.message }, 409);
@@ -430,9 +512,45 @@ export function createChannelsRoute(engine, hub) {
         id: meta.id || name,
         name: meta.name || name,
         description: meta.description || "",
+        project: readChannelProjectFromMeta(meta),
+        taskBoard: readChannelTaskBoardFromMeta(meta),
         messages,
         members,
+        tokenUsage: readChannelTokenUsageByMember({
+          agentsDir: engine.agentsDir,
+          members,
+          conversationId: meta.id || name,
+        }),
       });
+    } catch (err) {
+      return c.json({ error: err.message }, 500);
+    }
+  });
+
+  route.post("/channels/:name/task-board", async (c) => {
+    try {
+      const name = c.req.param("name");
+      const filePath = safeChannelPath(name);
+      if (!filePath) return c.json({ error: "Invalid channel id" }, 400);
+      if (!fs.existsSync(filePath)) return c.json({ error: "Channel not found" }, 404);
+
+      const body = await safeJson(c);
+      const taskBoard = normalizeTaskBoardPayload(body);
+      await updateChannelMeta(filePath, taskBoard ? {
+        taskBoardId: taskBoard.id,
+        taskBoardTitle: taskBoard.title,
+        taskBoardCoordinatorAgentId: taskBoard.coordinatorAgentId,
+        taskBoardSelectedAgentIds: taskBoard.selectedAgentIds,
+      } : {
+        taskBoardId: "",
+        taskBoardTitle: "",
+        taskBoardCoordinatorAgentId: "",
+        taskBoardSelectedAgentIds: [],
+      });
+      const meta = getChannelMeta(filePath);
+      const next = readChannelTaskBoardFromMeta(meta);
+      debugLog()?.log("api", `POST /channels/${name}/task-board board=${next?.id || "(none)"}`);
+      return c.json({ ok: true, taskBoard: next });
     } catch (err) {
       return c.json({ error: err.message }, 500);
     }
