@@ -374,6 +374,7 @@ describe('session-actions', () => {
         memoryEnabled: true,
         selectedFolder: '/workspace-a',
         workspaceFolders: ['/reference-a'],
+        currentAgentId: 'genta',
       });
       mockFetch.mockResolvedValueOnce(jsonResponse({
         ok: true,
@@ -393,11 +394,48 @@ describe('session-actions', () => {
             memoryEnabled: true,
             cwd: '/workspace-a',
             workspaceFolders: ['/reference-a'],
+            currentAgentId: 'genta',
             currentSessionPath: null,
           }),
         }),
       );
       expect(mockState.workspaceFolders).toEqual(['/reference-a']);
+    });
+
+    it('forwards selectedAgentId and currentAgentId so the server can branch off the focus agent', async () => {
+      // 回归：commit 0a6146b 后服务端只在 explicit currentAgentId 与 agentId 不等时
+      // 走 createSessionForAgent；客户端若不传 currentAgentId，永远 fallback 到焦点 agent。
+      (window as unknown as { i18n: { defaultName: string } }).i18n = { defaultName: '' };
+      Object.assign(mockState, {
+        pendingNewSession: true,
+        memoryEnabled: true,
+        currentAgentId: 'genta',
+        selectedAgentId: 'other-agent',
+        agents: [{ id: 'other-agent', name: 'Other Agent', yuan: 'hanako' }],
+      });
+      mockFetch.mockResolvedValueOnce(jsonResponse({
+        ok: true,
+        path: '/session/other.jsonl',
+        agentId: 'other-agent',
+        agentName: 'Other Agent',
+      }));
+      mockFetch.mockResolvedValueOnce(jsonResponse([]));
+
+      await expect(ensureSession()).resolves.toBe(true);
+
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        1,
+        '/api/sessions/new',
+        expect.objectContaining({
+          body: JSON.stringify({
+            memoryEnabled: true,
+            agentId: 'other-agent',
+            currentAgentId: 'genta',
+            currentSessionPath: null,
+          }),
+        }),
+      );
+      expect(mockState.currentAgentId).toBe('other-agent');
     });
 
     it('surfaces the server error when pending session creation fails', async () => {

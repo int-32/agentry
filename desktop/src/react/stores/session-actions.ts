@@ -550,6 +550,9 @@ export async function ensureSession(): Promise<boolean> {
     if (s.selectedAgentId && s.selectedAgentId !== s.currentAgentId) {
       body.agentId = s.selectedAgentId;
     }
+    if (s.currentAgentId) {
+      body.currentAgentId = s.currentAgentId;
+    }
     body.currentSessionPath = s.currentSessionPath;
 
     const res = await hanaFetch('/api/sessions/new', {
