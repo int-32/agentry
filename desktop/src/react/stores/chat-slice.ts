@@ -30,6 +30,7 @@ export interface ChatSlice {
    */
   _loadMessagesVersion: Record<string, number>;
   scrollPositions: Record<string, number>;
+  scrollToBottomRequests: Record<string, number>;
 
   initSession: (path: string, items: ChatListItem[], hasMore: boolean) => void;
   prependItems: (path: string, items: ChatListItem[], hasMore: boolean) => void;
@@ -50,6 +51,8 @@ export interface ChatSlice {
   setLoadingMore: (path: string, loading: boolean) => void;
   clearSession: (path: string) => void;
   saveScrollPosition: (path: string, scrollTop: number) => void;
+  requestScrollToBottom: (path: string) => void;
+  clearScrollToBottomRequest: (path: string, request: number) => void;
 }
 
 const MAX_CACHED_SESSIONS = 8;
@@ -64,6 +67,7 @@ export const createChatSlice = (
   sessionModelsByPath: {},
   _loadMessagesVersion: {},
   scrollPositions: {},
+  scrollToBottomRequests: {},
 
   initSession: (path, items, hasMore) => set((s) => {
     const sessions = { ...s.chatSessions };
@@ -360,6 +364,8 @@ export const createChatSlice = (
     delete versions[path];
     const scrollPositions = { ...s.scrollPositions };
     delete scrollPositions[path];
+    const scrollToBottomRequests = { ...s.scrollToBottomRequests };
+    delete scrollToBottomRequests[path];
     // FileRef 缓存和 streamBuffer 都绑定 session 生命周期，归属方主动清
     invalidateSessionCache(path);
     invalidateStreamBuffer(path);
@@ -371,12 +377,25 @@ export const createChatSlice = (
       sessionModelsByPath: models,
       _loadMessagesVersion: versions,
       scrollPositions,
+      scrollToBottomRequests,
     };
   }),
 
   saveScrollPosition: (path, scrollTop) => set((s) => ({
     scrollPositions: { ...s.scrollPositions, [path]: scrollTop },
   })),
+  requestScrollToBottom: (path) => set((s) => ({
+    scrollToBottomRequests: {
+      ...s.scrollToBottomRequests,
+      [path]: (s.scrollToBottomRequests[path] ?? 0) + 1,
+    },
+  })),
+  clearScrollToBottomRequest: (path, request) => set((s) => {
+    if ((s.scrollToBottomRequests[path] ?? 0) !== request) return {};
+    const scrollToBottomRequests = { ...s.scrollToBottomRequests };
+    delete scrollToBottomRequests[path];
+    return { scrollToBottomRequests };
+  }),
 });
 
 function registryFileKey(file: SessionRegistryFile): string | null {

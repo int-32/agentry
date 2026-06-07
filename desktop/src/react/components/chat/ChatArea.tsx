@@ -104,6 +104,8 @@ const Panel = memo(function Panel({ path, active }: { path: string; active: bool
   const isSessionStreaming = useStore(s => s.streamingSessions.includes(path));
   const sessionAgentId = useStore(s => s.sessions.find(se => se.path === path)?.agentId ?? null);
   const saveScrollPosition = useStore(s => s.saveScrollPosition);
+  const clearScrollToBottomRequest = useStore(s => s.clearScrollToBottomRequest);
+  const scrollToBottomRequest = useStore(s => s.scrollToBottomRequests[path] ?? 0);
   const ref = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const messageElementsRef = useRef(new Map<string, HTMLDivElement>());
@@ -111,6 +113,8 @@ const Panel = memo(function Panel({ path, active }: { path: string; active: bool
   const pendingScrollTopRef = useRef<number | null>(null);
   const restoredPathRef = useRef<string | null>(null);
   const initialSavedScrollTopRef = useRef(useStore.getState().scrollPositions[path]);
+  const initialScrollToBottomRequestRef = useRef(useStore.getState().scrollToBottomRequests[path] ?? 0);
+  const handledScrollToBottomRequestRef = useRef(0);
   const bottomScroll = useContinuousBottomScroll({
     scrollRef: ref,
     contentRef,
@@ -248,14 +252,25 @@ const Panel = memo(function Panel({ path, active }: { path: string; active: bool
     const el = ref.current;
     if (!el || !active || items.length === 0 || restoredPathRef.current === path) return;
     const savedScrollTop = initialSavedScrollTopRef.current;
-    if (typeof savedScrollTop === 'number' && Number.isFinite(savedScrollTop)) {
+    const shouldOpenAtBottom = initialScrollToBottomRequestRef.current > 0;
+    if (!shouldOpenAtBottom && typeof savedScrollTop === 'number' && Number.isFinite(savedScrollTop)) {
       el.scrollTop = savedScrollTop;
       bottomScroll.checkSticky();
     } else {
       bottomScroll.scrollToBottom({ mode: 'instant', forceSticky: true });
     }
+    handledScrollToBottomRequestRef.current = initialScrollToBottomRequestRef.current;
+    if (shouldOpenAtBottom) clearScrollToBottomRequest(path, initialScrollToBottomRequestRef.current);
     restoredPathRef.current = path;
-  }, [active, bottomScroll, items.length, path]);
+  }, [active, bottomScroll, clearScrollToBottomRequest, items.length, path]);
+
+  useLayoutEffect(() => {
+    if (!active || items.length === 0) return;
+    if (scrollToBottomRequest <= handledScrollToBottomRequestRef.current) return;
+    bottomScroll.scrollToBottom({ mode: 'instant', forceSticky: true });
+    handledScrollToBottomRequestRef.current = scrollToBottomRequest;
+    clearScrollToBottomRequest(path, scrollToBottomRequest);
+  }, [active, bottomScroll, clearScrollToBottomRequest, items.length, path, scrollToBottomRequest]);
 
   // 只有用户自己发出新消息时才恢复 sticky；assistant/tool 流式追加必须尊重用户上滑。
   const prevLen = useRef(items.length);

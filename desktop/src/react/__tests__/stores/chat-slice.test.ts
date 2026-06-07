@@ -36,6 +36,19 @@ describe('chat-slice', () => {
     expect(slice.chatSessions).toEqual({});
     expect(slice.sessionModelsByPath).toEqual({});
     expect(slice._loadMessagesVersion).toEqual({});
+    expect(slice.scrollToBottomRequests).toEqual({});
+  });
+
+  it('scroll-to-bottom 请求按 session 计数，并只清除当前请求', () => {
+    slice.requestScrollToBottom('/a');
+    slice.requestScrollToBottom('/a');
+    expect(slice.scrollToBottomRequests['/a']).toBe(2);
+
+    slice.clearScrollToBottomRequest('/a', 1);
+    expect(slice.scrollToBottomRequests['/a']).toBe(2);
+
+    slice.clearScrollToBottomRequest('/a', 2);
+    expect(slice.scrollToBottomRequests['/a']).toBeUndefined();
   });
 
   describe('updateSessionModel', () => {
@@ -116,11 +129,13 @@ describe('chat-slice', () => {
       slice.initSession('/a', [], false);
       slice.bumpLoadMessagesVersion('/a');
       slice.saveScrollPosition('/a', 128);
+      slice.requestScrollToBottom('/a');
       slice.clearSession('/a');
       expect(slice.chatSessions['/a']).toBeUndefined();
       expect(slice.sessionModelsByPath['/a']).toBeUndefined();
       expect(slice._loadMessagesVersion['/a']).toBeUndefined();
       expect(slice.scrollPositions['/a']).toBeUndefined();
+      expect(slice.scrollToBottomRequests['/a']).toBeUndefined();
     });
 
     it('只清目标 path，别的不动', () => {

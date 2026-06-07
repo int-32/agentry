@@ -262,6 +262,7 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
 
   const handleClick = useCallback(() => {
     if (editing) return;
+    useStore.getState().requestScrollToBottom(s.path);
     switchSession(s.path);
   }, [s.path, editing]);
 
